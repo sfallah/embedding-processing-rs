@@ -5,19 +5,18 @@ use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use crate::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 
 pub async fn process_document(
     ctx: Arc<ProcessingContext>,
-    embed_sender: Arc<UnboundedSender<EmbeddingsRequest>>,
+    embed_sender: Arc<mpsc::UnboundedSender<EmbeddingsRequest>>,
     url: String,
     text: Vec<u8>,
 ) -> anyhow::Result<DocumentDtoNew> {
     let splits = split_text(ctx.splitter.clone(), text).await?;
 
     let doc_id = ctx.clone().hasher.hash(&url);
-
     let mut set = JoinSet::new();
     splits
         .into_iter()
@@ -34,7 +33,7 @@ pub async fn process_document(
                     seq_id as i32,
                 )
                 .await
-                .unwrap()
+                .expect("Failed to process split")
             });
         });
 

@@ -1,12 +1,10 @@
 use crate::inference::llama_context::LlamaContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
 use std::sync::Arc;
-use tokio::sync::broadcast::Sender;
-use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
-pub async fn init() -> anyhow::Result<(Arc<UnboundedSender<EmbeddingsRequest>>, Arc<Sender<String>>, JoinHandle<()>)>
+pub async fn init() -> anyhow::Result<(Arc<mpsc::UnboundedSender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, JoinHandle<()>)>
 {
     let (embedding_sender, embedding_receiver) = mpsc::unbounded_channel::<EmbeddingsRequest>();
 
@@ -16,10 +14,10 @@ pub async fn init() -> anyhow::Result<(Arc<UnboundedSender<EmbeddingsRequest>>, 
 
     let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000));
 
-    let handle = tokio::spawn(async move {
+    let embed_handle = tokio::spawn(async move {
         async_embeddings_routine(model_instance, embedding_receiver, shutdown_receiver).await;
     });
-    let embedding_sender = Arc::new(embedding_sender);
+    let embed_sender = Arc::new(embedding_sender);
     let shutdown_sender = Arc::new(shutdown_sender);
-    Ok((embedding_sender, shutdown_sender, handle))
+    Ok((embed_sender, shutdown_sender, embed_handle))
 }

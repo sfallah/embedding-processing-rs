@@ -16,6 +16,7 @@ mod tests {
     use criterion::async_executor::AsyncExecutor;
     use fast_text_splitter::config::SplitterLiteConfig;
     use rstest::{fixture, rstest};
+    use std::ops::Deref;
     use std::sync::Arc;
     use tokio::sync::broadcast::Sender;
     use tokio::sync::mpsc::UnboundedSender;
@@ -91,25 +92,111 @@ mod tests {
         shutdown
             .send("shutdown".to_string())
             .expect("Failed to send shutdown signal");
-        handle.await?;
+        handle.await.expect("Failed to shutdown embeddings");
         Ok(())
     }
 
     #[rstest]
     #[tokio::test]
-    async fn test_splitter(#[future] ctx: Arc<ProcessingContext>) {
+    async fn test_splitter(#[future] ctx: Arc<ProcessingContext>) -> anyhow::Result<()> {
         let text = "This is a test text".to_string();
 
         let splitter = ctx.await.splitter.clone();
-        let splits = tokio::task::spawn(async move {
-            split_text(splitter, text.as_bytes().to_vec())
-                .await
-                .expect("Failed to split text")
-        })
-        .await
-        .expect("Failed to spawn task");
+        let splits = split_text(splitter, text.as_bytes().to_vec())
+            .await
+            .expect("Failed to split text");
         assert_eq!(splits.len(), 1);
         println!("{:?}", splits);
+        Ok(())
     }
 
+    #[rstest]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_summaries_process(
+        #[future] ctx: Arc<ProcessingContext>,
+        text: String,
+    ) -> anyhow::Result<()> {
+        let (embed_sender, shutdown, handle) = init().await?;
+        let ctx = ctx.await.clone();
+        let text = text.clone();
+        let embed_sender = embed_sender.clone();
+        let summaries = process_summaries(ctx, embed_sender, text, 0, 0)
+            .await
+            .expect("Failed to process summaries");
+        println!("{:?}", summaries);
+        assert_eq!(summaries.len(), 2);
+        let sum_texts = summaries
+            .iter()
+            .map(|sum| sum.text_content.clone())
+            .collect::<Vec<_>>();
+        println!("{}", sum_texts.join("\n"));
+        shutdown
+            .send("shutdown".to_string())
+            .expect("Failed to send shutdown signal");
+        handle.await.expect("Failed to shutdown embeddings");
+        Ok(())
+    }
+
+    #[rstest]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_split_process(
+        #[future] ctx: Arc<ProcessingContext>,
+        text: String,
+    ) -> anyhow::Result<()> {
+        let (embed_sender, shutdown, handle) = init().await?;
+        let ctx = ctx.await.clone();
+        let text = text.clone();
+        let embed_sender = embed_sender.clone();
+        let splitter = ctx.clone().splitter.clone();
+        let splits = split_text(splitter, text.as_bytes().to_vec())
+            .await
+            .expect("Failed to split text");
+        assert_eq!(splits.len(), 1);
+        println!("{:?}", splits);
+
+        let split = process_split(ctx, Arc::new(splits[0].clone()), embed_sender, 0, 0)
+            .await
+            .expect("Failed to process split");
+        shutdown
+            .send("shutdown".to_string())
+            .expect("Failed to send shutdown signal");
+        handle.await.expect("Failed to shutdown embeddings");
+        println!("{:?}", split);
+        Ok(())
+    }
+
+    #[rstest]
+    #[tokio::test(flavor = "multi_thread",)]
+    async fn test_document_process(
+        #[future] ctx: Arc<ProcessingContext>,
+        #[future] text_from_file: String,
+    ) -> anyhow::Result<()> {
+        let (embed_sender, shutdown, handle) = init().await?;
+        let ctx = ctx.await.clone();
+        let embed_sender = embed_sender.clone();
+        let doc = process_document(
+            ctx,
+            embed_sender,
+            "test_url".to_string(),
+            text_from_file.await.as_bytes().to_vec(),
+        )
+        .await
+        .expect("Failed to process document");
+
+        println!("{:?}", doc);
+        assert_eq!(doc.splits.len(), 11);
+
+        let sum_texts = doc
+            .splits
+            .iter()
+            .map(|split| split.text_content.clone())
+            .collect::<Vec<_>>();
+        println!("{}", sum_texts.join("\n"));
+
+        shutdown
+            .send("shutdown".to_string())
+            .expect("Failed to send shutdown signal");
+        handle.await.expect("Failed to shutdown embeddings");
+        Ok(())
+    }
 }

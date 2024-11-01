@@ -5,11 +5,10 @@ use crate::processing::splitter::split_text;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
-
+use tokio::sync::mpsc;
 pub async fn process_summaries(
     ctx: Arc<ProcessingContext>,
-    embed_sender: Arc<UnboundedSender<EmbeddingsRequest>>,
+    embed_sender: Arc<mpsc::UnboundedSender<EmbeddingsRequest>>,
     text: String,
     doc_id: u64,
     split_id: u64,

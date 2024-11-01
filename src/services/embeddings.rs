@@ -71,6 +71,7 @@ pub async fn async_embeddings_routine(
             msg = receiver.recv() => {
                 match msg {
                     Some(request) => {
+                        eprintln!("Received embeddings request");
                         let ctx = Arc::clone(&ctx);
                         let req = request.clone();
                         let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings_flat(&req.texts)).await {
@@ -85,6 +86,7 @@ pub async fn async_embeddings_routine(
                         if let Err(e) = send_res {
                             eprintln!("Failed to send embeddings response: {:?}", e);
                         }
+                        eprintln!("Sent embeddings response");
                     },
                     None => {
                         eprintln!("Failed to receive embeddings request");
@@ -116,5 +118,6 @@ pub async fn async_get_embeddings(
     let res = rep_receiver
         .recv()
         .expect("Failed to receive embeddings response");
+    eprintln!("Received embeddings response");
     Ok(res.embeddings.clone())
 }
