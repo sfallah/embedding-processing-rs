@@ -62,21 +62,22 @@ pub async fn async_embeddings_routine(
 ) {
     eprintln!("Starting embeddings routine");
     loop {
+        eprintln!("Waiting for requests.....");
         tokio::select! {
             _ = shutdown.recv() => {
                 eprintln!("Shutting down embeddings routine");
-                return;
+                break;
             }
             msg = receiver.recv() => {
                 match msg {
                     Some(request) => {
                         let ctx = Arc::clone(&ctx);
                         let req = request.clone();
-                        let embeddings = match tokio::spawn(async move { ctx.get_embeddings_flat(&req.texts) }).await {
+                        let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings_flat(&req.texts)).await {
                             Ok(embedding) => embedding,
                             Err(_) => {
                                 eprintln!("Failed to get embeddings");
-                            return;
+                            continue;
                             }
                         };
                         let response = EmbeddingsResponse::new(&request, embeddings);
@@ -87,7 +88,7 @@ pub async fn async_embeddings_routine(
                     },
                     None => {
                         eprintln!("Failed to receive embeddings request");
-                    return;
+                        continue;
                     }
                 }
             }

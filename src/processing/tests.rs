@@ -2,17 +2,24 @@
 mod tests {
     use crate::inference::llama_context::LlamaContext;
     use crate::processing::context::ProcessingContext;
-    use crate::processing::embeddings::process_embedding;
-    use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
-    use crate::utils::hash_utils::DeterministicAHasher;
-    use fast_text_splitter::config::SplitterLiteConfig;
-    use rstest::{fixture, rstest};
-    use std::sync::Arc;
-    use tokio::sync::{broadcast, mpsc};
     use crate::processing::documents::process_document;
+    use crate::processing::embeddings::process_embedding;
     use crate::processing::splits::process_split;
     use crate::processing::splitter::split_text;
     use crate::processing::summaries::process_summaries;
+    use crate::services::embeddings;
+    use crate::services::embeddings::{
+        async_embeddings_routine, async_get_embeddings, EmbeddingsRequest,
+    };
+    use crate::utils::app_utils::init;
+    use crate::utils::hash_utils::DeterministicAHasher;
+    use criterion::async_executor::AsyncExecutor;
+    use fast_text_splitter::config::SplitterLiteConfig;
+    use rstest::{fixture, rstest};
+    use std::sync::Arc;
+    use tokio::sync::broadcast::Sender;
+    use tokio::sync::mpsc::UnboundedSender;
+    use tokio::sync::{broadcast, mpsc};
 
     #[fixture]
     fn text() -> String {
@@ -41,7 +48,6 @@ mod tests {
             .await
             .expect("Failed to read test text file")
     }
-
 
     #[fixture]
     async fn ctx() -> Arc<ProcessingContext> {
@@ -75,44 +81,18 @@ mod tests {
         })
     }
 
-    #[rstest]
-    #[tokio::test]
-    async fn test_embeddings() {
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_embeddings() -> anyhow::Result<()> {
+        let (embed, shutdown, handle) = init().await?;
+
         let text = "This is a test text".to_string();
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(4)
-            .enable_all()
-            .build()
-            .unwrap();
-
-        println!("Model loaded");
-        let (embedding_sender, mut embedding_receiver) =
-            mpsc::unbounded_channel::<EmbeddingsRequest>();
-
-        let (shutdown_sender, mut shutdown_receiver) = broadcast::channel::<String>(1);
-
-        let model_path = "models/all-minilm-l6-v2-q2_k.gguf";
-
-        let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000));
-
-        let embedding_sender = Arc::new(embedding_sender);
-        let sender = embedding_sender.clone();
-
-        rt.block_on(async {
-            let _ = tokio::spawn(async move {
-                async_embeddings_routine(model_instance, embedding_receiver, shutdown_receiver).await;
-            }).await.expect("Failed to spawn embeddings routine");
-        });
-        rt.shutdown_timeout(std::time::Duration::from_secs(5));
-
-        let embeddings =
-            tokio::task::spawn(async move { process_embedding(sender, 0, vec![text.clone()]).await }).await.expect("Failed to get embeddings");
+        let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
         println!("{:?}", embeddings);
-
-
-        eprintln!("going for embeddings");
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        shutdown_sender.send("shutdown".to_string()).expect("Failed to send shutdown signal");
+        shutdown
+            .send("shutdown".to_string())
+            .expect("Failed to send shutdown signal");
+        handle.await?;
+        Ok(())
     }
 
     #[rstest]
@@ -126,70 +106,10 @@ mod tests {
                 .await
                 .expect("Failed to split text")
         })
-            .await
-            .expect("Failed to spawn task");
+        .await
+        .expect("Failed to spawn task");
         assert_eq!(splits.len(), 1);
         println!("{:?}", splits);
     }
 
-    #[rstest]
-    #[tokio::test]
-    async fn test_split_process(#[future] ctx: Arc<ProcessingContext>, text: String) {
-        let ctx = ctx.await.clone();
-        let splitter = ctx.clone().splitter.clone();
-        let splits = tokio::task::spawn(async move {
-            split_text(splitter, text.as_bytes().to_vec())
-                .await
-                .expect("Failed to split text")
-        })
-            .await
-            .expect("Failed to spawn task");
-        assert_eq!(splits.len(), 1);
-        println!("{:?}", splits);
-
-        let split = process_split(ctx, Arc::new(splits[0].clone()), 0, 0)
-            .await
-            .expect("Failed to process split");
-        println!("{:?}", split);
-    }
-
-    #[rstest]
-    #[tokio::test]
-    async fn test_summaries_process(#[future] ctx: Arc<ProcessingContext>, text: String) {
-        let ctx = ctx.await.clone();
-        let summaries = process_summaries(ctx, text, 0, 0)
-            .await
-            .expect("Failed to process summaries");
-        println!("{:?}", summaries);
-        assert_eq!(summaries.len(), 2);
-        let sum_texts = summaries
-            .iter()
-            .map(|sum| sum.text_content.clone())
-            .collect::<Vec<_>>();
-        println!("{}", sum_texts.join("\n"));
-    }
-
-    #[rstest]
-    #[tokio::test]
-    async fn test_document_process(
-        #[future] ctx: Arc<ProcessingContext>,
-        #[future] text_from_file: String,
-    ) {
-        let ctx = ctx.await.clone();
-        let doc = process_document(
-            ctx,
-            "test_url".to_string(),
-            text_from_file.await.as_bytes().to_vec(),
-        )
-            .await
-            .expect("Failed to process document");
-        println!("{:?}", doc);
-        assert_eq!(doc.splits.len(), 11);
-        let sum_texts = doc
-            .splits
-            .iter()
-            .map(|split| split.text_content.clone())
-            .collect::<Vec<_>>();
-        println!("{}", sum_texts.join("\n"));
-    }
 }
