@@ -1,4 +1,3 @@
-
 /// represents an individual embedding with metadata.
 #[derive(Clone, Debug)]
 pub struct EmbeddingNewDto {

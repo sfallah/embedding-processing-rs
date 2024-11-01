@@ -2,12 +2,14 @@ use crate::dtos::embedding_new::EmbeddingNewDto;
 use crate::dtos::summary_new::SummaryDtoNew;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
-use crate::services::embeddings::async_get_embeddings;
+use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
+use tokio::sync::mpsc::UnboundedSender;
 
 pub async fn process_summaries(
     ctx: Arc<ProcessingContext>,
+    embed_sender: Arc<UnboundedSender<EmbeddingsRequest>>,
     text: String,
     doc_id: u64,
     split_id: u64,
@@ -16,10 +18,10 @@ pub async fn process_summaries(
     let splits: Vec<_> = filter_splits(&splits, 4);
     let sentences: Vec<_> = splits_texts(&splits);
 
-    let embeddings =
-        async_get_embeddings(ctx.embeddings_sender.clone(), &sentences, ctx.n_embd).await?;
+    let embeddings = async_get_embeddings(embed_sender.clone(), &sentences, ctx.n_embd).await?;
 
-    let lx_ranks = lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None).await?;
+    let lx_ranks =
+        lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None).await?;
     let no_tokens = tokens_num(splits);
 
     let summaries: Vec<_> = lx_ranks
@@ -86,7 +88,7 @@ async fn lexrank_sentences(
     threshold: Option<f32>,
     max_iter: Option<usize>,
 ) -> anyhow::Result<Vec<(usize, f32)>> {
-    async_std::task::spawn(async move {
+    tokio::spawn(async move {
         lexrank_ndarray::lexrank_array(
             &embeddings,
             len,
@@ -95,5 +97,5 @@ async fn lexrank_sentences(
             max_iter.unwrap_or(10000),
         )
     })
-    .await
+    .await?
 }

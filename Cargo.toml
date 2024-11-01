@@ -8,7 +8,7 @@ anyhow = "1.0.82"
 ahash = "0.8.11"
 chrono = "0.4.38"
 cxx = "1.0.128"
-async-std = { version = "1.13.0", features = ["attributes"] }
+tokio = { version = "1.41.0", features = ["full"] }
 
 fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }
 hnswlib-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/hnswlib-rs", branch = "main" }
@@ -18,7 +18,8 @@ llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git
 [dev-dependencies]
 rstest = "0.23.0"
 tempfile = "3.10.1"
-criterion = { version = "0.5.1", default-features = false, features = ["async_std"] }
+criterion = { version = "0.5.1", features = ["async_tokio"] }
+tokio = { version = "1.41.0", features = ["full", "test-util"] }
 
 [[bench]]
 name = "benchmarks"

@@ -12,17 +12,21 @@ use embedding_processing_rs::utils::hash_utils::DeterministicAHasher;
 
 pub fn process_doc(c: &mut Criterion, doc: String, proc_ctx: Arc<ProcessingContext>) {
     c.bench_function("embeddings_splits_batch", |b| {
-        b.to_async(AsyncStdExecutor).iter(|| process_document(proc_ctx.clone(), "url".to_string(), doc.clone().into_bytes()));
+        b.to_async(AsyncStdExecutor).iter(|| {
+            process_document(
+                proc_ctx.clone(),
+                "url".to_string(),
+                doc.clone().into_bytes(),
+            )
+        });
     });
 }
-
 
 pub fn benches() {
     let mut criterion: Criterion<_> = Criterion::default()
         .sample_size(10)
         .measurement_time(std::time::Duration::from_secs(20))
         .configure_from_args();
-
 
     let splitter_patterns = vec![
         vec!["\n\n".to_string()],

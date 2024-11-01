@@ -7,6 +7,6 @@ pub async fn split_text(
     splitter: Arc<SplitterLiteConfig<HFTokenizer>>,
     text: Vec<u8>,
 ) -> anyhow::Result<Vec<SplitResultLite>> {
-    let splits = async_std::task::spawn(async move { splitter.hf_splits(text.as_slice()) }).await;
+    let splits = tokio::spawn(async move { splitter.hf_splits(text.as_slice()) }).await?;
     Ok(splits)
 }
