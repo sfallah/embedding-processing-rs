@@ -1,12 +1,10 @@
 use crate::dtos::document_new::DocumentDtoNew;
-use crate::dtos::split_new::SplitDtoNew;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use crate::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tokio::task::JoinSet;
 
 pub async fn process_document(
     ctx: Arc<ProcessingContext>,
@@ -16,28 +14,14 @@ pub async fn process_document(
 ) -> anyhow::Result<DocumentDtoNew> {
     let splits = split_text(ctx.splitter.clone(), text).await?;
 
+    let mut split_dtos: Vec<_> = Vec::new();
     let doc_id = ctx.clone().hasher.hash(&url);
-    let mut set = JoinSet::new();
-    splits
-        .into_iter()
-        .enumerate()
-        .for_each(|(seq_id, split_res)| {
-            let ctx_clone = ctx.clone();
-            let embed_sender = embed_sender.clone();
-            set.spawn(async move {
-                process_split(
-                    ctx_clone,
-                    Arc::from(split_res.clone()),
-                    embed_sender,
-                    doc_id,
-                    seq_id as i32,
-                )
-                .await
-                .expect("Failed to process split")
-            });
-        });
 
-    let split_dtos: Vec<SplitDtoNew> = set.join_all().await;
+    for (seq_id, split) in splits.iter().enumerate() {
+        let split_dto = process_split(ctx.clone(), Arc::from(split.clone()), embed_sender.clone(), doc_id, seq_id as i32).await?;
+        split_dtos.push(split_dto);
+    }
+
 
     let summaries: Vec<_> = split_dtos
         .iter()

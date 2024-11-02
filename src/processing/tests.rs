@@ -1,26 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use crate::inference::llama_context::LlamaContext;
     use crate::processing::context::ProcessingContext;
     use crate::processing::documents::process_document;
-    use crate::processing::embeddings::process_embedding;
     use crate::processing::splits::process_split;
     use crate::processing::splitter::split_text;
     use crate::processing::summaries::process_summaries;
-    use crate::services::embeddings;
-    use crate::services::embeddings::{
-        async_embeddings_routine, async_get_embeddings, EmbeddingsRequest,
-    };
-    use crate::utils::app_utils::init;
-    use crate::utils::hash_utils::DeterministicAHasher;
-    use criterion::async_executor::AsyncExecutor;
-    use fast_text_splitter::config::SplitterLiteConfig;
+    use crate::services::embeddings::async_get_embeddings;
+    use crate::utils::app_utils::{init, init_ctx};
     use rstest::{fixture, rstest};
-    use std::ops::Deref;
     use std::sync::Arc;
-    use tokio::sync::broadcast::Sender;
-    use tokio::sync::mpsc::UnboundedSender;
-    use tokio::sync::{broadcast, mpsc};
 
     #[fixture]
     fn text() -> String {
@@ -52,34 +40,7 @@ mod tests {
 
     #[fixture]
     async fn ctx() -> Arc<ProcessingContext> {
-        let splitter_patterns = vec![
-            vec!["\n\n".to_string()],
-            vec!["\n".to_string()],
-            vec![
-                ".".to_string(),
-                "!".to_string(),
-                "?".to_string(),
-                ". ".to_string(),
-            ],
-        ];
-        let nw_splitter =
-            SplitterLiteConfig::new_hf(splitter_patterns.clone(), Some(512), None, true, None);
-
-        let sentence_splitter = SplitterLiteConfig::new_hf(
-            splitter_patterns.clone(),
-            Some(512),
-            Some(splitter_patterns.len()),
-            true,
-            None,
-        );
-
-        let haser = DeterministicAHasher::new(None, None);
-        Arc::new(ProcessingContext {
-            splitter: Arc::new(nw_splitter),
-            sentence_splitter: Arc::new(sentence_splitter),
-            hasher: Arc::new(haser),
-            n_embd: 384,
-        })
+        init_ctx().await
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -166,7 +127,7 @@ mod tests {
     }
 
     #[rstest]
-    #[tokio::test(flavor = "multi_thread",)]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_document_process(
         #[future] ctx: Arc<ProcessingContext>,
         #[future] text_from_file: String,
@@ -180,18 +141,17 @@ mod tests {
             "test_url".to_string(),
             text_from_file.await.as_bytes().to_vec(),
         )
-        .await
-        .expect("Failed to process document");
+            .await
+            .expect("Failed to process document");
 
-        println!("{:?}", doc);
         assert_eq!(doc.splits.len(), 11);
 
-        let sum_texts = doc
+        let _sum_texts = doc
             .splits
             .iter()
             .map(|split| split.text_content.clone())
             .collect::<Vec<_>>();
-        println!("{}", sum_texts.join("\n"));
+        //println!("{}", sum_texts.join("\n"));
 
         shutdown
             .send("shutdown".to_string())
