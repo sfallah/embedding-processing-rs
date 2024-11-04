@@ -1,6 +1,6 @@
 use crate::inference::llama_context::LlamaContext;
-use std::sync::mpsc::Sender;
 use std::sync::Arc;
+use std::sync::mpsc::SyncSender;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::UnboundedReceiver;
 
@@ -9,14 +9,14 @@ pub struct EmbeddingsRequest {
     pub seq_id: usize,
     pub n_embd: usize,
     pub texts: Vec<String>,
-    pub sender: Arc<Sender<EmbeddingsResponse>>,
+    pub sender: Arc<SyncSender<EmbeddingsResponse>>,
 }
 impl EmbeddingsRequest {
     pub fn new(
         seq_id: usize,
         n_embd: usize,
         texts: Vec<String>,
-        sender: Arc<Sender<EmbeddingsResponse>>,
+        sender: Arc<SyncSender<EmbeddingsResponse>>,
     ) -> Self {
         EmbeddingsRequest {
             seq_id,
@@ -82,9 +82,9 @@ pub async fn async_embeddings_routine(
                             }
                         };
                         let response = EmbeddingsResponse::new(&request, embeddings);
-                        let send_res = request.sender.send(response);
-                        if let Err(e) = send_res {
+                        if let Err(e) = tokio::task::spawn_blocking(move || request.sender.send(response)).await {
                             eprintln!("Failed to send embeddings response: {:?}", e);
+                            continue;
                         }
                         //eprintln!("Sent embeddings response");
                     },
@@ -104,7 +104,7 @@ pub async fn async_get_embeddings(
     texts: &Vec<String>,
     n_embd: usize,
 ) -> anyhow::Result<Vec<f32>> {
-    let (rep_sender, rep_receiver) = std::sync::mpsc::channel();
+    let (rep_sender, rep_receiver) = std::sync::mpsc::sync_channel::<EmbeddingsResponse>(1);
     let rep_sender = Arc::new(rep_sender);
     let embd_request = EmbeddingsRequest::new(0, n_embd, texts.clone(), rep_sender.clone());
     if let Err(e) = req_sender.clone().send(embd_request) {
@@ -115,9 +115,22 @@ pub async fn async_get_embeddings(
         ));
     }
     //eprintln!("Sent embeddings request");
-    let res = rep_receiver
-        .recv()
-        .expect("Failed to receive embeddings response");
-    //eprintln!("Received embeddings response");
-    Ok(res.embeddings.clone())
+    match tokio::task::spawn_blocking(move || rep_receiver.recv()).await {
+        Ok(Ok(res)) => Ok(res.embeddings.clone()),
+        Ok(Err(e)) => {
+            eprintln!("Failed to receive embeddings response: {:?}", e);
+            Err(anyhow::anyhow!(
+                "Failed to receive embeddings response: {:?}",
+                e
+            ))
+        }
+        Err(e) => {
+            eprintln!("Failed to receive embeddings response: {:?}", e);
+            Err(anyhow::anyhow!(
+                "Failed to receive embeddings response: {:?}",
+                e
+            ))
+        }
+    }
+
 }
