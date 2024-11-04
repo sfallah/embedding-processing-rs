@@ -6,7 +6,9 @@ use embedding_processing_rs::utils::app_utils::init_ctx;
 #[tokio::main]
 async fn main() {
     //run_embeddings().await.unwrap();
+    let t_start = std::time::Instant::now();
     run_doc_processing().await.unwrap();
+    println!("Elapsed: {:?}", t_start.elapsed().as_millis());
 }
 
 async fn run_doc_processing() -> anyhow::Result<()> {

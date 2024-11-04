@@ -16,10 +16,20 @@ pub async fn process_document(
     let mut split_dtos: Vec<_> = Vec::new();
     let doc_id = ctx.clone().hasher.hash(&url);
 
+    let mut handles = Vec::new();
+
     for (seq_id, split) in splits.iter().enumerate() {
-        let split_dto = process_split(ctx.clone(), Arc::from(split.clone()), embed_sender.clone(), doc_id, seq_id as i32).await?;
-        split_dtos.push(split_dto);
+        let split = Arc::new(split.clone());
+        let ctx = ctx.clone();
+        let embed_sender = embed_sender.clone();
+        let handle = tokio::spawn(async move {
+            process_split(ctx.clone(), split, embed_sender, doc_id, seq_id as i32).await.expect("Failed to process split")
+        });
+        handles.push(handle);
     }
+    futures::future::join_all(handles.into_iter()).await.into_iter().for_each(|res| {
+        split_dtos.push(res.expect("Failed to process split"));
+    });
 
 
     let summaries: Vec<_> = split_dtos
