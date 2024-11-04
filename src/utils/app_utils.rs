@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use crate::inference::llama_context::LlamaContext;
 use crate::processing::context::ProcessingContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
@@ -7,22 +8,28 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
-pub async fn init() -> anyhow::Result<(Arc<async_channel::Sender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, JoinHandle<()>)>
+pub async fn init(embed_workers: usize) -> anyhow::Result<(Arc<async_channel::Sender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, Vec<JoinHandle<()>>)>
 {
     let (embedding_sender, embedding_receiver) = async_channel::unbounded::<EmbeddingsRequest>();
 
     let (shutdown_sender, shutdown_receiver) = broadcast::channel::<String>(1);
+    let shutdown_receiver = Arc::new(shutdown_receiver);
+    let shutdown_sender = Arc::new(shutdown_sender);
 
     let model_path = "models/all-minilm-l6-v2-q2_k.gguf";
 
-    let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000));
-
-    let embed_handle = tokio::spawn(async move {
-        async_embeddings_routine(model_instance, embedding_receiver, shutdown_receiver).await;
-    });
+    let mut embed_handles = Vec::new();
+    for _ in 0..embed_workers {
+        let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000));
+        let embedding_receiver = embedding_receiver.clone();
+        let shutdown_receiver = shutdown_receiver.clone();
+        let embed_handle = tokio::spawn( async move {
+                async_embeddings_routine(model_instance, embedding_receiver, shutdown_receiver.deref().resubscribe()).await;
+        });
+        embed_handles.push(embed_handle);
+    }
     let embed_sender = Arc::new(embedding_sender);
-    let shutdown_sender = Arc::new(shutdown_sender);
-    Ok((embed_sender, shutdown_sender, embed_handle))
+    Ok((embed_sender, shutdown_sender, embed_handles))
 }
 
 pub async fn init_ctx() -> Arc<ProcessingContext> {

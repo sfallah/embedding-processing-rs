@@ -45,7 +45,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_embeddings() -> anyhow::Result<()> {
-        let (embed, shutdown, handle) = init().await?;
+        let (embed, shutdown, handles) = init(1).await?;
 
         let text = "This is a test text".to_string();
         let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
@@ -53,7 +53,7 @@ mod tests {
         shutdown
             .send("shutdown".to_string())
             .expect("Failed to send shutdown signal");
-        handle.await.expect("Failed to shutdown embeddings");
+        futures::future::join_all(handles.into_iter()).await;
         Ok(())
     }
 
@@ -77,7 +77,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         text: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handle) = init().await?;
+        let (embed_sender, shutdown, handles) = init(1).await?;
         let ctx = ctx.await.clone();
         let text = text.clone();
         let embed_sender = embed_sender.clone();
@@ -94,7 +94,9 @@ mod tests {
         shutdown
             .send("shutdown".to_string())
             .expect("Failed to send shutdown signal");
-        handle.await.expect("Failed to shutdown embeddings");
+
+        futures::future::join_all(handles.into_iter()).await;
+
         Ok(())
     }
 
@@ -104,7 +106,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         text: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handle) = init().await?;
+        let (embed_sender, shutdown, handles) = init(2).await?;
         let ctx = ctx.await.clone();
         let text = text.clone();
         let embed_sender = embed_sender.clone();
@@ -121,7 +123,7 @@ mod tests {
         shutdown
             .send("shutdown".to_string())
             .expect("Failed to send shutdown signal");
-        handle.await.expect("Failed to shutdown embeddings");
+        futures::future::join_all(handles.into_iter()).await;
         println!("{:?}", split);
         Ok(())
     }
@@ -132,7 +134,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         #[future] text_from_file: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handle) = init().await?;
+        let (embed_sender, shutdown, handles) = init(4).await?;
         let ctx = ctx.await.clone();
         let embed_sender = embed_sender.clone();
         let doc = process_document(
@@ -157,7 +159,7 @@ mod tests {
         shutdown
             .send("shutdown".to_string())
             .expect("Failed to send shutdown signal");
-        handle.await.expect("Failed to shutdown embeddings");
+        futures::future::join_all(handles.into_iter()).await;
         Ok(())
     }
 }
