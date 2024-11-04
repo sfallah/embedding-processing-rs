@@ -1,22 +1,22 @@
 use crate::inference::llama_context::LlamaContext;
 use std::sync::Arc;
-use std::sync::mpsc::SyncSender;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::oneshot::Sender;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EmbeddingsRequest {
     pub seq_id: usize,
     pub n_embd: usize,
     pub texts: Vec<String>,
-    pub sender: Arc<SyncSender<EmbeddingsResponse>>,
+    pub sender: Sender<EmbeddingsResponse>,
 }
 impl EmbeddingsRequest {
     pub fn new(
         seq_id: usize,
         n_embd: usize,
         texts: Vec<String>,
-        sender: Arc<SyncSender<EmbeddingsResponse>>,
+        sender: Sender<EmbeddingsResponse>,
     ) -> Self {
         EmbeddingsRequest {
             seq_id,
@@ -37,10 +37,10 @@ pub struct EmbeddingsResponse {
     pub embeddings: Vec<f32>,
 }
 impl EmbeddingsResponse {
-    pub fn new(request: &EmbeddingsRequest, embeddings: Vec<f32>) -> Self {
+    pub fn new(seq_id: usize, n_embd:usize, embeddings: Vec<f32>) -> Self {
         EmbeddingsResponse {
-            seq_id: request.seq_id,
-            n_embd: request.n_embd,
+            seq_id,
+            n_embd,
             embeddings,
         }
     }
@@ -70,19 +70,18 @@ pub async fn async_embeddings_routine(
             }
             msg = receiver.recv() => {
                 match msg {
-                    Some(request) => {
+                    Some(EmbeddingsRequest {seq_id,n_embd, texts, sender}) => {
                         //eprintln!("Received embeddings request");
                         let ctx = Arc::clone(&ctx);
-                        let req = request.clone();
-                        let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings_flat(&req.texts)).await {
+                        let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings_flat(&texts)).await {
                             Ok(embedding) => embedding,
                             Err(_) => {
                                 eprintln!("Failed to get embeddings");
                             continue;
                             }
                         };
-                        let response = EmbeddingsResponse::new(&request, embeddings);
-                        if let Err(e) = tokio::task::spawn_blocking(move || request.sender.send(response)).await {
+                        let response = EmbeddingsResponse::new(seq_id,n_embd, embeddings);
+                        if let Err(e) = tokio::task::spawn_blocking(move || sender.send(response)).await {
                             eprintln!("Failed to send embeddings response: {:?}", e);
                             continue;
                         }
@@ -104,26 +103,17 @@ pub async fn async_get_embeddings(
     texts: &Vec<String>,
     n_embd: usize,
 ) -> anyhow::Result<Vec<f32>> {
-    let (rep_sender, rep_receiver) = std::sync::mpsc::sync_channel::<EmbeddingsResponse>(1);
-    let rep_sender = Arc::new(rep_sender);
-    let embd_request = EmbeddingsRequest::new(0, n_embd, texts.clone(), rep_sender.clone());
-    if let Err(e) = req_sender.clone().send(embd_request) {
+    let (rep_sender, rep_receiver) = tokio::sync::oneshot::channel::<EmbeddingsResponse>();
+    let embd_request = EmbeddingsRequest::new(0, n_embd, texts.clone(), rep_sender);
+    if let Err(e) = req_sender.send(embd_request) {
         eprintln!("Failed to send embeddings request: {:?}", e);
         return Err(anyhow::anyhow!(
             "Failed to send embeddings request: {:?}",
             e
         ));
     }
-    //eprintln!("Sent embeddings request");
-    match tokio::task::spawn_blocking(move || rep_receiver.recv()).await {
-        Ok(Ok(res)) => Ok(res.embeddings.clone()),
-        Ok(Err(e)) => {
-            eprintln!("Failed to receive embeddings response: {:?}", e);
-            Err(anyhow::anyhow!(
-                "Failed to receive embeddings response: {:?}",
-                e
-            ))
-        }
+    match rep_receiver.await {
+        Ok(res) => Ok(res.embeddings.clone()),
         Err(e) => {
             eprintln!("Failed to receive embeddings response: {:?}", e);
             Err(anyhow::anyhow!(
@@ -132,5 +122,4 @@ pub async fn async_get_embeddings(
             ))
         }
     }
-
 }
