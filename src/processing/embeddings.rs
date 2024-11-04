@@ -1,10 +1,10 @@
 use crate::dtos::embedding_new::EmbeddingNewDto;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
+use async_channel::Sender;
 
 pub async fn process_embedding(
-    sender: Arc<UnboundedSender<EmbeddingsRequest>>,
+    sender: Arc<Sender<EmbeddingsRequest>>,
     embed_id: u64,
     sentences: Vec<String>,
 ) -> anyhow::Result<EmbeddingNewDto> {

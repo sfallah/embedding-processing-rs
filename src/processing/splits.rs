@@ -5,12 +5,11 @@ use crate::processing::summaries::process_summaries;
 use crate::services::embeddings::EmbeddingsRequest;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
 pub async fn process_split(
     ctx: Arc<ProcessingContext>,
     split_res: Arc<SplitResultLite>,
-    embed_sender: Arc<mpsc::UnboundedSender<EmbeddingsRequest>>,
+    embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
     doc_id: u64,
     seq_id: i32,
 ) -> anyhow::Result<SplitDtoNew> {

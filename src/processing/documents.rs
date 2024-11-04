@@ -4,11 +4,10 @@ use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use crate::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
 pub async fn process_document(
     ctx: Arc<ProcessingContext>,
-    embed_sender: Arc<mpsc::UnboundedSender<EmbeddingsRequest>>,
+    embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
     url: String,
     text: Vec<u8>,
 ) -> anyhow::Result<DocumentDtoNew> {

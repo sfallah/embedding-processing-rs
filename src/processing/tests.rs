@@ -145,6 +145,7 @@ mod tests {
             .expect("Failed to process document");
 
         assert_eq!(doc.splits.len(), 11);
+        println!("{:?}", doc);
 
         let _sum_texts = doc
             .splits

@@ -1,7 +1,6 @@
 use crate::inference::llama_context::LlamaContext;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
-use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::oneshot::Sender;
 
 #[derive(Debug)]
@@ -57,7 +56,7 @@ unsafe impl Send for EmbeddingsResponse {}
 
 pub async fn async_embeddings_routine(
     ctx: Arc<LlamaContext>,
-    mut receiver: UnboundedReceiver<EmbeddingsRequest>,
+    receiver: async_channel::Receiver<EmbeddingsRequest>,
     mut shutdown: Receiver<String>,
 ) {
     eprintln!("Starting embeddings routine");
@@ -70,7 +69,7 @@ pub async fn async_embeddings_routine(
             }
             msg = receiver.recv() => {
                 match msg {
-                    Some(EmbeddingsRequest {seq_id,n_embd, texts, sender}) => {
+                    Ok(EmbeddingsRequest {seq_id,n_embd, texts, sender}) => {
                         //eprintln!("Received embeddings request");
                         let ctx = Arc::clone(&ctx);
                         let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings_flat(&texts)).await {
@@ -87,8 +86,8 @@ pub async fn async_embeddings_routine(
                         }
                         //eprintln!("Sent embeddings response");
                     },
-                    None => {
-                        eprintln!("Failed to receive embeddings request");
+                    Err(e) => {
+                        eprintln!("Failed to receive embeddings request: {:?}", e);
                         continue;
                     }
                 }
@@ -99,13 +98,13 @@ pub async fn async_embeddings_routine(
 }
 
 pub async fn async_get_embeddings(
-    req_sender: Arc<tokio::sync::mpsc::UnboundedSender<EmbeddingsRequest>>,
+    req_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
     texts: &Vec<String>,
     n_embd: usize,
 ) -> anyhow::Result<Vec<f32>> {
     let (rep_sender, rep_receiver) = tokio::sync::oneshot::channel::<EmbeddingsResponse>();
     let embd_request = EmbeddingsRequest::new(0, n_embd, texts.clone(), rep_sender);
-    if let Err(e) = req_sender.send(embd_request) {
+    if let Err(e) = req_sender.send(embd_request).await {
         eprintln!("Failed to send embeddings request: {:?}", e);
         return Err(anyhow::anyhow!(
             "Failed to send embeddings request: {:?}",

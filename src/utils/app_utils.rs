@@ -1,15 +1,15 @@
 use crate::inference::llama_context::LlamaContext;
-use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
-use std::sync::Arc;
-use fast_text_splitter::config::SplitterLiteConfig;
-use tokio::sync::{broadcast, mpsc};
-use tokio::task::JoinHandle;
 use crate::processing::context::ProcessingContext;
+use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
 use crate::utils::hash_utils::DeterministicAHasher;
+use fast_text_splitter::config::SplitterLiteConfig;
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use tokio::task::JoinHandle;
 
-pub async fn init() -> anyhow::Result<(Arc<mpsc::UnboundedSender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, JoinHandle<()>)>
+pub async fn init() -> anyhow::Result<(Arc<async_channel::Sender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, JoinHandle<()>)>
 {
-    let (embedding_sender, embedding_receiver) = mpsc::unbounded_channel::<EmbeddingsRequest>();
+    let (embedding_sender, embedding_receiver) = async_channel::unbounded::<EmbeddingsRequest>();
 
     let (shutdown_sender, shutdown_receiver) = broadcast::channel::<String>(1);
 
