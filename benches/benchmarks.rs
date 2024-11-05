@@ -7,7 +7,7 @@ pub fn process_doc(c: &mut Criterion, doc: String) {
 
     c.bench_function("embeddings_splits_batch", |b| {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let (embed_sender, _shutdown, _handle) = rt.block_on(init(4)).unwrap();
+        let (embed_sender, _shutdown, _handle) = rt.block_on(init(2)).unwrap();
         let proc_ctx = rt.block_on(init_ctx());
         b.to_async(rt).iter(|| {
             process_document(
