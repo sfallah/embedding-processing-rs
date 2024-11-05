@@ -4,7 +4,9 @@ use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use crate::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
+use tracing::trace;
 
+#[tracing::instrument(skip(ctx, embed_sender, text))]
 pub async fn process_document(
     ctx: Arc<ProcessingContext>,
     embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
@@ -15,6 +17,7 @@ pub async fn process_document(
 
     let mut split_dtos: Vec<_> = Vec::new();
     let doc_id = ctx.clone().hasher.hash(&url);
+    trace!("Document ID: {}", doc_id);
 
     let mut handles = Vec::new();
 

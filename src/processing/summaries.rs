@@ -5,6 +5,9 @@ use crate::processing::splitter::split_text;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
+use tracing::{debug, trace};
+
+#[tracing::instrument(skip(ctx, embed_sender, text))]
 pub async fn process_summaries(
     ctx: Arc<ProcessingContext>,
     embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
@@ -12,9 +15,11 @@ pub async fn process_summaries(
     doc_id: u64,
     split_id: u64,
 ) -> anyhow::Result<Vec<SummaryDto>> {
+    debug!("Processing summaries...");
     let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes()).await?;
     let splits: Vec<_> = filter_splits(&splits, 4);
     let sentences: Vec<_> = splits_texts(&splits);
+    debug!("Number of sentences: {}", sentences.len());
 
     let embeddings = async_get_embeddings(embed_sender.clone(), &sentences, ctx.n_embd).await?;
 
@@ -79,6 +84,7 @@ fn filter_splits(splits: &Vec<SplitResultLite>, ln: usize) -> Vec<SplitResultLit
         .collect()
 }
 
+#[tracing::instrument]
 async fn lexrank_sentences(
     embeddings: Vec<f32>,
     len: usize,
@@ -95,5 +101,5 @@ async fn lexrank_sentences(
             max_iter.unwrap_or(10000),
         )
     })
-    .await?
+        .await?
 }

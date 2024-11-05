@@ -1,23 +1,34 @@
+use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
 use embedding_processing_rs::processing::documents::process_document;
 use embedding_processing_rs::services::embeddings::async_get_embeddings;
 use embedding_processing_rs::utils::app_utils;
-use embedding_processing_rs::utils::app_utils::init_ctx;
+use embedding_processing_rs::utils::app_utils::{init_ctx, setup_tracing};
+use tracing::Instrument;
+
 
 #[tokio::main]
 async fn main() {
     //run_embeddings().await.unwrap();
-    let t_start = std::time::Instant::now();
-    run_doc_processing().await.unwrap();
-    println!("Elapsed: {:?}", t_start.elapsed().as_millis());
+
+    setup_tracing(Level::INFO);
+
+    info!("Starting up");
+
+    run_doc_processing().instrument(tracing::info_span!("run_doc_processing")).await.unwrap();
+    info!("Shutting down");
 }
 
+
+
+#[tracing::instrument]
 async fn run_doc_processing() -> anyhow::Result<()> {
-    let (embed, shutdown,handles) = app_utils::init(2).await?;
+    let (embed, shutdown, handles) = app_utils::init(2).await?;
     let ctx = init_ctx().await;
     let file = "tests/test_data/superlinear.txt";
     let doc = tokio::fs::read_to_string(file).await?;
     let res = process_document(ctx.clone(), embed.clone(), file.to_string(), doc.into_bytes().to_vec()).await?;
-    println!("{:?}", res);
+    //println!("{:?}", res);
     shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles.into_iter()).await;
     Ok(())

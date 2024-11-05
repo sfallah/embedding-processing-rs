@@ -7,6 +7,8 @@ use fast_text_splitter::config::SplitterLiteConfig;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 pub async fn init(embed_workers: usize) -> anyhow::Result<(Arc<async_channel::Sender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, Vec<JoinHandle<()>>)>
 {
@@ -61,4 +63,16 @@ pub async fn init_ctx() -> Arc<ProcessingContext> {
         hasher: Arc::new(haser),
         n_embd: 384,
     })
+}
+
+pub fn setup_tracing(level: Level) {
+    let subscriber = FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.
+        .with_max_level(level)
+        // completes the builder.
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("setting default subscriber failed")
 }

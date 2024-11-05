@@ -5,7 +5,9 @@ use crate::processing::summaries::process_summaries;
 use crate::services::embeddings::EmbeddingsRequest;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
+use tracing::trace;
 
+#[tracing::instrument(skip(ctx, split_res, embed_sender))]
 pub async fn process_split(
     ctx: Arc<ProcessingContext>,
     split_res: Arc<SplitResultLite>,
@@ -15,12 +17,14 @@ pub async fn process_split(
 ) -> anyhow::Result<SplitDto> {
     let split_id = ctx.hasher.hash(&format!("{}{}", doc_id, seq_id));
     let embed_id = ctx.hasher.hash(&format!("{}{}", split_id, seq_id));
+    trace!("Processing split: {}", split_id);
+
     let embedding = process_embedding(
         embed_sender.clone(),
         embed_id,
         vec![split_res.split_string.clone()],
     )
-    .await?;
+        .await?;
     let summaries = process_summaries(
         ctx.clone(),
         embed_sender.clone(),
@@ -28,7 +32,7 @@ pub async fn process_split(
         doc_id,
         split_id,
     )
-    .await?;
+        .await?;
     Ok(SplitDto::new(
         split_id,
         seq_id,

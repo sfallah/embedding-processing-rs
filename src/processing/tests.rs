@@ -6,9 +6,11 @@ mod tests {
     use crate::processing::splitter::split_text;
     use crate::processing::summaries::process_summaries;
     use crate::services::embeddings::async_get_embeddings;
-    use crate::utils::app_utils::{init, init_ctx};
+    use crate::utils::app_utils::{init, init_ctx, setup_tracing};
     use rstest::{fixture, rstest};
     use std::sync::Arc;
+    use tracing::Level;
+    use tracing_subscriber::FmtSubscriber;
 
     #[fixture]
     fn text() -> String {
@@ -134,6 +136,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         #[future] text_from_file: String,
     ) -> anyhow::Result<()> {
+        setup_tracing(Level::INFO);
         let (embed_sender, shutdown, handles) = init(4).await?;
         let ctx = ctx.await.clone();
         let embed_sender = embed_sender.clone();
@@ -147,7 +150,7 @@ mod tests {
             .expect("Failed to process document");
 
         assert_eq!(doc.splits.len(), 11);
-        println!("{:?}", doc);
+        //println!("{:?}", doc);
 
         let _sum_texts = doc
             .splits
