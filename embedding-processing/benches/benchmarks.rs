@@ -1,13 +1,13 @@
 use criterion::{criterion_main, Criterion};
-use embedding_processing_rs::processing::documents::process_document;
-use embedding_processing_rs::utils::app_utils::{init, init_ctx};
+use embedding_processing::processing::documents::process_document;
+use embedding_processing::utils::app_utils::{init, init_ctx};
 use std::fs;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
 
     c.bench_function("embeddings_splits_batch", |b| {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let (embed_sender, _shutdown, _handle) = rt.block_on(init(2)).unwrap();
+        let (embed_sender, _shutdown, _handle) = rt.block_on(init("../models/all-minilm-l6-v2-q2_k.gguf",2)).unwrap();
         let proc_ctx = rt.block_on(init_ctx());
         b.to_async(rt).iter(|| {
             process_document(

@@ -1,39 +1,20 @@
-[package]
-name = "embedding-processing-rs"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = [
+    "embedding-common",
+    "embedding-processing",
+    "embedding-database",
+    "embedding-index",
+    "embedding-cli",
+    #"embedding-processing-server",
+]
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.82"
-ahash = "0.8.11"
-chrono = "0.4.38"
-cxx = "1.0.128"
-tokio = { version = "1.41.0", features = ["full", "tracing"] }
-futures = "0.3.31"
-async-channel = "2.3.1"
-
-
-fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }
-hnswlib-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/hnswlib-rs", branch = "main" }
-lexrank-ndarray = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/lexrank-ndarray.git", branch = "main" }
-llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git", branch = "feat/llama_cpp_release_b3921" }
-rayon = "1.10.0"
-
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
+tokio = { version = "1.41.0", features = ["full", "tracing"] }
+futures = "0.3.31"
 
-[dev-dependencies]
-rstest = "0.23.0"
-tempfile = "3.10.1"
-criterion = { version = "0.5.1", features = ["async_tokio"] }
-tokio = { version = "1.41.0", features = ["test-util"] }
 
-[[bench]]
-name = "benchmarks"
-harness = false
 
-[features]
-default = []
-accelerate = ["lexrank-ndarray/accelerate"]
-blas = ["lexrank-ndarray/blas"]
-mkl = ["lexrank-ndarray/mkl"]

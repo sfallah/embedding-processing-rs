@@ -5,7 +5,7 @@ use crate::processing::splitter::split_text;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
-use tracing::{debug, trace};
+use tracing::{trace};
 
 #[tracing::instrument(skip(ctx, embed_sender, text))]
 pub async fn process_summaries(
@@ -15,11 +15,11 @@ pub async fn process_summaries(
     doc_id: u64,
     split_id: u64,
 ) -> anyhow::Result<Vec<SummaryDto>> {
-    debug!("Processing summaries...");
+    trace!("Processing summaries...");
     let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes()).await?;
     let splits: Vec<_> = filter_splits(&splits, 4);
     let sentences: Vec<_> = splits_texts(&splits);
-    debug!("Number of sentences: {}", sentences.len());
+    trace!("Number of sentences: {}", sentences.len());
 
     let embeddings = async_get_embeddings(embed_sender.clone(), &sentences, ctx.n_embd).await?;
 

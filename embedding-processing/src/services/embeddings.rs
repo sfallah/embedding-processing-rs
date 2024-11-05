@@ -2,7 +2,7 @@ use crate::inference::llama_context::LlamaContext;
 use std::sync::Arc;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::Sender;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, error, info, trace};
 
 #[derive(Debug)]
 pub struct EmbeddingsRequest {

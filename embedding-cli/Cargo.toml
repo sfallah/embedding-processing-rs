@@ -1,0 +1,15 @@
+[package]
+name = "embedding-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = {workspace = true}
+tokio = { workspace = true}
+futures = {workspace = true}
+tracing = {workspace = true}
+tracing-subscriber = {workspace = true}
+
+
+embedding-common = { path = "../embedding-common" }
+embedding-processing = { path = "../embedding-processing" }

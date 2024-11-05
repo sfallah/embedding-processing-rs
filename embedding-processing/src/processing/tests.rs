@@ -10,7 +10,8 @@ mod tests {
     use rstest::{fixture, rstest};
     use std::sync::Arc;
     use tracing::Level;
-    use tracing_subscriber::FmtSubscriber;
+
+    const MODEL_PATH: &str = "../models/all-minilm-l6-v2-q2_k.gguf";
 
     #[fixture]
     fn text() -> String {
@@ -47,7 +48,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_embeddings() -> anyhow::Result<()> {
-        let (embed, shutdown, handles) = init(1).await?;
+        let (embed, shutdown, handles) = init(MODEL_PATH,1).await?;
 
         let text = "This is a test text".to_string();
         let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
@@ -79,7 +80,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         text: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handles) = init(1).await?;
+        let (embed_sender, shutdown, handles) = init(MODEL_PATH,1).await?;
         let ctx = ctx.await.clone();
         let text = text.clone();
         let embed_sender = embed_sender.clone();
@@ -108,7 +109,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         text: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handles) = init(2).await?;
+        let (embed_sender, shutdown, handles) = init(MODEL_PATH, 2).await?;
         let ctx = ctx.await.clone();
         let text = text.clone();
         let embed_sender = embed_sender.clone();
@@ -137,7 +138,7 @@ mod tests {
         #[future] text_from_file: String,
     ) -> anyhow::Result<()> {
         setup_tracing(Level::INFO);
-        let (embed_sender, shutdown, handles) = init(4).await?;
+        let (embed_sender, shutdown, handles) = init(MODEL_PATH, 2).await?;
         let ctx = ctx.await.clone();
         let embed_sender = embed_sender.clone();
         let doc = process_document(
@@ -150,7 +151,7 @@ mod tests {
             .expect("Failed to process document");
 
         assert_eq!(doc.splits.len(), 11);
-        //println!("{:?}", doc);
+        println!("{:?}", doc);
 
         let _sum_texts = doc
             .splits

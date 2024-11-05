@@ -10,15 +10,13 @@ use tokio::task::JoinHandle;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-pub async fn init(embed_workers: usize) -> anyhow::Result<(Arc<async_channel::Sender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, Vec<JoinHandle<()>>)>
+pub async fn init(model_path:&str, embed_workers: usize) -> anyhow::Result<(Arc<async_channel::Sender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, Vec<JoinHandle<()>>)>
 {
     let (embedding_sender, embedding_receiver) = async_channel::unbounded::<EmbeddingsRequest>();
 
     let (shutdown_sender, shutdown_receiver) = broadcast::channel::<String>(1);
     let shutdown_receiver = Arc::new(shutdown_receiver);
     let shutdown_sender = Arc::new(shutdown_sender);
-
-    let model_path = "models/all-minilm-l6-v2-q2_k.gguf";
 
     let mut embed_handles = Vec::new();
     for _ in 0..embed_workers {
