@@ -1,4 +1,4 @@
-use crate::dtos::document_new::DocumentDtoNew;
+use crate::dtos::document_dto::DocumentDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
@@ -10,7 +10,7 @@ pub async fn process_document(
     embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
     url: String,
     text: Vec<u8>,
-) -> anyhow::Result<DocumentDtoNew> {
+) -> anyhow::Result<DocumentDto> {
     let splits = split_text(ctx.splitter.clone(), text).await?;
 
     let mut split_dtos: Vec<_> = Vec::new();
@@ -37,7 +37,7 @@ pub async fn process_document(
         .flat_map(|split| split.summaries.clone())
         .collect();
 
-    Ok(DocumentDtoNew::new(
+    Ok(DocumentDto::new(
         doc_id,
         url.as_str(),
         split_dtos,

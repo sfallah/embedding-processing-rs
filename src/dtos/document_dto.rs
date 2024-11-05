@@ -1,22 +1,22 @@
-use crate::dtos::split_new::SplitDtoNew;
-use crate::dtos::summary_new::SummaryDtoNew;
+use crate::dtos::split_dto::SplitDto;
+use crate::dtos::summary_dto::SummaryDto;
 
 #[derive(Debug, Clone)]
-pub struct DocumentDtoNew {
+pub struct DocumentDto {
     pub document_id: u64,
     pub document_url: String,
-    pub splits: Vec<SplitDtoNew>,
-    pub summaries: Vec<SummaryDtoNew>,
+    pub splits: Vec<SplitDto>,
+    pub summaries: Vec<SummaryDto>,
 }
 
-impl DocumentDtoNew {
+impl DocumentDto {
     pub fn new(
         document_id: u64,
         document_url: &str,
-        splits: Vec<SplitDtoNew>,
-        summaries: Vec<SummaryDtoNew>,
+        splits: Vec<SplitDto>,
+        summaries: Vec<SummaryDto>,
     ) -> Self {
-        DocumentDtoNew {
+        DocumentDto {
             document_id,
             document_url: document_url.to_string(),
             splits,

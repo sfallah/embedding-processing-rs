@@ -1,5 +1,5 @@
-use crate::dtos::embedding_new::EmbeddingNewDto;
-use crate::dtos::summary_new::SummaryDtoNew;
+use crate::dtos::embedding_dto::EmbeddingDto;
+use crate::dtos::summary_dto::SummaryDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
@@ -11,7 +11,7 @@ pub async fn process_summaries(
     text: String,
     doc_id: u64,
     split_id: u64,
-) -> anyhow::Result<Vec<SummaryDtoNew>> {
+) -> anyhow::Result<Vec<SummaryDto>> {
     let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes()).await?;
     let splits: Vec<_> = filter_splits(&splits, 4);
     let sentences: Vec<_> = splits_texts(&splits);
@@ -36,8 +36,8 @@ pub async fn process_summaries(
                 .hasher
                 .hash(&format!("{}{}{}", split_id, seq_id, no_tokens));
             let embd_id = ctx.hasher.hash(&format!("{}{}", sum_id, idx));
-            let embedding = EmbeddingNewDto::new(embd_id, embeddings.clone());
-            SummaryDtoNew::new(
+            let embedding = EmbeddingDto::new(embd_id, embeddings.clone());
+            SummaryDto::new(
                 sum_id,
                 doc_id,
                 split_id,

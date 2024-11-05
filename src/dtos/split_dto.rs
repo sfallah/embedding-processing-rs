@@ -1,28 +1,28 @@
-use crate::dtos::embedding_new::EmbeddingNewDto;
-use crate::dtos::summary_new::SummaryDtoNew;
+use crate::dtos::embedding_dto::EmbeddingDto;
+use crate::dtos::summary_dto::SummaryDto;
 
 #[derive(Debug, Clone)]
-pub struct SplitDtoNew {
+pub struct SplitDto {
     pub split_id: u64,
     pub sequence_id: i32,
     pub doc_id: u64,
     pub text_content: String,
     pub token_len: usize,
-    pub summaries: Vec<SummaryDtoNew>,
-    pub embedding: Option<EmbeddingNewDto>,
+    pub summaries: Vec<SummaryDto>,
+    pub embedding: Option<EmbeddingDto>,
 }
 
-impl SplitDtoNew {
+impl SplitDto {
     pub fn new(
         split_id: u64,
         sequence_id: i32,
         doc_id: u64,
         text_content: &str,
         token_len: usize,
-        summaries: Vec<SummaryDtoNew>,
-        embedding: Option<EmbeddingNewDto>,
+        summaries: Vec<SummaryDto>,
+        embedding: Option<EmbeddingDto>,
     ) -> Self {
-        SplitDtoNew {
+        SplitDto {
             split_id,
             sequence_id,
             doc_id,

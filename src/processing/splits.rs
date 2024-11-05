@@ -1,4 +1,4 @@
-use crate::dtos::split_new::SplitDtoNew;
+use crate::dtos::split_dto::SplitDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::embeddings::process_embedding;
 use crate::processing::summaries::process_summaries;
@@ -12,7 +12,7 @@ pub async fn process_split(
     embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
     doc_id: u64,
     seq_id: i32,
-) -> anyhow::Result<SplitDtoNew> {
+) -> anyhow::Result<SplitDto> {
     let split_id = ctx.hasher.hash(&format!("{}{}", doc_id, seq_id));
     let embed_id = ctx.hasher.hash(&format!("{}{}", split_id, seq_id));
     let embedding = process_embedding(
@@ -29,7 +29,7 @@ pub async fn process_split(
         split_id,
     )
     .await?;
-    Ok(SplitDtoNew::new(
+    Ok(SplitDto::new(
         split_id,
         seq_id,
         doc_id,

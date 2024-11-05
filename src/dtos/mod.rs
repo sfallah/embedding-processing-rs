@@ -1,4 +1,4 @@
-pub mod document_new;
-pub mod embedding_new;
-pub mod split_new;
-pub mod summary_new;
+pub mod document_dto;
+pub mod embedding_dto;
+pub mod split_dto;
+pub mod summary_dto;

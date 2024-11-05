@@ -1,7 +1,7 @@
-use crate::dtos::embedding_new::EmbeddingNewDto;
+use crate::dtos::embedding_dto::EmbeddingDto;
 
 #[derive(Debug, Clone)]
-pub struct SummaryDtoNew {
+pub struct SummaryDto {
     pub summary_id: u64,
     pub document_id: u64,
     pub split_id: u64,
@@ -9,10 +9,10 @@ pub struct SummaryDtoNew {
     pub text_content: String,
     pub token_len: usize,
     pub centrality: f32,
-    pub embedding: Option<EmbeddingNewDto>,
+    pub embedding: Option<EmbeddingDto>,
 }
 
-impl SummaryDtoNew {
+impl SummaryDto {
     pub fn new(
         summary_id: u64,
         document_id: u64,
@@ -21,9 +21,9 @@ impl SummaryDtoNew {
         text_content: &str,
         token_len: usize,
         centrality: f32,
-        embedding: Option<EmbeddingNewDto>,
+        embedding: Option<EmbeddingDto>,
     ) -> Self {
-        SummaryDtoNew {
+        SummaryDto {
             summary_id,
             document_id,
             split_id,
