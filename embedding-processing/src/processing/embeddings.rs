@@ -1,7 +1,7 @@
 use crate::dtos::embedding_dto::EmbeddingDto;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
-use std::sync::Arc;
 use async_channel::Sender;
+use std::sync::Arc;
 use tracing::trace;
 
 #[tracing::instrument(skip(sender, sentences))]

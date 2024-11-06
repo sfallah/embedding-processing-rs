@@ -48,7 +48,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_embeddings() -> anyhow::Result<()> {
-        let (embed, shutdown, handles) = init(MODEL_PATH,1).await?;
+        let (embed, shutdown, handles) = init(MODEL_PATH, 1).await?;
 
         let text = "This is a test text".to_string();
         let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
@@ -80,7 +80,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         text: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handles) = init(MODEL_PATH,1).await?;
+        let (embed_sender, shutdown, handles) = init(MODEL_PATH, 1).await?;
         let ctx = ctx.await.clone();
         let text = text.clone();
         let embed_sender = embed_sender.clone();
@@ -147,8 +147,8 @@ mod tests {
             "test_url".to_string(),
             text_from_file.await.as_bytes().to_vec(),
         )
-            .await
-            .expect("Failed to process document");
+        .await
+        .expect("Failed to process document");
 
         assert_eq!(doc.splits.len(), 11);
         debug!("{:?}", doc);

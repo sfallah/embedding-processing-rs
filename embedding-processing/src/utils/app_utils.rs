@@ -1,17 +1,23 @@
-use std::ops::Deref;
 use crate::inference::llama_context::LlamaContext;
 use crate::processing::context::ProcessingContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
+use std::ops::Deref;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-pub async fn init(model_path:&str, embed_workers: usize) -> anyhow::Result<(Arc<async_channel::Sender<EmbeddingsRequest>>, Arc<broadcast::Sender<String>>, Vec<JoinHandle<()>>)>
-{
+pub async fn init(
+    model_path: &str,
+    embed_workers: usize,
+) -> anyhow::Result<(
+    Arc<async_channel::Sender<EmbeddingsRequest>>,
+    Arc<broadcast::Sender<String>>,
+    Vec<JoinHandle<()>>,
+)> {
     let (embedding_sender, embedding_receiver) = async_channel::unbounded::<EmbeddingsRequest>();
 
     let (shutdown_sender, shutdown_receiver) = broadcast::channel::<String>(1);
@@ -23,8 +29,13 @@ pub async fn init(model_path:&str, embed_workers: usize) -> anyhow::Result<(Arc<
         let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000));
         let embedding_receiver = embedding_receiver.clone();
         let shutdown_receiver = shutdown_receiver.clone();
-        let embed_handle = tokio::spawn( async move {
-                async_embeddings_routine(model_instance, embedding_receiver, shutdown_receiver.deref().resubscribe()).await;
+        let embed_handle = tokio::spawn(async move {
+            async_embeddings_routine(
+                model_instance,
+                embedding_receiver,
+                shutdown_receiver.deref().resubscribe(),
+            )
+            .await;
         });
         embed_handles.push(embed_handle);
     }
@@ -71,6 +82,5 @@ pub fn setup_tracing(level: Level) {
         // completes the builder.
         .finish();
 
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("setting default subscriber failed")
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed")
 }

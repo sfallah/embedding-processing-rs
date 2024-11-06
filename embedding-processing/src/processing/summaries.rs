@@ -5,7 +5,7 @@ use crate::processing::splitter::split_text;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
-use tracing::{trace};
+use tracing::trace;
 
 #[tracing::instrument(skip(ctx, embed_sender, text))]
 pub async fn process_summaries(
@@ -101,5 +101,5 @@ async fn lexrank_sentences(
             max_iter.unwrap_or(10000),
         )
     })
-        .await?
+    .await?
 }

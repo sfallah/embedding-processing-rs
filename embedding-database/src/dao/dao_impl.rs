@@ -1,12 +1,12 @@
-use std::sync::Arc;
-use anyhow::anyhow;
-use embedding_common::Serde;
 use crate::db::interface::{Database, Table};
 use crate::db::rocksdb_impl::RocksDB;
 use crate::models::document::Document;
 use crate::models::embedding::Embedding;
 use crate::models::split::Split;
 use crate::models::summary::Summary;
+use anyhow::anyhow;
+use embedding_common::Serde;
+use std::sync::Arc;
 
 // Get
 fn get_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Result<Option<Document>> {

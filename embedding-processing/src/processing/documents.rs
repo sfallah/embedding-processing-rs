@@ -26,14 +26,18 @@ pub async fn process_document(
         let ctx = ctx.clone();
         let embed_sender = embed_sender.clone();
         let handle = tokio::spawn(async move {
-            process_split(ctx.clone(), split, embed_sender, doc_id, seq_id as i32).await.expect("Failed to process split")
+            process_split(ctx.clone(), split, embed_sender, doc_id, seq_id as i32)
+                .await
+                .expect("Failed to process split")
         });
         handles.push(handle);
     }
-    futures::future::join_all(handles.into_iter()).await.into_iter().for_each(|res| {
-        split_dtos.push(res.expect("Failed to process split"));
-    });
-
+    futures::future::join_all(handles.into_iter())
+        .await
+        .into_iter()
+        .for_each(|res| {
+            split_dtos.push(res.expect("Failed to process split"));
+        });
 
     let summaries: Vec<_> = split_dtos
         .iter()

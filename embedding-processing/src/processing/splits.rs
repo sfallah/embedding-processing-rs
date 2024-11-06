@@ -24,7 +24,7 @@ pub async fn process_split(
         embed_id,
         vec![split_res.split_string.clone()],
     )
-        .await?;
+    .await?;
     let summaries = process_summaries(
         ctx.clone(),
         embed_sender.clone(),
@@ -32,7 +32,7 @@ pub async fn process_split(
         doc_id,
         split_id,
     )
-        .await?;
+    .await?;
     Ok(SplitDto::new(
         split_id,
         seq_id,
