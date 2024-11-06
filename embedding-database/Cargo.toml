@@ -2,3 +2,14 @@
 name = "embedding-database"
 version = "0.1.0"
 edition = "2021"
+
+[dependencies]
+rocksdb = "0.22.0"
+byteorder = "1.5.0"
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_repr = { workspace = true }
+rmp-serde = { workspace = true }
+serde_json = { workspace = true }
+num_cpus = { workspace = true }
+embedding-common = { path = "../embedding-common" }

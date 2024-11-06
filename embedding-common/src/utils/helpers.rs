@@ -40,11 +40,11 @@ fn cur_dir() -> Result<PathBuf, std::io::Error> {
 ///
 /// # Arguments
 ///
-/// * `sub_dir` - A string slice that holds the name of the sub-directory to get.
+/// * `sub_dir` - A string slice that holds the name of the subdirectory to get.
 ///
 /// # Returns
 ///
-/// This function returns `PathBuf` that points to the specified sub-directory under the current
+/// This function returns `PathBuf` that points to the specified subdirectory under the current
 /// working directory.
 pub fn get_directory(sub_dir: &str) -> Result<PathBuf> {
     let mut path = cur_dir().with_context(|| "Failed to get current directory")?;

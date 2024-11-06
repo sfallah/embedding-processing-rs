@@ -1,4 +1,4 @@
-use crate::utils::hash_utils::DeterministicAHasher;
+use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
 use fast_text_splitter::hf_tokenizer::HFTokenizer;
 use std::sync::Arc;

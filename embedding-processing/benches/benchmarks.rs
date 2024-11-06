@@ -1,6 +1,6 @@
 use criterion::{criterion_main, Criterion};
 use embedding_processing::processing::documents::process_document;
-use embedding_processing::utils::app_utils::{init, init_ctx};
+use embedding_common::utils::app_utils::{init, init_ctx};
 use std::fs;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {

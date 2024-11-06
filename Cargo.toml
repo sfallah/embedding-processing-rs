@@ -15,6 +15,13 @@ tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 tokio = { version = "1.41.0", features = ["full", "tracing"] }
 futures = "0.3.31"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_repr = "0.1.18"
+rmp-serde = "1.1.2"
+serde_json = "1.0.105"
+ahash = "0.8.11"
+num_cpus = "1.16.0"
+
 
 
 

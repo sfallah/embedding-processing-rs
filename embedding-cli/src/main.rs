@@ -2,9 +2,8 @@ use tracing::{info, Level};
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
-use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use tracing::Instrument;
-
+use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 
 #[tokio::main]
 async fn main() {

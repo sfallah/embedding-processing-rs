@@ -2,7 +2,7 @@ use std::ops::Deref;
 use crate::inference::llama_context::LlamaContext;
 use crate::processing::context::ProcessingContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
-use crate::utils::hash_utils::DeterministicAHasher;
+use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
 use std::sync::Arc;
 use tokio::sync::broadcast;

@@ -9,7 +9,7 @@ mod tests {
     use crate::utils::app_utils::{init, init_ctx, setup_tracing};
     use rstest::{fixture, rstest};
     use std::sync::Arc;
-    use tracing::Level;
+    use tracing::{debug, Level};
 
     const MODEL_PATH: &str = "../models/all-minilm-l6-v2-q2_k.gguf";
 
@@ -137,7 +137,7 @@ mod tests {
         #[future] ctx: Arc<ProcessingContext>,
         #[future] text_from_file: String,
     ) -> anyhow::Result<()> {
-        setup_tracing(Level::INFO);
+        setup_tracing(Level::DEBUG);
         let (embed_sender, shutdown, handles) = init(MODEL_PATH, 2).await?;
         let ctx = ctx.await.clone();
         let embed_sender = embed_sender.clone();
@@ -151,7 +151,7 @@ mod tests {
             .expect("Failed to process document");
 
         assert_eq!(doc.splits.len(), 11);
-        println!("{:?}", doc);
+        debug!("{:?}", doc);
 
         let _sum_texts = doc
             .splits
