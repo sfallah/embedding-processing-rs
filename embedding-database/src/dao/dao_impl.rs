@@ -7,6 +7,95 @@ use crate::db::column_families::ColumnFamilyType;
 use anyhow::{anyhow, Result};
 use embedding_common::Serde;
 use std::sync::Arc;
+use std::marker::PhantomData;
+use serde::{Deserialize, Serialize};
+
+/// Trait that entities must implement to be used with the Repository.
+/// It provides methods for serialization/deserialization and specifies the column family.
+pub trait RepositoryModel: Serde + Sized + Serialize + for<'de> Deserialize<'de> {
+    /// Returns the column family associated with the entity.
+    fn cf() -> ColumnFamilyType;
+}
+
+/// Generic repository for entities implementing `RepositoryEntity`.
+pub struct Repository<'a, E> {
+    db: &'a RocksDB,
+    cf: ColumnFamilyType,
+    _marker: PhantomData<E>,
+}
+
+impl<'a, E> Repository<'a, E>
+where
+    E: RepositoryModel + Send + Sync + 'static,
+{
+    /// Creates a new repository for the given entity type.
+    pub fn new(db: &'a RocksDB) -> Self {
+        Self {
+            db,
+            cf: E::cf(),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Retrieves an entity by its key.
+    pub async fn get(&self, key: &u64) -> Result<Option<E>> {
+        match self.db.get(self.cf, key).await? {
+            Some(data) => {
+                let entity = E::unpack(&data)
+                    .map_err(|e| anyhow!("Failed to unpack entity: {}", e))?;
+                Ok(Some(entity))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Stores an entity with the specified key.
+    pub async fn put(&self, key: &u64, entity: &E) -> Result<()> {
+        let data = entity
+            .pack()
+            .map_err(|e| anyhow!("Failed to pack entity: {}", e))?;
+        self.db.put(self.cf, key, &data).await
+    }
+
+    /// Deletes an entity by its key.
+    pub async fn delete(&self, key: &u64) -> Result<()> {
+        self.db.delete(self.cf, key).await
+    }
+
+    /// Retrieves multiple entities by their keys.
+    pub async fn multi_get(&self, keys: &[u64]) -> Result<Vec<Option<E>>> {
+        let data_list = self.db.multi_get(self.cf, keys).await?;
+        let mut entities = Vec::with_capacity(data_list.len());
+        for data_opt in data_list {
+            if let Some(data) = data_opt {
+                let entity = E::unpack(&data)
+                    .map_err(|e| anyhow!("Failed to unpack entity: {}", e))?;
+                entities.push(Some(entity));
+            } else {
+                entities.push(None);
+            }
+        }
+        Ok(entities)
+    }
+
+    /// Retrieves all entities in the column family.
+    pub async fn get_all(&self) -> Result<Vec<E>> {
+        let data_list = self.db.get_all(self.cf).await?;
+        let mut entities = Vec::with_capacity(data_list.len());
+        for data in data_list {
+            let entity = E::unpack(&data)
+                .map_err(|e| anyhow!("Failed to unpack entity: {}", e))?;
+            entities.push(entity);
+        }
+        Ok(entities)
+    }
+
+    /// Deletes multiple entities by their keys.
+    pub async fn delete_many(&self, keys: &[u64]) -> Result<()> {
+        self.db.delete_many(self.cf, keys).await
+    }
+}
+
 
 /// Retrieves a `Document` by its ID.
 pub async fn get_document(db: Arc<RocksDB>, document_id: &u64) -> Result<Option<Document>> {
