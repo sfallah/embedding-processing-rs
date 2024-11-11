@@ -7,7 +7,6 @@ pub struct Document {
     pub document_url: String,
     pub split_ids: Vec<u64>,
     pub summary_ids: Option<Vec<u64>>,
-    pub embeddings: Vec<f32>,
 }
 
 impl Document {
@@ -17,7 +16,6 @@ impl Document {
             document_url: url.to_string(),
             split_ids: Vec::new(),
             summary_ids: Some(Vec::new()),
-            embeddings: Vec::new(),
         }
     }
 }

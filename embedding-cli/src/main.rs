@@ -1,19 +1,40 @@
+use std::sync::Arc;
+use anyhow::anyhow;
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
+use embedding_database::models;
+
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use tracing::Instrument;
 use tracing::{info, Level};
+use embedding_common::Serde;
+use embedding_common::utils::helpers::get_db_dir;
+use embedding_database::db::column_families::ColumnFamilyType;
+use embedding_database::db::rocksdb_impl::RocksDB;
+use embedding_database::models::document::Document;
+use embedding_database::models::embedding::{Embedding, EmbeddingDataType};
+use embedding_database::models::split::Split;
+use embedding_database::models::{document, summary};
+use embedding_database::models::summary::Summary;
+use embedding_processing::dtos::document_dto::DocumentDto;
 
 #[tokio::main]
 async fn main() {
     //run_embeddings().await.unwrap();
 
+
     setup_tracing(Level::TRACE);
 
     info!("Starting up");
 
-    run_doc_processing()
+    let db_path_binding = get_db_dir(Some("rocksdb_dir")).unwrap();
+    let db_path = db_path_binding.to_str().unwrap();
+    embedding_common::utils::helpers::create_directory(db_path).expect("Failed to create directory");
+    let rocksdb = RocksDB::open(&db_path).await.unwrap();
+    let db = Arc::new(rocksdb);
+
+    run_doc_processing(db)
         .instrument(tracing::info_span!("run_doc_processing"))
         .await
         .unwrap();
@@ -21,9 +42,9 @@ async fn main() {
 }
 
 #[tracing::instrument]
-async fn run_doc_processing() -> anyhow::Result<()> {
+async fn run_doc_processing(db: Arc<RocksDB>) -> anyhow::Result<()> {
     let (embed, shutdown, handles) =
-        app_utils::init("models/all-minilm-l6-v2-q2_k.gguf", 2).await?;
+        app_utils::init("models/all-minilm-l6-v2-q2_k.gguf", 8).await?;
     let ctx = init_ctx().await;
     let file = "embedding-processing/tests/test_data/superlinear.txt";
     let doc = tokio::fs::read_to_string(file).await?;
@@ -34,7 +55,9 @@ async fn run_doc_processing() -> anyhow::Result<()> {
         doc.into_bytes().to_vec(),
     )
     .await?;
+
     println!("{:?}", res);
+    save_document(db.clone(), &res).await?;
     shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles.into_iter()).await;
     Ok(())
@@ -52,3 +75,155 @@ async fn _run_embeddings() -> anyhow::Result<()> {
     futures::future::join_all(handles.into_iter()).await;
     Ok(())
 }
+
+pub async fn save_document(db: Arc<RocksDB>, doc_dto: &DocumentDto) -> anyhow::Result<()> {
+    let mut splits = Vec::new();
+    let mut summaries = Vec::new();
+    let mut embeddings = Vec::new();
+    let mut split_ids = Vec::new();
+    let mut document_summary_ids = Vec::new();
+
+    for split_dto in &doc_dto.splits {
+        let split_embedding_id = if let Some(embedding_dto) = &split_dto.embedding {
+            let embedding = Embedding {
+                embedding_id: embedding_dto.embedding_id,
+                data_id: split_dto.split_id,
+                embedding_type: EmbeddingDataType::Split,
+                embedding: embedding_dto.embedding.clone(),
+            };
+            embeddings.push(embedding);
+            Some(embedding_dto.embedding_id)
+        } else {
+            None
+        };
+
+        let mut split_summary_ids = Vec::new();
+
+        for summary_dto in &split_dto.summaries {
+            let summary_embedding_id = if let Some(embedding_dto) = &summary_dto.embedding {
+                let embedding = Embedding {
+                    embedding_id: embedding_dto.embedding_id,
+                    data_id: summary_dto.summary_id,
+                    embedding_type: EmbeddingDataType::Summary,
+                    embedding: embedding_dto.embedding.clone(),
+                };
+                embeddings.push(embedding);
+                embedding_dto.embedding_id
+            } else {
+                0
+            };
+
+            let summary = Summary {
+                summary_id: summary_dto.summary_id,
+                document_id: summary_dto.document_id,
+                split_id: summary_dto.split_id,
+                split_sequence_id: summary_dto.split_sequence_id,
+                embedding_id: summary_embedding_id,
+                text_content: summary_dto.text_content.clone(),
+                token_len: summary_dto.token_len,
+                centrality: summary_dto.centrality,
+            };
+            summaries.push(summary);
+            split_summary_ids.push(summary_dto.summary_id);
+        }
+
+        // Create Split model
+        let split = Split {
+            split_id: split_dto.split_id,
+            sequence_id: split_dto.sequence_id,
+            doc_id: split_dto.doc_id,
+            embedding_id: split_embedding_id.unwrap_or(0),
+            text_content: split_dto.text_content.clone(),
+            token_len: split_dto.token_len,
+            summary_ids: if split_summary_ids.is_empty() {
+                None
+            } else {
+                Some(split_summary_ids)
+            },
+        };
+        splits.push(split);
+        split_ids.push(split_dto.split_id);
+    }
+
+    for summary_dto in &doc_dto.summaries {
+        let summary_embedding_id = if let Some(embedding_dto) = &summary_dto.embedding {
+            let embedding = Embedding {
+                embedding_id: embedding_dto.embedding_id,
+                data_id: summary_dto.summary_id,
+                embedding_type: EmbeddingDataType::Summary,
+                embedding: embedding_dto.embedding.clone(),
+            };
+            embeddings.push(embedding);
+            embedding_dto.embedding_id
+        } else {
+            0
+        };
+
+        let summary = Summary {
+            summary_id: summary_dto.summary_id,
+            document_id: summary_dto.document_id,
+            split_id: summary_dto.split_id,
+            split_sequence_id: summary_dto.split_sequence_id,
+            embedding_id: summary_embedding_id,
+            text_content: summary_dto.text_content.clone(),
+            token_len: summary_dto.token_len,
+            centrality: summary_dto.centrality,
+        };
+        summaries.push(summary);
+        document_summary_ids.push(summary_dto.summary_id);
+    }
+
+    let document = Document {
+        document_id: doc_dto.document_id,
+        document_url: doc_dto.document_url.clone(),
+        split_ids,
+        summary_ids: if document_summary_ids.is_empty() {
+            None
+        } else {
+            Some(document_summary_ids)
+        }
+    };
+
+    save_models_to_db(db, &document, &splits, &summaries, &embeddings).await?;
+
+    Ok(())
+}
+
+async fn save_models_to_db(
+    db: Arc<RocksDB>,
+    document: &Document,
+    splits: &[Split],
+    summaries: &[Summary],
+    embeddings: &[Embedding],
+) -> anyhow::Result<()> {
+    for embedding in embeddings {
+        let embedding_id = &embedding.embedding_id;
+        let data = embedding.pack()
+            .map_err(|e| anyhow!("Failed to serialize embedding: {}", e))?;
+        db.put(ColumnFamilyType::Embeddings, embedding_id, &data).await?;
+    }
+
+    for split in splits {
+        let split_id = &split.split_id;
+        let data = split.pack()
+            .map_err(|e| anyhow!("Failed to serialize split: {}", e))?;
+        db.put(ColumnFamilyType::Splits, split_id, &data).await?;
+    }
+
+    for summary in summaries {
+        let summary_id = &summary.summary_id;
+        let data = summary.pack()
+            .map_err(|e| anyhow!("Failed to serialize summary: {}", e))?;
+        db.put(ColumnFamilyType::Summaries, summary_id, &data).await?;
+    }
+
+    let document_id = &document.document_id;
+    let data = document.pack()
+        .map_err(|e| anyhow!("Failed to serialize document: {}", e))?;
+    db.put(ColumnFamilyType::Documents, document_id, &data).await?;
+
+    Ok(())
+}
+
+
+

@@ -5,11 +5,13 @@ use rocksdb::{
 };
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
+use serde::{Deserialize, Serialize};
 use tokio::task;
 use tracing::{info, error};
 use tracing::instrument;
 use crate::db::column_families::ColumnFamilyType;
 
+#[derive(Debug)]
 pub struct RocksDB {
     pub db: Arc<DBWithThreadMode<MultiThreaded>>,
 }
