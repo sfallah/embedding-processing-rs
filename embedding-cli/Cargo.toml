@@ -13,3 +13,4 @@ tracing-subscriber = {workspace = true}
 
 embedding-common = { path = "../embedding-common" }
 embedding-processing = { path = "../embedding-processing" }
+embedding-database = { path = "../embedding-database" }

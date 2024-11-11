@@ -8,6 +8,38 @@ use anyhow::{anyhow, Result};
 use embedding_common::Serde;
 use std::sync::Arc;
 
+/// Stores a `Document` in the database.
+pub async fn put_document(db: Arc<RocksDB>, document: &Document) -> Result<()> {
+    let document_id = &document.document_id;
+    let data = document.pack().map_err(|e| anyhow!("Failed to pack document: {}", e))?;
+    db.put(ColumnFamilyType::Documents, document_id, &data).await?;
+    Ok(())
+}
+
+/// Stores a `Split` in the database.
+pub async fn put_split(db: Arc<RocksDB>, split: &Split) -> Result<()> {
+    let split_id = &split.split_id;
+    let data = split.pack().map_err(|e| anyhow!("Failed to pack split: {}", e))?;
+    db.put(ColumnFamilyType::Splits, split_id, &data).await?;
+    Ok(())
+}
+
+/// Stores a `Summary` in the database.
+pub async fn put_summary(db: Arc<RocksDB>, summary: &Summary) -> Result<()> {
+    let summary_id = &summary.summary_id;
+    let data = summary.pack().map_err(|e| anyhow!("Failed to pack summary: {}", e))?;
+    db.put(ColumnFamilyType::Summaries, summary_id, &data).await?;
+    Ok(())
+}
+
+/// Stores an `Embedding` in the database.
+pub async fn put_embedding(db: Arc<RocksDB>, embedding: &Embedding) -> Result<()> {
+    let embedding_id = &embedding.embedding_id;
+    let data = embedding.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
+    db.put(ColumnFamilyType::Embeddings, embedding_id, &data).await?;
+    Ok(())
+}
+
 /// Retrieves a `Document` by its ID.
 pub async fn get_document(db: Arc<RocksDB>, document_id: &u64) -> Result<Option<Document>> {
     match db.get(ColumnFamilyType::Documents, document_id).await? {
