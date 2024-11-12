@@ -9,7 +9,7 @@ use embedding_common::Serde;
 use std::sync::Arc;
 
 /// Stores a `Document` in the database.
-pub async fn put_document(db: Arc<RocksDB>, document: &Document) -> Result<()> {
+pub async fn put_document(db: &Arc<RocksDB>, document: &Document) -> Result<()> {
     let document_id = &document.document_id;
     let data = document.pack().map_err(|e| anyhow!("Failed to pack document: {}", e))?;
     db.put(ColumnFamilyType::Documents, document_id, &data).await?;
@@ -17,7 +17,7 @@ pub async fn put_document(db: Arc<RocksDB>, document: &Document) -> Result<()> {
 }
 
 /// Stores a `Split` in the database.
-pub async fn put_split(db: Arc<RocksDB>, split: &Split) -> Result<()> {
+pub async fn put_split(db: &Arc<RocksDB>, split: &Split) -> Result<()> {
     let split_id = &split.split_id;
     let data = split.pack().map_err(|e| anyhow!("Failed to pack split: {}", e))?;
     db.put(ColumnFamilyType::Splits, split_id, &data).await?;
@@ -25,7 +25,7 @@ pub async fn put_split(db: Arc<RocksDB>, split: &Split) -> Result<()> {
 }
 
 /// Stores a `Summary` in the database.
-pub async fn put_summary(db: Arc<RocksDB>, summary: &Summary) -> Result<()> {
+pub async fn put_summary(db: &Arc<RocksDB>, summary: &Summary) -> Result<()> {
     let summary_id = &summary.summary_id;
     let data = summary.pack().map_err(|e| anyhow!("Failed to pack summary: {}", e))?;
     db.put(ColumnFamilyType::Summaries, summary_id, &data).await?;
@@ -33,7 +33,7 @@ pub async fn put_summary(db: Arc<RocksDB>, summary: &Summary) -> Result<()> {
 }
 
 /// Stores an `Embedding` in the database.
-pub async fn put_embedding(db: Arc<RocksDB>, embedding: &Embedding) -> Result<()> {
+pub async fn put_embedding(db: &Arc<RocksDB>, embedding: &Embedding) -> Result<()> {
     let embedding_id = &embedding.embedding_id;
     let data = embedding.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
     db.put(ColumnFamilyType::Embeddings, embedding_id, &data).await?;
@@ -41,7 +41,7 @@ pub async fn put_embedding(db: Arc<RocksDB>, embedding: &Embedding) -> Result<()
 }
 
 /// Retrieves a `Document` by its ID.
-pub async fn get_document(db: Arc<RocksDB>, document_id: &u64) -> Result<Option<Document>> {
+pub async fn get_document(db: &Arc<RocksDB>, document_id: &u64) -> Result<Option<Document>> {
     match db.get(ColumnFamilyType::Documents, document_id).await? {
         Some(data) => {
             let document =
@@ -53,7 +53,7 @@ pub async fn get_document(db: Arc<RocksDB>, document_id: &u64) -> Result<Option<
 }
 
 /// Retrieves a `Split` by its ID.
-pub async fn get_split(db: Arc<RocksDB>, split_id: &u64) -> Result<Option<Split>> {
+pub async fn get_split(db: &Arc<RocksDB>, split_id: &u64) -> Result<Option<Split>> {
     match db.get(ColumnFamilyType::Splits, split_id).await? {
         Some(data) => {
             let split =
@@ -65,7 +65,7 @@ pub async fn get_split(db: Arc<RocksDB>, split_id: &u64) -> Result<Option<Split>
 }
 
 /// Retrieves a `Summary` by its ID.
-pub async fn get_summary(db: Arc<RocksDB>, summary_id: &u64) -> Result<Option<Summary>> {
+pub async fn get_summary(db: &Arc<RocksDB>, summary_id: &u64) -> Result<Option<Summary>> {
     match db.get(ColumnFamilyType::Summaries, summary_id).await? {
         Some(data) => {
             let summary =
@@ -77,7 +77,7 @@ pub async fn get_summary(db: Arc<RocksDB>, summary_id: &u64) -> Result<Option<Su
 }
 
 /// Retrieves an `Embedding` by its ID.
-pub async fn get_embedding(db: Arc<RocksDB>, embedding_id: &u64) -> Result<Option<Embedding>> {
+pub async fn get_embedding(db: &Arc<RocksDB>, embedding_id: &u64) -> Result<Option<Embedding>> {
     match db.get(ColumnFamilyType::Embeddings, embedding_id).await? {
         Some(data) => {
             let embedding =
@@ -90,10 +90,10 @@ pub async fn get_embedding(db: Arc<RocksDB>, embedding_id: &u64) -> Result<Optio
 
 /// Retrieves all `Splits` associated with a `Document`.
 pub async fn get_splits_of_document(
-    db: Arc<RocksDB>,
+    db: &Arc<RocksDB>,
     document_id: &u64,
 ) -> Result<Option<Vec<Split>>> {
-    let document_info = match get_document(db.clone(), document_id).await? {
+    let document_info = match get_document(&db, document_id).await? {
         Some(doc) => doc,
         None => return Ok(None),
     };
@@ -116,10 +116,10 @@ pub async fn get_splits_of_document(
 
 /// Retrieves all `Summaries` associated with a `Document`.
 pub async fn get_summaries_of_document(
-    db: Arc<RocksDB>,
+    db: &Arc<RocksDB>,
     document_id: &u64,
 ) -> Result<Option<Vec<Summary>>> {
-    let document_info = match get_document(db.clone(), document_id).await? {
+    let document_info = match get_document(&db, document_id).await? {
         Some(doc) => doc,
         None => return Ok(None),
     };
@@ -145,10 +145,10 @@ pub async fn get_summaries_of_document(
 
 /// Retrieves all `Summaries` associated with a `Split`.
 pub async fn get_summaries_of_split(
-    db: Arc<RocksDB>,
+    db: &Arc<RocksDB>,
     split_id: &u64,
 ) -> Result<Option<Vec<Summary>>> {
-    let split_info = match get_split(db.clone(), split_id).await? {
+    let split_info = match get_split(&db, split_id).await? {
         Some(split) => split,
         None => return Ok(None),
     };

@@ -1,71 +1,85 @@
 use std::sync::Arc;
-use anyhow::anyhow;
+use clap::Parser;
+use futures::future::join_all;
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
-use embedding_database::models;
 
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use tracing::Instrument;
-use tracing::{info, Level};
-use embedding_common::Serde;
+use tracing::info;
+use embedding_cli::Args;
 use embedding_common::utils::helpers::get_db_dir;
-use embedding_database::db::column_families::ColumnFamilyType;
+use embedding_database::dao::dao_impl::{put_document, put_embedding, put_split, put_summary};
 use embedding_database::db::rocksdb_impl::RocksDB;
 use embedding_database::models::document::Document;
 use embedding_database::models::embedding::{Embedding, EmbeddingDataType};
 use embedding_database::models::split::Split;
-use embedding_database::models::{document, summary};
 use embedding_database::models::summary::Summary;
 use embedding_processing::dtos::document_dto::DocumentDto;
 
 #[tokio::main]
 async fn main() {
-    //run_embeddings().await.unwrap();
+    let args = Args::parse();
 
-
-    setup_tracing(Level::TRACE);
+    if let Err(e) = args.validate() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+    setup_tracing(args.log_level.to_tracing_level());
 
     info!("Starting up");
 
-    let db_path_binding = get_db_dir(Some("rocksdb_dir")).unwrap();
+    let db_path_binding = get_db_dir(Some(&args.db_path.unwrap_or_else(|| "rocksdb_dir".to_string())))
+        .unwrap();
     let db_path = db_path_binding.to_str().unwrap();
     embedding_common::utils::helpers::create_directory(db_path).expect("Failed to create directory");
     let rocksdb = RocksDB::open(&db_path).await.unwrap();
     let db = Arc::new(rocksdb);
 
-    run_doc_processing(db)
+    run_doc_processing(db, &args.model_path, args.max_tokens, args.np, &args.file_path)
         .instrument(tracing::info_span!("run_doc_processing"))
         .await
         .unwrap();
+
     info!("Shutting down");
 }
 
 #[tracing::instrument]
-async fn run_doc_processing(db: Arc<RocksDB>) -> anyhow::Result<()> {
-    let (embed, shutdown, handles) =
-        app_utils::init("models/all-minilm-l6-v2-q2_k.gguf", 8).await?;
+async fn run_doc_processing(
+    db: Arc<RocksDB>,
+    model_path: &str,
+    max_tokens: usize,
+    np: usize,
+    file_path: &std::path::Path,
+) -> anyhow::Result<()> {
+    let (embed, shutdown, handles) = app_utils::init(&model_path, np).await?;
+
     let ctx = init_ctx().await;
-    let file = "embedding-processing/tests/test_data/superlinear.txt";
-    let doc = tokio::fs::read_to_string(file).await?;
+
+    let doc = tokio::fs::read_to_string("embedding-processing/tests/test_data/superlinear.txt").await?;
+
     let res = process_document(
         ctx.clone(),
         embed.clone(),
-        file.to_string(),
+        file_path.to_string_lossy().to_string(),
         doc.into_bytes().to_vec(),
     )
-    .await?;
+        .await?;
 
     println!("{:?}", res);
+
     save_document(db.clone(), &res).await?;
+
     shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles.into_iter()).await;
+
     Ok(())
 }
 
-async fn _run_embeddings() -> anyhow::Result<()> {
+async fn _run_embeddings(model_path: &str, np: usize) -> anyhow::Result<()> {
     let (embed, shutdown, handles) =
-        app_utils::init("models/all-minilm-l6-v2-q2_k.gguf", 1).await?;
+        app_utils::init(&model_path, np).await?;
     let text = "This is a test".to_string();
     let embeddings = async_get_embeddings(embed.clone(), &vec![text.clone()], 512).await?;
     println!("{:?}", embeddings);
@@ -127,7 +141,6 @@ pub async fn save_document(db: Arc<RocksDB>, doc_dto: &DocumentDto) -> anyhow::R
             split_summary_ids.push(summary_dto.summary_id);
         }
 
-        // Create Split model
         let split = Split {
             split_id: split_dto.split_id,
             sequence_id: split_dto.sequence_id,
@@ -184,43 +197,28 @@ pub async fn save_document(db: Arc<RocksDB>, doc_dto: &DocumentDto) -> anyhow::R
         }
     };
 
-    save_models_to_db(db, &document, &splits, &summaries, &embeddings).await?;
+    save_models_to_db(&db, &document, &splits, &summaries, &embeddings).await?;
 
     Ok(())
 }
 
 async fn save_models_to_db(
-    db: Arc<RocksDB>,
+    db: &Arc<RocksDB>,
     document: &Document,
     splits: &[Split],
     summaries: &[Summary],
     embeddings: &[Embedding],
 ) -> anyhow::Result<()> {
-    for embedding in embeddings {
-        let embedding_id = &embedding.embedding_id;
-        let data = embedding.pack()
-            .map_err(|e| anyhow!("Failed to serialize embedding: {}", e))?;
-        db.put(ColumnFamilyType::Embeddings, embedding_id, &data).await?;
-    }
+    let embedding_futures = embeddings.iter().map(|embedding| put_embedding(db, embedding));
+    join_all(embedding_futures).await.into_iter().collect::<Result<(), _>>()?;
 
-    for split in splits {
-        let split_id = &split.split_id;
-        let data = split.pack()
-            .map_err(|e| anyhow!("Failed to serialize split: {}", e))?;
-        db.put(ColumnFamilyType::Splits, split_id, &data).await?;
-    }
+    let split_futures = splits.iter().map(|split| put_split(db, split));
+    join_all(split_futures).await.into_iter().collect::<Result<(), _>>()?;
 
-    for summary in summaries {
-        let summary_id = &summary.summary_id;
-        let data = summary.pack()
-            .map_err(|e| anyhow!("Failed to serialize summary: {}", e))?;
-        db.put(ColumnFamilyType::Summaries, summary_id, &data).await?;
-    }
+    let summary_futures = summaries.iter().map(|summary| put_summary(db, summary));
+    join_all(summary_futures).await.into_iter().collect::<Result<(), _>>()?;
 
-    let document_id = &document.document_id;
-    let data = document.pack()
-        .map_err(|e| anyhow!("Failed to serialize document: {}", e))?;
-    db.put(ColumnFamilyType::Documents, document_id, &data).await?;
+    put_document(db, document).await?;
 
     Ok(())
 }

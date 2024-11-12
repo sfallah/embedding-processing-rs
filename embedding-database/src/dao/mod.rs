@@ -1,1 +1,1 @@
-mod dao_impl;
+pub mod dao_impl;
