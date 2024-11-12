@@ -6,7 +6,7 @@ use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
 
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use tracing::Instrument;
+use tracing::{error, Instrument};
 use tracing::info;
 use embedding_cli::Args;
 use embedding_common::utils::helpers::get_db_dir;
@@ -23,7 +23,7 @@ async fn main() {
     let args = Args::parse();
 
     if let Err(e) = args.validate() {
-        eprintln!("Error: {}", e);
+        error!("Error: {}", e);
         std::process::exit(1);
     }
     setup_tracing(args.log_level.to_tracing_level());
@@ -37,7 +37,15 @@ async fn main() {
     let rocksdb = RocksDB::open(&db_path).await.unwrap();
     let db = Arc::new(rocksdb);
 
-    run_doc_processing(db, &args.model_path, args.max_tokens, args.np, &args.file_path)
+    run_doc_processing(
+        db,
+        &args.model_path,
+        args.max_tokens,
+        args.merge_level,
+        args.np,
+        args.n_embd,
+        &args.file_path
+    )
         .instrument(tracing::info_span!("run_doc_processing"))
         .await
         .unwrap();
@@ -50,14 +58,16 @@ async fn run_doc_processing(
     db: Arc<RocksDB>,
     model_path: &str,
     max_tokens: usize,
+    merge_level: Option<usize>,
     np: usize,
+    n_embd: usize,
     file_path: &std::path::Path,
 ) -> anyhow::Result<()> {
     let (embed, shutdown, handles) = app_utils::init(&model_path, np).await?;
 
-    let ctx = init_ctx().await;
+    let ctx = init_ctx(max_tokens, merge_level, n_embd).await;
 
-    let doc = tokio::fs::read_to_string("embedding-processing/tests/test_data/superlinear.txt").await?;
+    let doc = tokio::fs::read_to_string(file_path).await?;
 
     let res = process_document(
         ctx.clone(),

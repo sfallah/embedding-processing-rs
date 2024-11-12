@@ -43,7 +43,11 @@ pub async fn init(
     Ok((embed_sender, shutdown_sender, embed_handles))
 }
 
-pub async fn init_ctx() -> Arc<ProcessingContext> {
+pub async fn init_ctx(
+    max_tokens: usize,
+    merge_level: Option<usize>,
+    n_embd: usize
+) -> Arc<ProcessingContext> {
     let splitter_patterns = vec![
         vec!["\n\n".to_string()],
         vec!["\n".to_string()],
@@ -55,11 +59,11 @@ pub async fn init_ctx() -> Arc<ProcessingContext> {
         ],
     ];
     let nw_splitter =
-        SplitterLiteConfig::new_hf(splitter_patterns.clone(), Some(512), None, true, None);
+        SplitterLiteConfig::new_hf(splitter_patterns.clone(), Some(max_tokens), merge_level, true, None);
 
     let sentence_splitter = SplitterLiteConfig::new_hf(
         splitter_patterns.clone(),
-        Some(512),
+        Some(max_tokens),
         Some(splitter_patterns.len()),
         true,
         None,
@@ -70,7 +74,7 @@ pub async fn init_ctx() -> Arc<ProcessingContext> {
         splitter: Arc::new(nw_splitter),
         sentence_splitter: Arc::new(sentence_splitter),
         hasher: Arc::new(haser),
-        n_embd: 384,
+        n_embd,
     })
 }
 

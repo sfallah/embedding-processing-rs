@@ -9,7 +9,7 @@ pub fn process_doc(c: &mut Criterion, doc: String) {
         let (embed_sender, _shutdown, _handle) = rt
             .block_on(init("../models/all-minilm-l6-v2-q2_k.gguf", 2))
             .unwrap();
-        let proc_ctx = rt.block_on(init_ctx());
+        let proc_ctx = rt.block_on(init_ctx(512, None, 384));
         b.to_async(rt).iter(|| {
             process_document(
                 proc_ctx.clone(),
