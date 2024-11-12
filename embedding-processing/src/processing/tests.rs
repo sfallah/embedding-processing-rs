@@ -43,7 +43,7 @@ mod tests {
 
     #[fixture]
     async fn ctx() -> Arc<ProcessingContext> {
-        init_ctx().await
+        init_ctx(512, None, 384).await
     }
 
     #[tokio::test(flavor = "multi_thread")]

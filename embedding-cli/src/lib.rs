@@ -20,6 +20,10 @@ pub struct Args {
     #[arg(long, default_value = "510")]
     pub max_tokens: usize,
 
+    /// Dimensionality of the embeddings and hidden states.
+    #[arg(long, default_value = "384")]
+    pub n_embd: usize,
+
     /// Number of GPU layers
     #[arg(long, default_value = "1000")]
     pub ngl: usize,
