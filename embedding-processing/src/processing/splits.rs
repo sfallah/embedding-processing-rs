@@ -1,4 +1,4 @@
-use crate::dtos::split_dto::SplitDto;
+use embedding_common::dtos::split_dto::SplitDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::embeddings::process_embedding;
 use crate::processing::summaries::process_summaries;

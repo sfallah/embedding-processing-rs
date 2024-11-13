@@ -12,11 +12,10 @@ use embedding_cli::Args;
 use embedding_common::utils::helpers::get_db_dir;
 use embedding_database::dao::dao_impl::{put_document, put_embedding, put_split, put_summary};
 use embedding_database::db::rocksdb_impl::RocksDB;
-use embedding_database::models::document::Document;
-use embedding_database::models::embedding::{Embedding, EmbeddingDataType};
-use embedding_database::models::split::Split;
-use embedding_database::models::summary::Summary;
-use embedding_processing::dtos::document_dto::DocumentDto;
+use embedding_common::models::document::Document;
+use embedding_common::models::embedding::Embedding;
+use embedding_common::models::split::Split;
+use embedding_common::models::summary::Summary;
 
 #[tokio::main]
 async fn main() {
@@ -79,7 +78,18 @@ async fn run_doc_processing(
 
     println!("{:?}", res);
 
-    save_document(db.clone(), &res).await?;
+    let document = res.to_model();
+    let splits = res.splits.iter().map(|split| split.to_model()).collect::<Vec<_>>();
+    let summaries = res.summaries.iter().map(|summary| summary.to_model()).collect::<Vec<_>>();
+    let embeddings: Vec<Embedding> = res.splits.iter()
+        .filter_map(|split_dto| split_dto.to_embedding_model())
+        .chain(
+            res.summaries.iter()
+                .filter_map(|summary_dto| summary_dto.to_embedding_model())
+        )
+        .collect();
+
+    save_models_to_db(&db, &document, &splits, &summaries, &embeddings).await?;
 
     shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles.into_iter()).await;
@@ -97,118 +107,6 @@ async fn _run_embeddings(model_path: &str, np: usize) -> anyhow::Result<()> {
     println!("got second embeddings");
     shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles.into_iter()).await;
-    Ok(())
-}
-
-pub async fn save_document(db: Arc<RocksDB>, doc_dto: &DocumentDto) -> anyhow::Result<()> {
-    let mut splits = Vec::new();
-    let mut summaries = Vec::new();
-    let mut embeddings = Vec::new();
-    let mut split_ids = Vec::new();
-    let mut document_summary_ids = Vec::new();
-
-    for split_dto in &doc_dto.splits {
-        let split_embedding_id = if let Some(embedding_dto) = &split_dto.embedding {
-            let embedding = Embedding {
-                embedding_id: embedding_dto.embedding_id,
-                data_id: split_dto.split_id,
-                embedding_type: EmbeddingDataType::Split,
-                embedding: embedding_dto.embedding.clone(),
-            };
-            embeddings.push(embedding);
-            Some(embedding_dto.embedding_id)
-        } else {
-            None
-        };
-
-        let mut split_summary_ids = Vec::new();
-
-        for summary_dto in &split_dto.summaries {
-            let summary_embedding_id = if let Some(embedding_dto) = &summary_dto.embedding {
-                let embedding = Embedding {
-                    embedding_id: embedding_dto.embedding_id,
-                    data_id: summary_dto.summary_id,
-                    embedding_type: EmbeddingDataType::Summary,
-                    embedding: embedding_dto.embedding.clone(),
-                };
-                embeddings.push(embedding);
-                embedding_dto.embedding_id
-            } else {
-                0
-            };
-
-            let summary = Summary {
-                summary_id: summary_dto.summary_id,
-                document_id: summary_dto.document_id,
-                split_id: summary_dto.split_id,
-                split_sequence_id: summary_dto.split_sequence_id,
-                embedding_id: summary_embedding_id,
-                text_content: summary_dto.text_content.clone(),
-                token_len: summary_dto.token_len,
-                centrality: summary_dto.centrality,
-            };
-            summaries.push(summary);
-            split_summary_ids.push(summary_dto.summary_id);
-        }
-
-        let split = Split {
-            split_id: split_dto.split_id,
-            sequence_id: split_dto.sequence_id,
-            doc_id: split_dto.doc_id,
-            embedding_id: split_embedding_id.unwrap_or(0),
-            text_content: split_dto.text_content.clone(),
-            token_len: split_dto.token_len,
-            summary_ids: if split_summary_ids.is_empty() {
-                None
-            } else {
-                Some(split_summary_ids)
-            },
-        };
-        splits.push(split);
-        split_ids.push(split_dto.split_id);
-    }
-
-    for summary_dto in &doc_dto.summaries {
-        let summary_embedding_id = if let Some(embedding_dto) = &summary_dto.embedding {
-            let embedding = Embedding {
-                embedding_id: embedding_dto.embedding_id,
-                data_id: summary_dto.summary_id,
-                embedding_type: EmbeddingDataType::Summary,
-                embedding: embedding_dto.embedding.clone(),
-            };
-            embeddings.push(embedding);
-            embedding_dto.embedding_id
-        } else {
-            0
-        };
-
-        let summary = Summary {
-            summary_id: summary_dto.summary_id,
-            document_id: summary_dto.document_id,
-            split_id: summary_dto.split_id,
-            split_sequence_id: summary_dto.split_sequence_id,
-            embedding_id: summary_embedding_id,
-            text_content: summary_dto.text_content.clone(),
-            token_len: summary_dto.token_len,
-            centrality: summary_dto.centrality,
-        };
-        summaries.push(summary);
-        document_summary_ids.push(summary_dto.summary_id);
-    }
-
-    let document = Document {
-        document_id: doc_dto.document_id,
-        document_url: doc_dto.document_url.clone(),
-        split_ids,
-        summary_ids: if document_summary_ids.is_empty() {
-            None
-        } else {
-            Some(document_summary_ids)
-        }
-    };
-
-    save_models_to_db(&db, &document, &splits, &summaries, &embeddings).await?;
-
     Ok(())
 }
 

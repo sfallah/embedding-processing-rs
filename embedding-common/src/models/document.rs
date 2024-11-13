@@ -1,4 +1,4 @@
-use embedding_common::types::Serde;
+use crate::Serde;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
