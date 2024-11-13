@@ -728,6 +728,7 @@ dependencies = [
  "embedding-database",
  "embedding-processing",
  "futures",
+ "rayon",
  "tokio",
  "tracing",
  "tracing-subscriber",

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 anyhow = {workspace = true}
 tokio = { workspace = true}
+rayon = {workspace = true}
 futures = {workspace = true}
 tracing = {workspace = true}
 tracing-subscriber = {workspace = true}

@@ -1,21 +1,25 @@
+use tracing::{info, error, Instrument};
 use std::sync::Arc;
 use clap::Parser;
 use futures::future::join_all;
+use rayon::prelude::*;
+use tokio::task;
+
+use embedding_common::models::document::Document;
+use embedding_common::models::embedding::Embedding;
+use embedding_common::models::split::Split;
+use embedding_common::models::summary::Summary;
+use embedding_common::utils::helpers::get_db_dir;
+
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
 
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use tracing::{error, Instrument};
-use tracing::info;
-use embedding_cli::Args;
-use embedding_common::utils::helpers::get_db_dir;
 use embedding_database::dao::dao_impl::{put_document, put_embedding, put_split, put_summary};
 use embedding_database::db::rocksdb_impl::RocksDB;
-use embedding_common::models::document::Document;
-use embedding_common::models::embedding::Embedding;
-use embedding_common::models::split::Split;
-use embedding_common::models::summary::Summary;
+
+use embedding_cli::Args;
 
 #[tokio::main]
 async fn main() {
@@ -78,16 +82,22 @@ async fn run_doc_processing(
 
     println!("{:?}", res);
 
-    let document = res.to_model();
-    let splits = res.splits.iter().map(|split| split.to_model()).collect::<Vec<_>>();
-    let summaries = res.summaries.iter().map(|summary| summary.to_model()).collect::<Vec<_>>();
-    let embeddings: Vec<Embedding> = res.splits.iter()
-        .filter_map(|split_dto| split_dto.to_embedding_model())
-        .chain(
-            res.summaries.iter()
-                .filter_map(|summary_dto| summary_dto.to_embedding_model())
-        )
-        .collect();
+    let (document, splits, summaries, embeddings) = task::spawn_blocking(move || {
+        let document = res.to_model();
+
+        let splits: Vec<_> = res.splits.par_iter().map(|split| split.to_model()).collect();
+        let summaries: Vec<_> = res.summaries.par_iter().map(|summary| summary.to_model()).collect();
+
+        let embeddings: Vec<Embedding> = res.splits.par_iter()
+            .filter_map(|split_dto| split_dto.to_embedding_model())
+            .chain(
+                res.summaries.par_iter()
+                    .filter_map(|summary_dto| summary_dto.to_embedding_model())
+            )
+            .collect();
+
+        (document, splits, summaries, embeddings)
+    }).await?;
 
     save_models_to_db(&db, &document, &splits, &summaries, &embeddings).await?;
 
