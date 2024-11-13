@@ -1,3 +1,5 @@
+use crate::models::embedding::{Embedding, EmbeddingDataType};
+
 /// represents an individual embedding with metadata.
 #[derive(Clone, Debug)]
 pub struct EmbeddingDto {
@@ -11,6 +13,14 @@ impl EmbeddingDto {
         EmbeddingDto {
             embedding_id,
             embedding,
+        }
+    }
+    pub fn to_model(&self, data_id: u64, embedding_type: EmbeddingDataType) -> Embedding {
+        Embedding {
+            embedding_id: self.embedding_id,
+            data_id,
+            embedding_type,
+            embedding: self.embedding.clone(),
         }
     }
 }

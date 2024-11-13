@@ -1,35 +1,37 @@
-use crate::dtos::embedding_dto::EmbeddingDto;
-use crate::dtos::summary_dto::SummaryDto;
+use crate::Serde;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
-pub struct SplitDto {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Split {
     pub split_id: u64,
     pub sequence_id: i32,
     pub doc_id: u64,
+    pub embedding_id: u64,
     pub text_content: String,
     pub token_len: usize,
-    pub summaries: Vec<SummaryDto>,
-    pub embedding: Option<EmbeddingDto>,
+    pub summary_ids: Option<Vec<u64>>,
 }
 
-impl SplitDto {
+impl Split {
     pub fn new(
         split_id: u64,
         sequence_id: i32,
         doc_id: u64,
+        embedding_id: u64,
         text_content: &str,
         token_len: usize,
-        summaries: Vec<SummaryDto>,
-        embedding: Option<EmbeddingDto>,
+        summary_ids: Option<Vec<u64>>,
     ) -> Self {
-        SplitDto {
+        Split {
             split_id,
             sequence_id,
             doc_id,
+            embedding_id,
             text_content: text_content.to_string(),
             token_len,
-            summaries,
-            embedding,
+            summary_ids,
         }
     }
 }
+
+impl Serde for Split {}

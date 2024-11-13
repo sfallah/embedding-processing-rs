@@ -1,5 +1,6 @@
 use crate::dtos::split_dto::SplitDto;
 use crate::dtos::summary_dto::SummaryDto;
+use crate::models::document::Document;
 
 #[derive(Debug, Clone)]
 pub struct DocumentDto {
@@ -21,6 +22,22 @@ impl DocumentDto {
             document_url: document_url.to_string(),
             splits,
             summaries,
+        }
+    }
+    pub fn to_model(&self) -> Document {
+        let split_ids = self.splits.iter().map(|s| s.split_id).collect();
+
+        let summary_ids = if self.summaries.is_empty() {
+            None
+        } else {
+            Some(self.summaries.iter().map(|s| s.summary_id).collect())
+        };
+
+        Document {
+            document_id: self.document_id,
+            document_url: self.document_url.clone(),
+            split_ids,
+            summary_ids,
         }
     }
 }

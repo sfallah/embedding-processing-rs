@@ -1,8 +1,8 @@
 use crate::db::rocksdb_impl::RocksDB;
-use crate::models::document::Document;
-use crate::models::embedding::Embedding;
-use crate::models::split::Split;
-use crate::models::summary::Summary;
+use embedding_common::models::document::Document;
+use embedding_common::models::embedding::Embedding;
+use embedding_common::models::split::Split;
+use embedding_common::models::summary::Summary;
 use crate::db::column_families::ColumnFamilyType;
 use anyhow::{anyhow, Result};
 use embedding_common::Serde;

@@ -1,5 +1,5 @@
-use crate::dtos::embedding_dto::EmbeddingDto;
-use crate::dtos::summary_dto::SummaryDto;
+use embedding_common::dtos::embedding_dto::EmbeddingDto;
+use embedding_common::dtos::summary_dto::SummaryDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
