@@ -1,6 +1,7 @@
 use crate::Serde;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use uuid::Uuid;
 
 /// Represent the enum for data type of the embedding.
 #[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Clone, Copy)]
@@ -38,3 +39,10 @@ impl Embedding {
     }
 }
 impl Serde for Embedding {}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+pub struct EmbeddingUser {
+    pub embed_id: u64,
+    pub user_uuid: Uuid,
+}
+impl Serde for EmbeddingUser {}

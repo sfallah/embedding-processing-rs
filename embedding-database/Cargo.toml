@@ -14,10 +14,11 @@ serde_repr = { workspace = true }
 rmp-serde = { workspace = true }
 serde_json = { workspace = true }
 num_cpus = { workspace = true }
+uuid = { workspace = true }
 embedding-common = { path = "../embedding-common" }
 
 [dev-dependencies]
 rstest = "0.23.0"
-fake = "3.0.0"
+fake = "3.0.1"
 tempdir = "0.3.7"
 tokio = { version = "1.41.0", features = ["test-util"] }
