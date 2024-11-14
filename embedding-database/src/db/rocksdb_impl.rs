@@ -55,7 +55,7 @@ impl RocksDB {
     /// Opens the RocksDB database asynchronously.
     #[instrument]
     pub async fn open(path: &str) -> Result<Self> {
-        let cfs = vec!["default", "documents", "splits", "summaries", "embeddings"];
+        let cfs = vec!["default", "documents", "splits", "summaries", "embeddings", "embedding_users"];
         let path = path.to_string();
         let path_clone = path.clone();
 
@@ -132,6 +132,21 @@ impl RocksDB {
         }
 
         Ok(result)
+    }
+
+    pub fn get_sync(&self, cf: ColumnFamilyType, key: &u64) -> Result<Option<Vec<u8>>> {
+        let key_bytes = Self::key_to_bytes(key);
+        let db = self.db.clone();
+        let cf_name = cf.name().to_string();
+        let cf_name_clone = cf_name.clone();
+
+        info!("Getting key: {} from cf: {}", key, cf_name_clone);
+
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        let value = db.get_cf(&cf, &key_bytes)?;
+        Ok(value)
     }
 
     /// Asynchronously retrieves all values from the specified cf.

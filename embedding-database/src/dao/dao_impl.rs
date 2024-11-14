@@ -1,12 +1,13 @@
 use crate::db::rocksdb_impl::RocksDB;
 use embedding_common::models::document::Document;
-use embedding_common::models::embedding::Embedding;
+use embedding_common::models::embedding::{Embedding, EmbeddingUser};
 use embedding_common::models::split::Split;
 use embedding_common::models::summary::Summary;
 use crate::db::column_families::ColumnFamilyType;
 use anyhow::{anyhow, Result};
 use embedding_common::Serde;
 use std::sync::Arc;
+use uuid::Uuid;
 
 /// Stores a `Document` in the database.
 pub async fn put_document(db: &Arc<RocksDB>, document: &Document) -> Result<()> {
@@ -37,6 +38,13 @@ pub async fn put_embedding(db: &Arc<RocksDB>, embedding: &Embedding) -> Result<(
     let embedding_id = &embedding.embedding_id;
     let data = embedding.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
     db.put(ColumnFamilyType::Embeddings, embedding_id, &data).await?;
+    Ok(())
+}
+
+pub async fn put_embedding_user(db: &Arc<RocksDB>, embedding_user: &EmbeddingUser) -> Result<()> {
+    let embed_id = &embedding_user.embed_id;
+    let data = embedding_user.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
+    db.put(ColumnFamilyType::EmbeddingUsers, embed_id, &data).await?;
     Ok(())
 }
 
@@ -83,6 +91,28 @@ pub async fn get_embedding(db: &Arc<RocksDB>, embedding_id: &u64) -> Result<Opti
             let embedding =
                 Embedding::unpack(&data).map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
             Ok(Some(embedding))
+        }
+        None => Ok(None),
+    }
+}
+
+pub async fn get_embedding_user(db: &Arc<RocksDB>, embed_id: u64) -> Result<Option<EmbeddingUser>> {
+    match db.get(ColumnFamilyType::EmbeddingUsers, &embed_id).await? {
+        Some(data) => {
+            let embedding_user =
+                EmbeddingUser::unpack(&data).map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
+            Ok(Some(embedding_user))
+        }
+        None => Ok(None),
+    }
+}
+
+pub fn get_embedding_user_sync(db: &Arc<RocksDB>, embed_id: u64) -> Result<Option<EmbeddingUser>> {
+    match db.get_sync(ColumnFamilyType::EmbeddingUsers, &embed_id)? {
+        Some(data) => {
+            let embedding_user =
+                EmbeddingUser::unpack(&data).map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
+            Ok(Some(embedding_user))
         }
         None => Ok(None),
     }
@@ -171,3 +201,13 @@ pub async fn get_summaries_of_split(
 
     Ok(Some(summaries))
 }
+
+pub fn has_embedding_user(db: &Arc<RocksDB>, embed_id: u64, user_uuid: &Uuid) -> Result<bool> {
+    let res = match get_embedding_user_sync(db, embed_id) {
+        Ok(opt) => opt.map(|eu| eu.user_uuid == *user_uuid).unwrap_or(false),
+        Err(_) => false,
+    };
+    Ok(res)
+}
+
+
