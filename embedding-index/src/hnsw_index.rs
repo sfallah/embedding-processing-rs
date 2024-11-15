@@ -4,6 +4,7 @@ use embedding_database::db::rocksdb_impl::RocksDB;
 use std::sync::{Arc, Mutex};
 use usearch::{new_index, Index, IndexOptions, MetricKind, ScalarKind};
 use uuid::Uuid;
+use rayon::prelude::*;
 
 pub struct HnswIndex {
     pub index: Arc<Mutex<Index>>,
@@ -81,9 +82,9 @@ impl HnswIndex {
     pub fn batch_add(&self, embeddings: &Vec<Vec<f32>>, labels: &Vec<u64>) -> anyhow::Result<()> {
         let index = self.index.lock().map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
         Self::check_expand_capacity(&index, embeddings.len())?;
-        for (i, vec) in embeddings.iter().enumerate() {
-            index.add(labels[i], vec).map_err(|e| anyhow::Error::msg(format!("Failed to add item: {:?}", e)))?;
-        }
+        embeddings.par_iter().enumerate().for_each(|(i, vec)| {
+            index.add(labels[i], vec).map_err(|e| anyhow::Error::msg(format!("Failed to add item: {:?}", e))).unwrap();
+        });
         Ok(())
     }
 
