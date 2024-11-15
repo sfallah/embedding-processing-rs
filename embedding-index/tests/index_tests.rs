@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use embedding_database::db::column_families::ColumnFamilyType;
+    use embedding_common::models::embedding::EmbeddingUser;
+    use embedding_database::dao::dao_impl::put_embedding_user;
     use embedding_database::db::rocksdb_impl::RocksDB;
     use embedding_index::hnsw_index::HnswIndex;
     use embedding_index::utils::generate_random_vectors;
     use rand::{thread_rng, Rng};
+    use std::sync::Arc;
     use usearch::{new_index, IndexOptions, MetricKind, ScalarKind};
     use uuid::Uuid;
 
@@ -39,7 +41,7 @@ mod tests {
     async fn index_filter_test() -> anyhow::Result<()> {
         let temp_dir = tempdir::TempDir::new("test_embedding_users")?;
         let db_path = temp_dir.path().to_str().unwrap();
-        let rocksdb = RocksDB::open(db_path).await?;
+        let rocksdb = Arc::new(RocksDB::open(db_path).await?);
 
         let index = HnswIndex::new(384)?;
 
@@ -69,19 +71,17 @@ mod tests {
                     .skip(i * 10)
                     .take(10)
                     .collect::<Vec<_>>();
-                (user_id, embed_ids, embeddings)
+                (*user_id, embed_ids, embeddings)
             })
             .collect();
 
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.iter().zip(embeddings.iter()) {
-                rocksdb
-                    .put(
-                        ColumnFamilyType::EmbeddingUsers,
-                        embed_id,
-                        user_id.as_bytes(),
-                    )
-                    .await?;
+                let embedding_user = EmbeddingUser {
+                    user_uuid: *user_id,
+                    embed_id: *embed_id,
+                };
+                put_embedding_user(&rocksdb, &embedding_user).await.map_err(|e| anyhow!("Failed to put embedding user: {}", e))?;
                 let res = tokio::task::block_in_place(|| {
                     index
                         .add(embedding, *embed_id)
@@ -93,6 +93,18 @@ mod tests {
                         eprintln!("Failed to add item to index: {}", e);
                     }
                 }
+            }
+        }
+
+        for (user_id, embed_ids, embeddings) in records.iter() {
+            for (embed_id, embedding) in embed_ids.iter().zip(embeddings.iter()) {
+                let res = index.query_filter(rocksdb.clone(), user_id, embedding, 4)?;
+                assert_eq!(res.0.len(), 4);
+                assert_eq!(res.1.len(), 4);
+                let first_label = res.0[0];
+                let first_dist = res.1[0];
+                assert_eq!(first_label, *embed_id);
+                assert_eq!(first_dist, 0.0);
             }
         }
         Ok(())
