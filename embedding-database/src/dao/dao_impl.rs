@@ -202,8 +202,8 @@ pub async fn get_summaries_of_split(
     Ok(Some(summaries))
 }
 
-pub fn has_embedding_user(db: &Arc<RocksDB>, embed_id: u64, user_uuid: &Uuid) -> Result<bool> {
-    let res = match get_embedding_user_sync(db, embed_id) {
+pub fn has_embedding_user(db: Arc<RocksDB>, embed_id: u64, user_uuid: &Uuid) -> Result<bool> {
+    let res = match get_embedding_user_sync(&db.clone(), embed_id) {
         Ok(opt) => opt.map(|eu| eu.user_uuid == *user_uuid).unwrap_or(false),
         Err(_) => false,
     };

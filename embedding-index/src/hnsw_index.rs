@@ -1,10 +1,9 @@
-use std::sync::{Arc, Mutex};
 use anyhow::anyhow;
-use usearch::{new_index, Index, IndexOptions, MetricKind, ScalarKind};
-use usearch::ffi::new_native_index;
-use uuid::Uuid;
 use embedding_database::dao::dao_impl::has_embedding_user;
 use embedding_database::db::rocksdb_impl::RocksDB;
+use std::sync::{Arc, Mutex};
+use usearch::{new_index, Index, IndexOptions, MetricKind, ScalarKind};
+use uuid::Uuid;
 
 pub struct HnswIndex {
     pub index: Arc<Mutex<Index>>,
@@ -74,11 +73,11 @@ impl HnswIndex {
         index.remove(label).map_err(|e| anyhow::Error::msg(format!("Failed to delete item: {:?}", e)))
     }
 
-    pub fn query_filter(&self, db: &Arc<RocksDB>, user_uuid: &Uuid, query: &Vec<f32>, k: usize) -> anyhow::Result<(Vec<u64>, Vec<f32>)> {
+    pub fn query_filter(&self, db: Arc<RocksDB>, user_uuid: &Uuid, query: &Vec<f32>, k: usize) -> anyhow::Result<(Vec<u64>, Vec<f32>)> {
         let index = self.index.lock().map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
         let matches = index.filtered_search(query, k, |key| {
             let embed_id: u64 = key.into();
-            has_embedding_user(db, embed_id, user_uuid).unwrap()
+            has_embedding_user(db.clone(), embed_id, user_uuid).unwrap()
         }).map_err(|e| anyhow::Error::msg(format!("Failed to query index: {:?}", e)))?;
         Ok((matches.keys, matches.distances))
     }
