@@ -28,7 +28,7 @@ impl HnswIndex {
                 return Err(anyhow::Error::msg(format!("Failed to create index: {:?}", e))),
             Ok(index) => index,
         };
-        index.reserve(1000).map_err(|e| anyhow!("Failed to reserve index: {:?}", e))?;
+        index.reserve(64).map_err(|e| anyhow!("Failed to reserve index: {:?}", e))?;
         //index.reserve(1000).map_err(|e| anyhow!("Failed to reserve index: {:?}", e))?;
 
         let inner = Arc::new(Mutex::new(index));
@@ -65,7 +65,26 @@ impl HnswIndex {
 
     pub fn add(&self, rust_vec: &Vec<f32>, label: u64) -> anyhow::Result<()> {
         let index = self.index.lock().map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
+        Self::check_expand_capacity(&index, 1)?;
         index.add(label, rust_vec).map_err(|e| anyhow::Error::msg(format!("Failed to add item: {:?}", e)))
+    }
+
+    pub fn check_expand_capacity(index: &Index, num: usize) -> anyhow::Result<()> {
+        if index.capacity() <= index.size() + num {
+            let num = if num > 64 { num } else { 64 };
+            index.reserve(index.size() + num).map_err(|e| anyhow!("Failed to reserve index: {:?}", e))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn batch_add(&self, embeddings: &Vec<Vec<f32>>, labels: &Vec<u64>) -> anyhow::Result<()> {
+        let index = self.index.lock().map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
+        Self::check_expand_capacity(&index, embeddings.len())?;
+        for (i, vec) in embeddings.iter().enumerate() {
+            index.add(labels[i], vec).map_err(|e| anyhow::Error::msg(format!("Failed to add item: {:?}", e)))?;
+        }
+        Ok(())
     }
 
     pub fn delete(&self, label: u64) -> anyhow::Result<usize> {
@@ -85,5 +104,15 @@ impl HnswIndex {
     pub fn save(&self, location: &str) -> anyhow::Result<()> {
         let index = self.index.lock().map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
         index.save(location).map_err(|e| anyhow::Error::msg(format!("Failed to save index: {:?}", e)))
+    }
+
+    pub fn size(&self) -> usize {
+        let index = self.index.lock().unwrap();
+        index.size()
+    }
+
+    pub fn capacity(&self) -> usize {
+        let index = self.index.lock().unwrap();
+        index.capacity()
     }
 }
