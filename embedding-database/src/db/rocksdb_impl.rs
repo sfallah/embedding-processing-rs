@@ -1,8 +1,5 @@
 use byteorder::{ByteOrder, LittleEndian};
-use rocksdb::{
-    ColumnFamilyDescriptor, DBCompressionType, DBWithThreadMode, IteratorMode, MultiThreaded,
-    Options, WriteBatch,
-};
+use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, DBWithThreadMode, IteratorMode, MultiThreaded, Options, WriteBatch};
 use std::sync::Arc;
 use anyhow::{Result, anyhow};
 use tokio::task;
