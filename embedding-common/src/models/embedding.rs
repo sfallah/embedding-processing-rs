@@ -22,6 +22,7 @@ pub struct Embedding {
     pub embedding_type: EmbeddingDataType,
     /// actual data of the embedding as a vector of floats.
     pub embedding: Vec<f32>,
+    pub model_id: u64,
 }
 impl Embedding {
     pub fn new(
@@ -29,12 +30,14 @@ impl Embedding {
         data_id: u64,
         embedding_type: EmbeddingDataType,
         embedding: Vec<f32>,
+        model_id: u64,
     ) -> Self {
         Embedding {
             embedding_id,
             data_id,
             embedding_type,
             embedding,
+            model_id,
         }
     }
 }
@@ -44,5 +47,11 @@ impl Serde for Embedding {}
 pub struct EmbeddingUser {
     pub embed_id: u64,
     pub user_uuid: Uuid,
+}
+
+impl EmbeddingUser {
+    pub fn new(embed_id: u64, user_uuid: Uuid) -> Self {
+        EmbeddingUser { embed_id, user_uuid }
+    }
 }
 impl Serde for EmbeddingUser {}

@@ -6,6 +6,7 @@ pub enum ColumnFamilyType {
     Summaries,
     Embeddings,
     EmbeddingUsers,
+    Models,
 }
 
 impl ColumnFamilyType {
@@ -17,6 +18,7 @@ impl ColumnFamilyType {
             ColumnFamilyType::Summaries => "summaries",
             ColumnFamilyType::Embeddings => "embeddings",
             ColumnFamilyType::EmbeddingUsers => "embedding_users",
+            ColumnFamilyType::Models => "models",
         }
     }
 }

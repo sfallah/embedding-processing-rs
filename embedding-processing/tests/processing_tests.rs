@@ -1,12 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use crate::processing::context::ProcessingContext;
-    use crate::processing::documents::process_document;
-    use crate::processing::splits::process_split;
-    use crate::processing::splitter::split_text;
-    use crate::processing::summaries::process_summaries;
-    use crate::services::embeddings::async_get_embeddings;
-    use crate::utils::app_utils::{init, init_ctx, setup_tracing};
+    use embedding_processing::processing::context::ProcessingContext;
+    use embedding_processing::processing::documents::process_document;
+    use embedding_processing::processing::splits::process_split;
+    use embedding_processing::processing::splitter::split_text;
+    use embedding_processing::processing::summaries::process_summaries;
+    use embedding_processing::services::embeddings::async_get_embeddings;
+    use embedding_processing::utils::app_utils::{init, init_ctx, setup_tracing};
     use rstest::{fixture, rstest};
     use std::sync::Arc;
     use tracing::{debug, Level};
@@ -41,14 +41,9 @@ mod tests {
             .expect("Failed to read test text file")
     }
 
-    #[fixture]
-    async fn ctx() -> Arc<ProcessingContext> {
-        init_ctx(512, None, 384).await
-    }
-
     #[tokio::test(flavor = "multi_thread")]
     async fn test_embeddings() -> anyhow::Result<()> {
-        let (embed, shutdown, handles) = init(MODEL_PATH, 1).await?;
+        let (embed, shutdown, handles, model) = init(MODEL_PATH, 1).await?;
 
         let text = "This is a test text".to_string();
         let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
@@ -60,11 +55,10 @@ mod tests {
         Ok(())
     }
 
-    #[rstest]
     #[tokio::test]
-    async fn test_splitter(#[future] ctx: Arc<ProcessingContext>) -> anyhow::Result<()> {
+    async fn test_splitter() -> anyhow::Result<()> {
         let text = "This is a test text".to_string();
-
+        let ctx = init_ctx(512, None, 384, 0).await.await;
         let splitter = ctx.await.splitter.clone();
         let splits = split_text(splitter, text.as_bytes().to_vec())
             .await
@@ -77,11 +71,10 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_summaries_process(
-        #[future] ctx: Arc<ProcessingContext>,
         text: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handles) = init(MODEL_PATH, 1).await?;
-        let ctx = ctx.await.clone();
+        let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 1).await?;
+        let ctx = init_ctx(512, None, 384, model.model_id).await.await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
         let summaries = process_summaries(ctx, embed_sender, text, 0, 0)
@@ -106,11 +99,10 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_split_process(
-        #[future] ctx: Arc<ProcessingContext>,
         text: String,
     ) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handles) = init(MODEL_PATH, 2).await?;
-        let ctx = ctx.await.clone();
+        let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
+        let ctx = init_ctx(512, None, 384, model.model_id).await.await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
         let splitter = ctx.clone().splitter.clone();
@@ -134,11 +126,11 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_document_process(
-        #[future] ctx: Arc<ProcessingContext>,
         #[future] text_from_file: String,
     ) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
-        let (embed_sender, shutdown, handles) = init(MODEL_PATH, 2).await?;
+        let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
+        let ctx = init_ctx(512, None, 384, model.model_id).await.await;
         let ctx = ctx.await.clone();
         let embed_sender = embed_sender.clone();
         let doc = process_document(

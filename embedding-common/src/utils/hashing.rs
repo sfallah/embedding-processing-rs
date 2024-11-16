@@ -1,4 +1,4 @@
-use ahash::RandomState;
+use ahash::{AHasher, RandomState};
 use std::hash::{BuildHasher, Hash, Hasher};
 
 /// A deterministic hasher that uses the AHash algorithm with fixed seeds.
@@ -42,4 +42,9 @@ impl DeterministicAHasher {
         t.hash(&mut hasher);
         hasher.finish()
     }
+
+    pub fn get_hasher(&self) -> AHasher {
+        self.state.build_hasher()
+    }
+
 }

@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use embedding_common::Serde;
 use std::sync::Arc;
 use uuid::Uuid;
+use embedding_common::models::model::Model;
 
 /// Stores a `Document` in the database.
 pub async fn put_document(db: &Arc<RocksDB>, document: &Document) -> Result<()> {
@@ -45,6 +46,13 @@ pub async fn put_embedding_user(db: &Arc<RocksDB>, embedding_user: &EmbeddingUse
     let embed_id = &embedding_user.embed_id;
     let data = embedding_user.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
     db.put(ColumnFamilyType::EmbeddingUsers, embed_id, &data).await?;
+    Ok(())
+}
+
+pub async fn put_model(db: &Arc<RocksDB>, model:Model) -> Result<()> {
+    let model_id = &model.model_id;
+    let data = model.pack().map_err(|e| anyhow!("Failed to pack model: {}", e))?;
+    db.put(ColumnFamilyType::Models, model_id, &data).await?;
     Ok(())
 }
 

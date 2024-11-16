@@ -9,9 +9,10 @@ pub async fn process_embedding(
     sender: Arc<Sender<EmbeddingsRequest>>,
     embed_id: u64,
     sentences: Vec<String>,
+    model_id: u64,
 ) -> anyhow::Result<EmbeddingDto> {
     trace!("Processing embedding...");
     let embedding = async_get_embeddings(sender.clone(), &sentences, 384).await?;
     trace!("Embedding processed");
-    Ok(EmbeddingDto::new(embed_id, embedding))
+    Ok(EmbeddingDto::new(embed_id, embedding, model_id))
 }

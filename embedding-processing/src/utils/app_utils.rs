@@ -9,6 +9,7 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
+use embedding_common::models::model::Model;
 
 pub async fn init(
     model_path: &str,
@@ -17,6 +18,7 @@ pub async fn init(
     Arc<async_channel::Sender<EmbeddingsRequest>>,
     Arc<broadcast::Sender<String>>,
     Vec<JoinHandle<()>>,
+    Arc<Model>,
 )> {
     let (embedding_sender, embedding_receiver) = async_channel::unbounded::<EmbeddingsRequest>();
 
@@ -24,9 +26,19 @@ pub async fn init(
     let shutdown_receiver = Arc::new(shutdown_receiver);
     let shutdown_sender = Arc::new(shutdown_sender);
 
+
+    let mut n_ctx = None;
+    let mut n_embd = None;
+
     let mut embed_handles = Vec::new();
     for _ in 0..embed_workers {
         let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000));
+
+        if n_ctx.is_none() {
+            n_ctx = Some(model_instance.get_n_ctx());
+            n_embd = Some(model_instance.get_n_embd());
+        }
+
         let embedding_receiver = embedding_receiver.clone();
         let shutdown_receiver = shutdown_receiver.clone();
         let embed_handle = tokio::spawn(async move {
@@ -40,13 +52,17 @@ pub async fn init(
         embed_handles.push(embed_handle);
     }
     let embed_sender = Arc::new(embedding_sender);
-    Ok((embed_sender, shutdown_sender, embed_handles))
+    let hasher = DeterministicAHasher::new(None, None);
+    let model = Model::new(&hasher, model_path.to_string(), n_ctx.unwrap(), n_embd.unwrap());
+    let model = Arc::new(model);
+    Ok((embed_sender, shutdown_sender, embed_handles, model))
 }
 
 pub async fn init_ctx(
     max_tokens: usize,
     merge_level: Option<usize>,
-    n_embd: usize
+    n_embd: usize,
+    model_id: u64
 ) -> Arc<ProcessingContext> {
     let splitter_patterns = vec![
         vec!["\n\n".to_string()],
@@ -69,12 +85,13 @@ pub async fn init_ctx(
         None,
     );
 
-    let haser = DeterministicAHasher::new(None, None);
+    let hasher = DeterministicAHasher::new(None, None);
     Arc::new(ProcessingContext {
         splitter: Arc::new(nw_splitter),
         sentence_splitter: Arc::new(sentence_splitter),
-        hasher: Arc::new(haser),
+        hasher: Arc::new(hasher),
         n_embd,
+        model_id,
     })
 }
 
