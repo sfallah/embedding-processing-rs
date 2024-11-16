@@ -726,12 +726,14 @@ dependencies = [
  "clap",
  "embedding-common",
  "embedding-database",
+ "embedding-index",
  "embedding-processing",
  "futures",
  "rayon",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -757,6 +759,7 @@ dependencies = [
  "byteorder",
  "embedding-common",
  "fake",
+ "futures",
  "num_cpus",
  "rmp-serde",
  "rocksdb",

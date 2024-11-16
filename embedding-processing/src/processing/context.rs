@@ -9,6 +9,7 @@ pub struct ProcessingContext {
     pub sentence_splitter: Arc<SplitterLiteConfig<HFTokenizer>>,
     pub hasher: Arc<DeterministicAHasher>,
     pub n_embd: usize,
+    pub model_id: u64,
 }
 unsafe impl Sync for ProcessingContext {}
 unsafe impl Send for ProcessingContext {}

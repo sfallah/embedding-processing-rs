@@ -23,6 +23,7 @@ pub async fn process_split(
         embed_sender.clone(),
         embed_id,
         vec![split_res.split_string.clone()],
+        ctx.model_id,
     )
     .await?;
     let summaries = process_summaries(

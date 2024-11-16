@@ -6,21 +6,24 @@ pub struct EmbeddingDto {
     pub embedding_id: u64,
     /// actual data of the embedding as a vector of floats.
     pub embedding: Vec<f32>,
+    pub model_id: u64,
 }
 
 impl EmbeddingDto {
-    pub fn new(embedding_id: u64, embedding: Vec<f32>) -> Self {
+    pub fn new(embedding_id: u64, embedding: Vec<f32>, model_id: u64) -> Self {
         EmbeddingDto {
             embedding_id,
             embedding,
+            model_id,
         }
     }
     pub fn to_model(&self, data_id: u64, embedding_type: EmbeddingDataType) -> Embedding {
-        Embedding {
-            embedding_id: self.embedding_id,
+        Embedding::new(
+            self.embedding_id,
             data_id,
             embedding_type,
-            embedding: self.embedding.clone(),
-        }
+            self.embedding.clone(),
+            self.model_id,
+        )
     }
 }

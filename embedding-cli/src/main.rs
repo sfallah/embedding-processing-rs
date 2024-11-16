@@ -1,12 +1,13 @@
 use tracing::{info, error, Instrument};
 use std::sync::Arc;
+use anyhow::anyhow;
 use clap::Parser;
 use futures::future::join_all;
 use rayon::prelude::*;
 use tokio::task;
 
 use embedding_common::models::document::Document;
-use embedding_common::models::embedding::Embedding;
+use embedding_common::models::embedding::{Embedding, EmbeddingDataType, EmbeddingUser};
 use embedding_common::models::split::Split;
 use embedding_common::models::summary::Summary;
 use embedding_common::utils::helpers::get_db_dir;
@@ -16,10 +17,14 @@ use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
 
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use embedding_database::dao::dao_impl::{put_document, put_embedding, put_split, put_summary};
+use embedding_database::dao::dao_impl::{put_document, put_embedding, put_embedding_user, put_split, put_summary};
 use embedding_database::db::rocksdb_impl::RocksDB;
 
 use embedding_cli::Args;
+use embedding_common::models::model::Model;
+use uuid::Uuid;
+use embedding_index::hnsw_index::HnswIndex;
+use rayon::prelude::*;
 
 #[tokio::main]
 async fn main() {
@@ -40,6 +45,10 @@ async fn main() {
     let rocksdb = RocksDB::open(&db_path).await.unwrap();
     let db = Arc::new(rocksdb);
 
+    let user_id = args.user_id.map_or(Uuid::new_v4(), |user_id| {
+        Uuid::parse_str(&user_id).unwrap()
+    });
+
     run_doc_processing(
         db,
         &args.model_path,
@@ -47,7 +56,8 @@ async fn main() {
         args.merge_level,
         args.np,
         args.n_embd,
-        &args.file_path
+        &args.file_path,
+        user_id
     )
         .instrument(tracing::info_span!("run_doc_processing"))
         .await
@@ -65,10 +75,11 @@ async fn run_doc_processing(
     np: usize,
     n_embd: usize,
     file_path: &std::path::Path,
+    user_id: Uuid,
 ) -> anyhow::Result<()> {
-    let (embed, shutdown, handles) = app_utils::init(&model_path, np).await?;
+    let (embed, shutdown, handles, model) = app_utils::init(&model_path, np).await?;
 
-    let ctx = init_ctx(max_tokens, merge_level, n_embd).await;
+    let ctx = init_ctx(max_tokens, merge_level, n_embd, model.model_id).await;
 
     let doc = tokio::fs::read_to_string(file_path).await?;
 
@@ -82,7 +93,7 @@ async fn run_doc_processing(
 
     println!("{:?}", res);
 
-    let (document, splits, summaries, embeddings) = task::spawn_blocking(move || {
+    let (document, splits, summaries, embeddings, embedding_users) = task::spawn_blocking(move || {
         let document = res.to_model();
 
         let splits: Vec<_> = res.splits.par_iter().map(|split| split.to_model()).collect();
@@ -96,10 +107,15 @@ async fn run_doc_processing(
             )
             .collect();
 
-        (document, splits, summaries, embeddings)
+        let embedding_users = embeddings.iter().map(|embedding| {
+            let embed_id = embedding.embedding_id;
+            EmbeddingUser::new(embed_id, user_id)
+        }).collect::<Vec<_>>();
+
+        (document, splits, summaries, embeddings, embedding_users)
     }).await?;
 
-    save_models_to_db(&db, &document, &splits, &summaries, &embeddings).await?;
+    save_models_to_db(&db, &document, &splits, &summaries, &embeddings, &embedding_users, model.clone()).await?;
 
     shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles.into_iter()).await;
@@ -107,18 +123,24 @@ async fn run_doc_processing(
     Ok(())
 }
 
-async fn _run_embeddings(model_path: &str, np: usize) -> anyhow::Result<()> {
-    let (embed, shutdown, handles) =
-        app_utils::init(&model_path, np).await?;
-    let text = "This is a test".to_string();
-    let embeddings = async_get_embeddings(embed.clone(), &vec![text.clone()], 512).await?;
-    println!("{:?}", embeddings);
-    let _embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
-    println!("got second embeddings");
-    shutdown.send("shutdown".to_string())?;
-    futures::future::join_all(handles.into_iter()).await;
+async fn create_index(_path:String,n_embd:i32, embeddings: &[Embedding]) -> anyhow::Result<()> {
+    let splits_index = HnswIndex::new(n_embd as usize)?;
+    let summaries_index = HnswIndex::new(n_embd as usize)?;
+    embeddings.iter().for_each(|embedding| {
+        match embedding.embedding_type {
+            EmbeddingDataType::Split => {
+                splits_index.add(&embedding.embedding, embedding.embedding_id).unwrap();
+            }
+            EmbeddingDataType::Summary => {
+                summaries_index.add(&embedding.embedding, embedding.embedding_id).unwrap();
+            }
+        }
+    });
+    splits_index.save("output/splits_index.usearch").map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
+    summaries_index.save("output/summaries_index.usearch").map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
     Ok(())
 }
+
 
 async fn save_models_to_db(
     db: &Arc<RocksDB>,
@@ -126,9 +148,15 @@ async fn save_models_to_db(
     splits: &[Split],
     summaries: &[Summary],
     embeddings: &[Embedding],
+    embedding_users: &[EmbeddingUser],
+    model: Arc<Model>,
 ) -> anyhow::Result<()> {
+    //FIXME: These will be sequential, but we can make them parallel
     let embedding_futures = embeddings.iter().map(|embedding| put_embedding(db, embedding));
     join_all(embedding_futures).await.into_iter().collect::<Result<(), _>>()?;
+
+    let embedding_user_futures = embedding_users.iter().map(|embedding_user| put_embedding_user(db, embedding_user));
+    join_all(embedding_user_futures).await.into_iter().collect::<Result<(), _>>()?;
 
     let split_futures = splits.iter().map(|split| put_split(db, split));
     join_all(split_futures).await.into_iter().collect::<Result<(), _>>()?;
@@ -137,6 +165,8 @@ async fn save_models_to_db(
     join_all(summary_futures).await.into_iter().collect::<Result<(), _>>()?;
 
     put_document(db, document).await?;
+
+
 
     Ok(())
 }

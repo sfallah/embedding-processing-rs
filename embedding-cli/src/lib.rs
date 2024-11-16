@@ -47,6 +47,13 @@ pub struct Args {
     /// Path to the text file to process
     #[arg(long, default_value = "embedding-processing/tests/test_data/superlinear.txt")]
     pub file_path: PathBuf,
+
+    #[arg(long)]
+    pub user_id: Option<String>,
+
+    #[arg(long, default_value = "index_dir")]
+    pub index_dir: Option<String>,
+
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]

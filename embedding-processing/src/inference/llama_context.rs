@@ -21,6 +21,9 @@ impl LlamaContext {
     pub fn get_n_embd(&self) -> i32 {
         self.ctx.get_n_embd()
     }
+    pub fn get_n_ctx(&self) -> i32 {
+        self.ctx.get_n_ctx()
+    }
 
     pub fn get_embeddings_flat(&self, texts: &Vec<String>) -> Vec<f32> {
         self.ctx.get_embeddings(&texts, false)
