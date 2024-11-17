@@ -2,7 +2,7 @@ use tracing::{info, error, Instrument};
 use std::sync::Arc;
 use anyhow::anyhow;
 use clap::Parser;
-use futures::future::join_all;
+use futures::future::{join_all, try_join_all, FutureExt};
 use rayon::prelude::*;
 use tokio::task;
 
@@ -38,7 +38,7 @@ async fn main() {
 
     info!("Starting up");
 
-    let db_path_binding = get_db_dir(Some(&args.db_path.unwrap_or_else(|| "rocksdb_dir".to_string())))
+    let db_path_binding = get_db_dir(Some(&args.db_path.unwrap_or_else(|| "rocks_db_dir".to_string())))
         .unwrap();
     let db_path = db_path_binding.to_str().unwrap();
     embedding_common::utils::helpers::create_directory(db_path).expect("Failed to create directory");
@@ -151,22 +151,15 @@ async fn save_models_to_db(
     embedding_users: &[EmbeddingUser],
     model: Arc<Model>,
 ) -> anyhow::Result<()> {
-    //FIXME: These will be sequential, but we can make them parallel
-    let embedding_futures = embeddings.iter().map(|embedding| put_embedding(db, embedding));
-    join_all(embedding_futures).await.into_iter().collect::<Result<(), _>>()?;
 
-    let embedding_user_futures = embedding_users.iter().map(|embedding_user| put_embedding_user(db, embedding_user));
-    join_all(embedding_user_futures).await.into_iter().collect::<Result<(), _>>()?;
+    let futures = embeddings.iter()
+        .map(|embedding| put_embedding(db, embedding).boxed())
+        .chain(embedding_users.iter().map(|user| put_embedding_user(db, user).boxed()))
+        .chain(splits.iter().map(|split| put_split(db, split).boxed()))
+        .chain(summaries.iter().map(|summary| put_summary(db, summary).boxed()))
+        .chain(std::iter::once(put_document(db, document).boxed()));
 
-    let split_futures = splits.iter().map(|split| put_split(db, split));
-    join_all(split_futures).await.into_iter().collect::<Result<(), _>>()?;
-
-    let summary_futures = summaries.iter().map(|summary| put_summary(db, summary));
-    join_all(summary_futures).await.into_iter().collect::<Result<(), _>>()?;
-
-    put_document(db, document).await?;
-
-
+    try_join_all(futures).await?;
 
     Ok(())
 }
