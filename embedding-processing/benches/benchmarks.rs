@@ -6,10 +6,10 @@ use std::fs;
 pub fn process_doc(c: &mut Criterion, doc: String) {
     c.bench_function("embeddings_splits_batch", |b| {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let (embed_sender, _shutdown, _handle) = rt
+        let (embed_sender, _shutdown, _handle, model) = rt
             .block_on(init("../models/all-minilm-l6-v2-q2_k.gguf", 2))
             .unwrap();
-        let proc_ctx = rt.block_on(init_ctx(512, None, 384));
+        let proc_ctx = rt.block_on(init_ctx(512, None, 384, model.model_id));
         b.to_async(rt).iter(|| {
             process_document(
                 proc_ctx.clone(),
