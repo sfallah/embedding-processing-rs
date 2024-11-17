@@ -1,8 +1,8 @@
-use embedding_common::dtos::document_dto::DocumentDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use crate::services::embeddings::EmbeddingsRequest;
+use embedding_common::dtos::document_dto::DocumentDto;
 use std::sync::Arc;
 use tracing::trace;
 
@@ -19,8 +19,26 @@ pub async fn process_document(
     let doc_id = ctx.clone().hasher.hash(&url);
     trace!("Document ID: {}", doc_id);
 
-    let mut handles = Vec::new();
+    //let mut handles = Vec::new();
 
+    let splits_futures = splits.iter().enumerate().map(|(seq_id, split)| {
+        let split = Arc::new(split.clone());
+        process_split(
+            ctx.clone(),
+            split,
+            embed_sender.clone(),
+            doc_id,
+            seq_id as i32,
+        )
+    });
+
+    futures::future::join_all(splits_futures)
+        .await
+        .into_iter()
+        .for_each(|res| {
+            split_dtos.push(res.expect("Failed to process split"));
+        });
+    /*
     for (seq_id, split) in splits.iter().enumerate() {
         let split = Arc::new(split.clone());
         let ctx = ctx.clone();
@@ -38,6 +56,8 @@ pub async fn process_document(
         .for_each(|res| {
             split_dtos.push(res.expect("Failed to process split"));
         });
+
+     */
 
     let summaries: Vec<_> = split_dtos
         .iter()
