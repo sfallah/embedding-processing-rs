@@ -13,8 +13,8 @@ pub struct Args {
     pub np: usize,
 
     /// RocksDB directory path
-    #[arg(long)]
-    pub db_path: Option<String>,
+    #[arg(long, default_value = "rocksdb_dir")]
+    pub db_path: String,
 
     /// Max tokens in a split
     #[arg(long, default_value = "510")]
@@ -52,7 +52,7 @@ pub struct Args {
     pub user_id: Option<String>,
 
     #[arg(long, default_value = "index_dir")]
-    pub index_dir: Option<String>,
+    pub index_dir: String,
 
 }
 

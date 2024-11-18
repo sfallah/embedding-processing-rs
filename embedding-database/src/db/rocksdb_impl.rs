@@ -52,7 +52,7 @@ impl RocksDB {
     /// Opens the RocksDB database asynchronously.
     #[instrument]
     pub async fn open(path: &str) -> Result<Self> {
-        let cfs = vec!["default", "documents", "splits", "summaries", "embeddings", "embedding_users"];
+        let cfs = vec!["default", "documents", "splits", "summaries", "embeddings", "embedding_users", "models"];
         let path = path.to_string();
         let path_clone = path.clone();
 

@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use embedding_processing::processing::context::ProcessingContext;
     use embedding_processing::processing::documents::process_document;
     use embedding_processing::processing::splits::process_split;
     use embedding_processing::processing::splitter::split_text;
@@ -43,7 +42,7 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_embeddings() -> anyhow::Result<()> {
-        let (embed, shutdown, handles, model) = init(MODEL_PATH, 1).await?;
+        let (embed, shutdown, handles, _model) = init(MODEL_PATH, 1).await?;
 
         let text = "This is a test text".to_string();
         let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
@@ -58,8 +57,8 @@ mod tests {
     #[tokio::test]
     async fn test_splitter() -> anyhow::Result<()> {
         let text = "This is a test text".to_string();
-        let ctx = init_ctx(512, None, 384, 0).await.await;
-        let splitter = ctx.await.splitter.clone();
+        let ctx = init_ctx(512, None, 384, 0).await;
+        let splitter = ctx.splitter.clone();
         let splits = split_text(splitter, text.as_bytes().to_vec())
             .await
             .expect("Failed to split text");
@@ -74,7 +73,7 @@ mod tests {
         text: String,
     ) -> anyhow::Result<()> {
         let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 1).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await.await;
+        let ctx = init_ctx(512, None, 384, model.model_id).await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
         let summaries = process_summaries(ctx, embed_sender, text, 0, 0)
@@ -102,7 +101,7 @@ mod tests {
         text: String,
     ) -> anyhow::Result<()> {
         let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await.await;
+        let ctx = init_ctx(512, None, 384, model.model_id).await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
         let splitter = ctx.clone().splitter.clone();
@@ -130,8 +129,7 @@ mod tests {
     ) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
         let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await.await;
-        let ctx = ctx.await.clone();
+        let ctx = init_ctx(512, None, 384, model.model_id).await;
         let embed_sender = embed_sender.clone();
         let doc = process_document(
             ctx,
