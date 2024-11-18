@@ -1,0 +1,15 @@
+[package]
+name = "embedding-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+zeromq = "0.4.1"
+rand = "0.8.5"
+tokio = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_repr = { workspace = true }
+chrono = { workspace = true }
+
+embedding-common = { path = "../embedding-common" }
