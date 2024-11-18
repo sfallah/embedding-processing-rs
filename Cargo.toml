@@ -6,7 +6,7 @@ members = [
     "embedding-database",
     "embedding-index",
     "embedding-cli",
-    #"embedding-processing-server",
+    "embedding-server",
 ]
 
 [workspace.dependencies]
@@ -23,3 +23,4 @@ rmp-serde = "1.1.2"
 serde_json = "1.0.105"
 ahash = "0.8.11"
 num_cpus = "1.16.0"
+chrono = "0.4.38"
