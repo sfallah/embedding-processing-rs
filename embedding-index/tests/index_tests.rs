@@ -5,12 +5,18 @@ mod tests {
     use embedding_database::dao::dao_impl::put_embedding_user;
     use embedding_database::db::rocksdb_impl::RocksDB;
     use embedding_index::hnsw_index::HnswIndex;
-    use embedding_index::utils::generate_random_vectors;
+    use embedding_index::utils::{generate_random_vectors, index_file};
     use rand::{thread_rng, Rng};
     use std::sync::Arc;
     use usearch::{new_index, IndexOptions, MetricKind, ScalarKind};
     use uuid::Uuid;
+    use embedding_common::config::AppConfig;
 
+    fn read_config() -> anyhow::Result<AppConfig> {
+        let config_file = "tests/test_config/index_config_test.toml".to_string();
+        let app_config =AppConfig::from_file(config_file)?;
+        Ok(app_config)
+    }
     #[test]
     fn index_add_test() -> anyhow::Result<()> {
         let options = IndexOptions {
@@ -37,13 +43,28 @@ mod tests {
         Ok(())
     }
 
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn config_load() -> anyhow::Result<()> {
+        let app_config = read_config()?;
+        let index_config = app_config.index_config;
+        println!("index_config: {:?}", index_config);
+        let index_file = index_file("summaries".to_string(), &index_config);
+        assert_eq!(index_file, "index_dir/summaries__L2sq_F16_384_16_32_32.usearch");
+        println!("index_file: {:?}", index_file);
+        Ok(())
+    }
+
+
+
     #[tokio::test(flavor = "multi_thread")]
     async fn index_filter_test() -> anyhow::Result<()> {
         let temp_dir = tempdir::TempDir::new("test_embedding_users")?;
         let db_path = temp_dir.path().to_str().unwrap();
         let rocksdb = Arc::new(RocksDB::open(db_path).await?);
 
-        let index = HnswIndex::new(384)?;
+        let app_config = read_config()?;
+        let index = HnswIndex::load_index("summaries".to_string(), &app_config.index_config)?;
 
         let mut user_ids = vec![];
         for _ in 0..4 {
@@ -128,7 +149,8 @@ mod tests {
         let db_path = temp_dir.path().to_str().unwrap();
         let rocksdb = Arc::new(RocksDB::open(db_path).await?);
 
-        let index = HnswIndex::new(384)?;
+        let app_config = read_config()?;
+        let index = HnswIndex::load_index("summaries".to_string(), &app_config.index_config)?;
 
         let mut user_ids = vec![];
         for _ in 0..4 {

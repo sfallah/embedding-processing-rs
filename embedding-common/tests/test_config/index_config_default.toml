@@ -1,0 +1,8 @@
+[index_config]
+index_dir = "test_index_dir"
+dimensions = 384
+metric_kind = "Cos"
+#scalar_kind = "F16"
+#connectivity = 16
+#expansion_add = 32
+expansion_search = 32

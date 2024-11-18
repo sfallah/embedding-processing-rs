@@ -7,7 +7,6 @@ use rayon::prelude::*;
 use tokio::task;
 
 use anyhow::Result;
-use tracing_subscriber::fmt::format;
 use embedding_common::models::document::Document;
 use embedding_common::models::embedding::{Embedding, EmbeddingDataType, EmbeddingUser};
 use embedding_common::models::split::Split;
