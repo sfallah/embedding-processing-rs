@@ -6,6 +6,8 @@ use futures::future::join_all;
 use rayon::prelude::*;
 use tokio::task;
 
+use anyhow::Result;
+use tracing_subscriber::fmt::format;
 use embedding_common::models::document::Document;
 use embedding_common::models::embedding::{Embedding, EmbeddingDataType, EmbeddingUser};
 use embedding_common::models::split::Split;
@@ -13,21 +15,19 @@ use embedding_common::models::summary::Summary;
 use embedding_common::utils::helpers::get_db_dir;
 
 use embedding_processing::processing::documents::process_document;
-use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
 
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use embedding_database::dao::dao_impl::{put_document, put_embedding, put_embedding_user, put_split, put_summary};
+use embedding_database::dao::dao_impl::{put_document, put_embedding, put_embedding_user, put_model, put_split, put_summary};
 use embedding_database::db::rocksdb_impl::RocksDB;
 
 use embedding_cli::Args;
 use embedding_common::models::model::Model;
 use uuid::Uuid;
 use embedding_index::hnsw_index::HnswIndex;
-use rayon::prelude::*;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let args = Args::parse();
 
     if let Err(e) = args.validate() {
@@ -38,11 +38,10 @@ async fn main() {
 
     info!("Starting up");
 
-    let db_path_binding = get_db_dir(Some(&args.db_path.unwrap_or_else(|| "rocksdb_dir".to_string())))
-        .unwrap();
+    let db_path_binding = get_db_dir(Some(&args.db_path))?;
     let db_path = db_path_binding.to_str().unwrap();
     embedding_common::utils::helpers::create_directory(db_path).expect("Failed to create directory");
-    let rocksdb = RocksDB::open(&db_path).await.unwrap();
+    let rocksdb = RocksDB::open(&db_path).await?;
     let db = Arc::new(rocksdb);
 
     let user_id = args.user_id.map_or(Uuid::new_v4(), |user_id| {
@@ -57,13 +56,15 @@ async fn main() {
         args.np,
         args.n_embd,
         &args.file_path,
-        user_id
+        user_id,
+        args.index_dir,
     )
         .instrument(tracing::info_span!("run_doc_processing"))
         .await
-        .unwrap();
+        ?;
 
     info!("Shutting down");
+    Ok(())
 }
 
 #[tracing::instrument]
@@ -76,7 +77,8 @@ async fn run_doc_processing(
     n_embd: usize,
     file_path: &std::path::Path,
     user_id: Uuid,
-) -> anyhow::Result<()> {
+    index_dir: String,
+) -> Result<()> {
     let (embed, shutdown, handles, model) = app_utils::init(&model_path, np).await?;
 
     let ctx = init_ctx(max_tokens, merge_level, n_embd, model.model_id).await;
@@ -116,14 +118,13 @@ async fn run_doc_processing(
     }).await?;
 
     save_models_to_db(&db, &document, &splits, &summaries, &embeddings, &embedding_users, model.clone()).await?;
-
+    create_index(index_dir, n_embd as i32, &embeddings).await?;
     shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles.into_iter()).await;
-
     Ok(())
 }
 
-async fn create_index(_path:String,n_embd:i32, embeddings: &[Embedding]) -> anyhow::Result<()> {
+async fn create_index(index_dir: String, n_embd: i32, embeddings: &[Embedding]) -> Result<()> {
     let splits_index = HnswIndex::new(n_embd as usize)?;
     let summaries_index = HnswIndex::new(n_embd as usize)?;
     embeddings.iter().for_each(|embedding| {
@@ -136,8 +137,11 @@ async fn create_index(_path:String,n_embd:i32, embeddings: &[Embedding]) -> anyh
             }
         }
     });
-    splits_index.save("output/splits_index.usearch").map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
-    summaries_index.save("output/summaries_index.usearch").map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
+    embedding_common::utils::helpers::create_directory(index_dir.as_str()).map_err(|e| anyhow!("Failed to create index directory: {:?}", e))?;
+    let splits_index_file = format!("{}/splits_index.usearch", index_dir);
+    splits_index.save(splits_index_file.as_str()).map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
+    let summaries_index_file = format!("{}/summaries_index.usearch", index_dir);
+    summaries_index.save(summaries_index_file.as_str()).map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
     Ok(())
 }
 
@@ -150,22 +154,22 @@ async fn save_models_to_db(
     embeddings: &[Embedding],
     embedding_users: &[EmbeddingUser],
     model: Arc<Model>,
-) -> anyhow::Result<()> {
-    //FIXME: These will be sequential, but we can make them parallel
+) -> Result<()> {
+    put_model(db, model.clone().as_ref()).await?;
+
     let embedding_futures = embeddings.iter().map(|embedding| put_embedding(db, embedding));
-    join_all(embedding_futures).await.into_iter().collect::<Result<(), _>>()?;
+    join_all(embedding_futures).await.into_iter().collect::<Result<()>>()?;
 
     let embedding_user_futures = embedding_users.iter().map(|embedding_user| put_embedding_user(db, embedding_user));
-    join_all(embedding_user_futures).await.into_iter().collect::<Result<(), _>>()?;
+    join_all(embedding_user_futures).await.into_iter().collect::<Result<()>>()?;
 
     let split_futures = splits.iter().map(|split| put_split(db, split));
-    join_all(split_futures).await.into_iter().collect::<Result<(), _>>()?;
+    join_all(split_futures).await.into_iter().collect::<Result<()>>()?;
 
     let summary_futures = summaries.iter().map(|summary| put_summary(db, summary));
-    join_all(summary_futures).await.into_iter().collect::<Result<(), _>>()?;
+    join_all(summary_futures).await.into_iter().collect::<Result<()>>()?;
 
     put_document(db, document).await?;
-
 
 
     Ok(())
