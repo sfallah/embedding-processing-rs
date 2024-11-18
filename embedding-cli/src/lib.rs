@@ -1,3 +1,5 @@
+pub mod file_io;
+
 use clap::ValueEnum;
 use std::path::PathBuf;
 
