@@ -42,6 +42,7 @@ pub async fn put_embedding(db: &Arc<RocksDB>, embedding: &Embedding) -> Result<(
     Ok(())
 }
 
+#[tracing::instrument(skip(db))]
 pub async fn put_embedding_user(db: &Arc<RocksDB>, embedding_user: &EmbeddingUser) -> Result<()> {
     let embed_id = &embedding_user.embed_id;
     let data = embedding_user.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;

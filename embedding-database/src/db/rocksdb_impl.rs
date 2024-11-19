@@ -131,6 +131,7 @@ impl RocksDB {
         Ok(result)
     }
 
+    #[instrument(skip(self))]
     pub fn get_sync(&self, cf: ColumnFamilyType, key: &u64) -> Result<Option<Vec<u8>>> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();

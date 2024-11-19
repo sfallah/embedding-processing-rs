@@ -108,6 +108,8 @@ impl HnswIndex {
         Ok((matches.keys, matches.distances))
     }
 
+
+
     pub fn save(&self) -> anyhow::Result<()> {
         let location = index_file(self.index_name.clone(), &self.index_config);
         self.index
@@ -133,6 +135,20 @@ impl HnswIndex {
     pub async fn async_save(index: Self) -> anyhow::Result<()> {
         tokio::task::spawn(async move {
             index.save()
+        }).await?
+    }
+
+    pub async fn async_query_filter(
+        index: Self,
+        db: Arc<RocksDB>,
+        user_uuid: &Uuid,
+        query: &Vec<f32>,
+        k: usize,
+    ) -> anyhow::Result<(Vec<u64>, Vec<f32>)> {
+        let query = query.clone();
+        let user_uuid = user_uuid.clone();
+        tokio::task::spawn(async move {
+            index.query_filter(db, &user_uuid, &query, k)
         }).await?
     }
 }
