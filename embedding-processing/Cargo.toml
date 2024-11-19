@@ -13,7 +13,7 @@ tracing-subscriber = { workspace = true }
 ahash = {workspace = true}
 chrono = "0.4.38"
 cxx = "1.0.128"
-async-channel = "2.3.1"
+async-channel = {workspace = true}
 
 
 fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }

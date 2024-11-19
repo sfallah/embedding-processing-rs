@@ -47,7 +47,7 @@ pub struct Args {
     pub log_level: LogLevel,
 
     /// Path to the text file to process
-    #[arg(long, default_value = "embedding-processing/tests/test_data/superlinear.txt")]
+    #[arg(long, default_value = "embedding-processing/tests/test_data/")]
     pub file_path: PathBuf,
 
     #[arg(long)]
@@ -55,6 +55,9 @@ pub struct Args {
 
     #[arg(long, default_value = "index_dir")]
     pub index_dir: String,
+
+    #[arg(long, default_value = "config.toml")]
+    pub config_file: String,
 
 }
 
@@ -81,16 +84,10 @@ impl LogLevel {
 
 impl Args {
     pub fn validate(&self) -> Result<(), String> {
-        if let Some(ext) = self.file_path.extension() {
-            if ext != "txt" {
-                return Err(format!(
-                    "Invalid file extension: {}. Only .txt files are allowed.",
-                    ext.to_string_lossy()
-                ));
-            }
+        if self.file_path.is_dir() {
+            Ok(())
         } else {
-            return Err("The file has no extension. Only .txt files are allowed.".to_string());
+            Err(format!("{} is not a directory", self.file_path.display()))
         }
-        Ok(())
     }
 }

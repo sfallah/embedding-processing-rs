@@ -8,7 +8,6 @@ mod tests {
     use embedding_index::utils::{generate_random_vectors, index_file};
     use rand::{thread_rng, Rng};
     use std::sync::Arc;
-    use usearch::{new_index, IndexOptions, MetricKind, ScalarKind};
     use uuid::Uuid;
     use embedding_common::config::AppConfig;
 
@@ -19,27 +18,15 @@ mod tests {
     }
     #[test]
     fn index_add_test() -> anyhow::Result<()> {
-        let options = IndexOptions {
-            dimensions: 384, // necessary for most metric kinds
-            metric: MetricKind::L2sq, // or ::L2sq, ::Cos ...
-            quantization: ScalarKind::F32, // or ::F32, ::F16, ::I8, ::B1x8 ...
-            connectivity: 0, // zero for auto
-            expansion_add: 0, // zero for auto
-            expansion_search: 0, // zero for auto
-            multi: false,
-        };
+        let config = read_config()?;
+        let index = HnswIndex::load_index("test_index".to_string(), config.index_config)?;
 
-        let index = match new_index(&options) {
-            Err(e) =>
-                return Err(anyhow::Error::msg(format!("Failed to create index: {:?}", e))),
-            Ok(index) => index,
-        };
-        index.reserve(1000).map_err(|e| anyhow!("Failed to reserve index: {:?}", e))?;
-
-        let binding = generate_random_vectors(1, 384);
-        let embedding = binding.get(0).ok_or(anyhow!("No embeddings"))?;
+        let embeddings = generate_random_vectors(2, 384);
+        let embedding1 = embeddings.get(0).ok_or(anyhow!("No embeddings"))?;
         let embed_id = thread_rng().gen();
-        index.add(embed_id, embedding)?;
+        index.add(embedding1, embed_id)?;
+        let embedding2 = embeddings.get(1).ok_or(anyhow!("No embeddings"))?;
+        index.upsert(embedding2, embed_id)?;
         Ok(())
     }
 
@@ -64,7 +51,7 @@ mod tests {
         let rocksdb = Arc::new(RocksDB::open(db_path).await?);
 
         let app_config = read_config()?;
-        let index = HnswIndex::load_index("summaries".to_string(), &app_config.index_config)?;
+        let index = HnswIndex::load_index("summaries".to_string(), app_config.index_config)?;
 
         let mut user_ids = vec![];
         for _ in 0..4 {
@@ -150,7 +137,7 @@ mod tests {
         let rocksdb = Arc::new(RocksDB::open(db_path).await?);
 
         let app_config = read_config()?;
-        let index = HnswIndex::load_index("summaries".to_string(), &app_config.index_config)?;
+        let index = HnswIndex::load_index("summaries".to_string(), app_config.index_config)?;
 
         let mut user_ids = vec![];
         for _ in 0..4 {
