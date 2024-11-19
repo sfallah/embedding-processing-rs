@@ -1,21 +1,24 @@
-use std::path::Path;
 use crate::utils::{create_dir, from_config, index_file};
 use anyhow::anyhow;
 use embedding_common::config::IndexConfig;
 use embedding_database::dao::dao_impl::has_embedding_user;
 use embedding_database::db::rocksdb_impl::RocksDB;
 use rayon::prelude::*;
-use std::sync::{Arc, Mutex};
-use usearch::{new_index, Index, IndexOptions, MetricKind, ScalarKind};
+use std::path::Path;
+use std::sync::{Arc};
+use usearch::{new_index, Index};
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct HnswIndex {
-    pub index: Arc<Mutex<Index>>,
+    pub index: Arc<Index>,
+    pub index_name: String,
+    pub index_config: IndexConfig,
 }
 
 impl HnswIndex {
-    pub fn load_index(index_name: String, index_config: &IndexConfig) -> anyhow::Result<Self> {
-        let options = from_config(index_config);
+    pub fn load_index(index_name: String, index_config: IndexConfig) -> anyhow::Result<Self> {
+        let options = from_config(&index_config);
         let index = match new_index(&options) {
             Err(e) => {
                 return Err(anyhow::Error::msg(format!(
@@ -28,7 +31,7 @@ impl HnswIndex {
 
         create_dir(index_config.index_dir.as_str())?;
 
-        let index_file = index_file(index_name, index_config);
+        let index_file = index_file(index_name.clone(), &index_config);
         let file_path = Path::new(index_file.as_str());
         if file_path.exists() && file_path.is_file() {
             index.load(file_path.to_str().unwrap()).map_err(|e| anyhow!("Failed to load index: {:?}", e))?;
@@ -38,26 +41,34 @@ impl HnswIndex {
                 .map_err(|e| anyhow!("Failed to reserve index: {:?}", e))?;
         }
 
-        let inner = Arc::new(Mutex::new(index));
-        Ok(Self { index: inner })
+        let inner = Arc::new(index);
+        let index_config = index_config.clone();
+        Ok(Self { index: inner, index_name, index_config })
     }
 
     pub fn add(&self, rust_vec: &Vec<f32>, label: u64) -> anyhow::Result<()> {
-        let index = self
-            .index
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
-        Self::check_expand_capacity(&index, 1)?;
-        index
+        self.check_expand_capacity( 1)?;
+        self.index
             .add(label, rust_vec)
-            .map_err(|e| anyhow::Error::msg(format!("Failed to add item: {:?}", e)))
+            .map_err(|e| anyhow!("Failed to add item: {:?}", e))
     }
 
-    pub fn check_expand_capacity(index: &Index, num: usize) -> anyhow::Result<()> {
-        if index.capacity() <= index.size() + num {
+    pub fn upsert(&self, rust_vec: &Vec<f32>, label: u64) -> anyhow::Result<bool> {
+        let contains = self.index.contains(label);
+        if contains {
+            self.index
+                .remove(label)
+                .map_err(|e| anyhow!("Failed to delete item: {:?}", e))?;
+        }
+        self.add(rust_vec, label)?;
+        Ok(contains)
+    }
+
+    pub fn check_expand_capacity(&self, num: usize) -> anyhow::Result<()> {
+        if self.index.capacity() <= self.index.size() + num {
             let num = if num > 64 { num } else { 64 };
-            index
-                .reserve(index.size() + num)
+            self.index
+                .reserve(self.index.size() + num)
                 .map_err(|e| anyhow!("Failed to reserve index: {:?}", e))
         } else {
             Ok(())
@@ -65,13 +76,9 @@ impl HnswIndex {
     }
 
     pub fn batch_add(&self, embeddings: &Vec<Vec<f32>>, labels: &Vec<u64>) -> anyhow::Result<()> {
-        let index = self
-            .index
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
-        Self::check_expand_capacity(&index, embeddings.len())?;
+        self.check_expand_capacity(embeddings.len())?;
         embeddings.par_iter().enumerate().for_each(|(i, vec)| {
-            index
+            self.index
                 .add(labels[i], vec)
                 .map_err(|e| anyhow::Error::msg(format!("Failed to add item: {:?}", e)))
                 .unwrap();
@@ -80,11 +87,7 @@ impl HnswIndex {
     }
 
     pub fn delete(&self, label: u64) -> anyhow::Result<usize> {
-        let index = self
-            .index
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
-        index
+        self.index
             .remove(label)
             .map_err(|e| anyhow::Error::msg(format!("Failed to delete item: {:?}", e)))
     }
@@ -96,36 +99,40 @@ impl HnswIndex {
         query: &Vec<f32>,
         k: usize,
     ) -> anyhow::Result<(Vec<u64>, Vec<f32>)> {
-        let index = self
-            .index
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
-        let matches = index
+        let matches = self.index
             .filtered_search(query, k, |key| {
                 let embed_id: u64 = key.into();
                 has_embedding_user(db.clone(), embed_id, user_uuid).unwrap()
             })
-            .map_err(|e| anyhow::Error::msg(format!("Failed to query index: {:?}", e)))?;
+            .map_err(|e| anyhow!("Failed to query index: {:?}", e))?;
         Ok((matches.keys, matches.distances))
     }
 
-    pub fn save(&self, location: &str) -> anyhow::Result<()> {
-        let index = self
-            .index
-            .lock()
-            .map_err(|e| anyhow!("Failed to lock index: {:?}", e))?;
-        index
-            .save(location)
-            .map_err(|e| anyhow::Error::msg(format!("Failed to save index: {:?}", e)))
+    pub fn save(&self) -> anyhow::Result<()> {
+        let location = index_file(self.index_name.clone(), &self.index_config);
+        self.index
+            .save(location.as_str())
+            .map_err(|e| anyhow!("Failed to save index: {:?}", e))
     }
 
     pub fn size(&self) -> usize {
-        let index = self.index.lock().unwrap();
-        index.size()
+        self.index.size()
     }
 
     pub fn capacity(&self) -> usize {
-        let index = self.index.lock().unwrap();
-        index.capacity()
+        self.index.capacity()
+    }
+
+    pub async fn async_upsert(index: Self, rust_vec: &Vec<f32>, label: u64) -> anyhow::Result<bool> {
+        let embedding = rust_vec.clone();
+        tokio::task::spawn(async move {
+            index.upsert(&embedding, label)
+        }).await?
+    }
+
+    pub async fn async_save(index: Self) -> anyhow::Result<()> {
+        tokio::task::spawn(async move {
+            index.save()
+        }).await?
     }
 }

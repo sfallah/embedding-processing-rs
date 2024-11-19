@@ -812,6 +812,7 @@ name = "embedding-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-channel",
  "clap",
  "embedding-common",
  "embedding-database",
@@ -835,11 +836,14 @@ dependencies = [
  "anyhow",
  "chrono",
  "config",
+ "log",
  "rand 0.8.5",
  "rmp-serde",
  "serde",
  "serde_json",
  "serde_repr",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 
