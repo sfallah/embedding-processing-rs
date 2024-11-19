@@ -5,7 +5,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
 pub struct IndexConfig {
-    #[serde(default = "default_dir")]
+    #[serde(default = "default_index_dir")]
     pub index_dir: String,
     pub dimensions: usize,
     #[serde(default)]
@@ -20,7 +20,7 @@ pub struct IndexConfig {
     pub expansion_search: usize,
 }
 
-fn default_dir() -> String {
+fn default_index_dir() -> String {
     "index_dir".to_string()
 }
 
