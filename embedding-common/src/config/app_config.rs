@@ -3,12 +3,21 @@ use anyhow::anyhow;
 use config::Config;
 use serde::Deserialize;
 use tracing::error;
-use crate::config::IndexConfig;
+use crate::config::{DatabaseConfig, IndexConfig};
+use crate::config::model_config::ModelConfig;
+use crate::config::splitter_config::SplitterConfig;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
 pub struct AppConfig {
+    #[serde(rename = "index")]
     pub index_config: IndexConfig,
+    #[serde(rename = "splitter")]
+    pub splitter_config: SplitterConfig,
+    #[serde(rename = "model")]
+    pub model_config: ModelConfig,
+    #[serde(rename = "database")]
+    pub database_config: DatabaseConfig,
 }
 
 impl AppConfig {

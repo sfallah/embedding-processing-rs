@@ -21,7 +21,7 @@ use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_database::dao::dao_impl::{put_document, put_embedding, put_embedding_user, put_model, put_split, put_summary};
 use embedding_database::db::rocksdb_impl::RocksDB;
 
-use embedding_cli::Args;
+use embedding_cli::Cli;
 use embedding_common::models::model::Model;
 use uuid::Uuid;
 use embedding_common::config::{AppConfig};
@@ -31,8 +31,8 @@ use embedding_processing::services::embeddings::EmbeddingsRequest;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Args::parse();
-    setup_tracing(args.log_level.to_tracing_level());
+    let args = Cli::parse();
+    setup_tracing(args.log_level);
     debug!("{:?}", args);
 
     if let Err(e) = args.validate() {
@@ -41,7 +41,11 @@ async fn main() -> Result<()> {
     }
     info!("Starting up");
 
-    let db_path_binding = get_db_dir(Some(&args.db_path))?;
+    let app_config = AppConfig::from_file_async(args.config_file).await?;
+
+    let db_config = app_config.clone().database_config;
+
+    let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
     let db_path = db_path_binding.to_str().unwrap();
     embedding_common::utils::helpers::create_directory(db_path).expect("Failed to create directory");
     let rocksdb = RocksDB::open(&db_path).await?;
@@ -53,14 +57,9 @@ async fn main() -> Result<()> {
 
     run_process_docs(
         db,
-        &args.model_path,
-        args.max_tokens,
-        args.merge_level,
-        args.np,
-        args.n_embd,
         &args.file_path,
         user_id,
-        args.config_file,
+        app_config.clone(),
     )
         .instrument(tracing::info_span!("run_process_docs"))
         .await
@@ -73,25 +72,23 @@ async fn main() -> Result<()> {
 #[tracing::instrument]
 async fn run_process_docs(
     db: Arc<RocksDB>,
-    model_path: &str,
-    max_tokens: usize,
-    merge_level: Option<usize>,
-    np: usize,
-    n_embd: usize,
     file_path: &std::path::Path,
     user_id: Uuid,
-    config_file: String,
+    app_config: AppConfig,
 ) -> Result<()> {
-    let app_config = AppConfig::from_file_async(config_file).await?;
+
+    let model_config = app_config.model_config;
+    let splitter_config = app_config.splitter_config;
 
     let splits_index = HnswIndex::load_index("splits".to_string(), app_config.index_config.clone())?;
     let summaries_index = HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone())?;
 
     let text_files = embedding_cli::file_io::list_files(&file_path, &vec!["txt".to_string()]).await?;
 
-    let (embed, shutdown, handles, model) = app_utils::init(&model_path, np).await?;
+    let (embed, shutdown, handles, model) = app_utils::init(&model_config.gguf_file, model_config.instances).await?;
 
-    let ctx = init_ctx(max_tokens, merge_level, n_embd, model.model_id).await;
+
+    let ctx = init_ctx(splitter_config.max_tokens, splitter_config.merge_level, model.n_embd as usize, model.model_id).await;
 
     let futures = text_files.iter().map(|file_path| {
         process_doc(

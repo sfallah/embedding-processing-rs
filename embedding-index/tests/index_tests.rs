@@ -12,7 +12,7 @@ mod tests {
     use embedding_common::config::AppConfig;
 
     fn read_config() -> anyhow::Result<AppConfig> {
-        let config_file = "tests/test_config/index_config_test.toml".to_string();
+        let config_file = "tests/config/index_config_test.toml".to_string();
         let app_config =AppConfig::from_file(config_file)?;
         Ok(app_config)
     }
