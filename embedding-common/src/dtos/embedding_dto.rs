@@ -1,7 +1,8 @@
+use serde::{Deserialize, Serialize};
 use crate::models::embedding::{Embedding, EmbeddingDataType};
 
 /// represents an individual embedding with metadata.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct EmbeddingDto {
     pub embedding_id: u64,
     /// actual data of the embedding as a vector of floats.
