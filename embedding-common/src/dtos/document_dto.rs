@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use crate::dtos::split_dto::SplitDto;
 use crate::dtos::summary_dto::SummaryDto;
 use crate::models::document::Document;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DocumentDto {
     pub document_id: u64,
     pub document_url: String,

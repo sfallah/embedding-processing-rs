@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use crate::dtos::embedding_dto::EmbeddingDto;
 use crate::models::embedding::{Embedding, EmbeddingDataType};
 use crate::models::summary::Summary;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SummaryDto {
     pub summary_id: u64,
     pub document_id: u64,

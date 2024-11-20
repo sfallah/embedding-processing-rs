@@ -1,9 +1,10 @@
+use serde::{Deserialize, Serialize};
 use crate::dtos::embedding_dto::EmbeddingDto;
 use crate::dtos::summary_dto::SummaryDto;
 use crate::models::embedding::{Embedding, EmbeddingDataType};
 use crate::models::split::Split;
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SplitDto {
     pub split_id: u64,
     pub sequence_id: i32,
