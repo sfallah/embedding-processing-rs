@@ -229,7 +229,7 @@ pub async fn get_summaries_of_split(
     Ok(Some(summaries))
 }
 
-//#[tracing::instrument(skip(db))]
+#[tracing::instrument(skip(db))]
 pub fn has_embedding_user(db: &Arc<RocksDB>, embed_id: u64, user_uuids: Vec<Uuid>) -> Result<bool> {
     let res = match get_embedding_user(&db.clone(), embed_id) {
         Ok(opt) => {

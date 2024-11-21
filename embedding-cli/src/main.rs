@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::task;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 use anyhow::Result;
 use async_channel::Sender;
@@ -95,6 +95,8 @@ async fn run_query(
 
     let query_embd =
         async_get_embeddings(embed.clone(), &vec![query.to_string()], model.n_embd as usize).await?;
+
+    trace!("Query embeddings: {:?}", query_embd.len());
 
     let (embd_ids, _scores) =
         splits_index.query_filter(&db, &vec![user_id.clone()], &query_embd.to_vec(), top_k)

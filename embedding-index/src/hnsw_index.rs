@@ -40,13 +40,15 @@ impl HnswIndex {
                 error!("Failed to load index: {:?}", e);
                 return Err(anyhow!("Failed to load index: {:?}", e));
             }
-            info!("Loaded existing index: {}", index_file);
+            info!("Loaded existing index: {}, size: {}, capacity: {}", index_file, index.size(), index.capacity());
         } else {
-            if let Err(e) = index.reserve(64) {
+            info!("Created and reserved index for: {}", index_file);
+        }
+        if index.capacity() == index.size() || index.capacity() <= 64 {
+            if let Err(e) = index.reserve(index.size() + 64) {
                 error!("Failed to reserve index: {:?}", e);
                 return Err(anyhow!("Failed to reserve index: {:?}", e));
             }
-            info!("Created and reserved new index for: {}", index_file);
         }
         let inner = Arc::new(Mutex::new(index));
         let index_config = index_config.clone();
@@ -195,6 +197,7 @@ impl HnswIndex {
             .await?
     }
 
+    #[tracing::instrument(skip(self, db, query, k))]
     pub async fn query_filter(
         &self,
         db: &Arc<RocksDB>,
@@ -206,6 +209,7 @@ impl HnswIndex {
         let db = db.clone();
         let query = query.clone();
         let user_uuids = user_uuids.clone();
+        info!("Querying index with query: {:?}", query.len());
         let matches = spawn_blocking(move || {
             let index = index.lock().unwrap();
             index
