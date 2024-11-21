@@ -49,7 +49,7 @@ pub async fn put_embedding_user(db: &Arc<RocksDB>, embedding_user: &EmbeddingUse
     Ok(())
 }
 
-pub async fn put_model(db: &Arc<RocksDB>, model:Model) -> Result<()> {
+pub async fn put_model(db: &Arc<RocksDB>, model:&Model) -> Result<()> {
     let model_id = &model.model_id;
     let data = model.pack().map_err(|e| anyhow!("Failed to pack model: {}", e))?;
     db.put(ColumnFamilyType::Models, model_id, &data).await?;

@@ -6,6 +6,15 @@ edition = "2021"
 [dependencies]
 zeromq = "0.4.1"
 rand = "0.8.5"
+async-channel = "2.3.1"
+rayon = { workspace = true }
+anyhow = { workspace = true }
+futures = { workspace = true }
+clap = { workspace = true }
+ctrlc = { workspace = true }
+tracing = { workspace = true}
+tracing-subscriber = { workspace = true }
+num_cpus = { workspace = true }
 tokio = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
@@ -13,3 +22,6 @@ serde_repr = { workspace = true }
 chrono = { workspace = true }
 
 embedding-common = { path = "../embedding-common" }
+embedding-database = { path = "../embedding-database" }
+embedding-index = { path = "../embedding-index" }
+embedding-processing = { path = "../embedding-processing" }

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::split_dto::SplitDto;
-use embedding_common::models::embedding::Embedding;
 use embedding_common::Serde;
 use crate::dtos::document_status::RetrievalStatus;
 
@@ -26,6 +26,6 @@ pub struct SplitRetrievalResponse {
     /// optional collection of split objects.
     pub split: Option<SplitDto>,
     /// optional collection of embedding objects.
-    pub embeddings: Option<Vec<Embedding>>,
+    pub embeddings: Option<Vec<EmbeddingDto>>,
 }
 impl Serde for SplitRetrievalResponse {}
