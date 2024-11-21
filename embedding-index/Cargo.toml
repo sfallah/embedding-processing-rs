@@ -7,12 +7,16 @@ edition = "2021"
 anyhow = { workspace = true }
 uuid = { workspace = true }
 tokio = {workspace = true}
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+futures = { workspace = true }
 usearch = "2.16.2"
 ndarray = "0.16.1"
 rand = "0.8.5"
 rayon = "1.10.0"
 embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }
+
 [dev-dependencies]
 rstest = "0.23.0"
 tempdir = "0.3.7"

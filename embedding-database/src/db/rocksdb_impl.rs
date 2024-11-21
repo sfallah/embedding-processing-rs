@@ -1,11 +1,14 @@
+use crate::db::column_families::ColumnFamilyType;
+use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
-use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, DBWithThreadMode, IteratorMode, MultiThreaded, Options, WriteBatch};
+use rocksdb::{
+    ColumnFamilyDescriptor, DBCompressionType, DBWithThreadMode, IteratorMode, MultiThreaded,
+    Options, WriteBatch,
+};
 use std::sync::Arc;
-use anyhow::{Result, anyhow};
 use tokio::task;
 use tracing::info;
 use tracing::instrument;
-use crate::db::column_families::ColumnFamilyType;
 
 #[derive(Debug)]
 pub struct RocksDB {
@@ -35,24 +38,30 @@ impl RocksDB {
         key_bytes
     }
 
-    fn open_column_families(
-        path: &str,
-        cfs: Vec<&str>,
-    ) -> Result<DBWithThreadMode<MultiThreaded>> {
+    fn open_column_families(path: &str, cfs: Vec<&str>) -> Result<DBWithThreadMode<MultiThreaded>> {
         let opts = Self::configure_options();
         let cf_descriptors: Vec<_> = cfs
             .into_iter()
             .map(|name| ColumnFamilyDescriptor::new(name, Options::default()))
             .collect();
 
-        let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(&opts, path, cf_descriptors)?;
+        let db =
+            DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(&opts, path, cf_descriptors)?;
         Ok(db)
     }
 
     /// Opens the RocksDB database asynchronously.
     #[instrument]
     pub async fn open(path: &str) -> Result<Self> {
-        let cfs = vec!["default", "documents", "splits", "summaries", "embeddings", "embedding_users", "models"];
+        let cfs = vec![
+            "default",
+            "documents",
+            "splits",
+            "summaries",
+            "embeddings",
+            "embedding_users",
+            "models",
+        ];
         let path = path.to_string();
         let path_clone = path.clone();
 
@@ -61,13 +70,11 @@ impl RocksDB {
         let db = task::spawn_blocking(move || -> Result<DBWithThreadMode<MultiThreaded>> {
             Self::open_column_families(&path, cfs)
         })
-            .await??;
+        .await??;
 
         info!("Successfully opened RocksDB at path: {}", path_clone);
 
-        Ok(RocksDB {
-            db: Arc::new(db),
-        })
+        Ok(RocksDB { db: Arc::new(db) })
     }
 
     /// Asynchronously puts a key-value pair into the specified cf.
@@ -89,7 +96,7 @@ impl RocksDB {
             db.put_cf(&cf, &key_bytes, &value)?;
             Ok(())
         })
-            .await??;
+        .await??;
 
         info!(
             "Successfully put key: {} ({} bytes) into cf: {}",
@@ -116,15 +123,15 @@ impl RocksDB {
             let value = db.get_cf(&cf, &key_bytes)?;
             Ok(value)
         })
-            .await??;
+        .await??;
 
         match &result {
             Some(value) => info!(
-        "Successfully got key: {} ({} bytes) from cf: {}",
-        key,
-        value.len(),
-        cf_name_clone
-    ),
+                "Successfully got key: {} ({} bytes) from cf: {}",
+                key,
+                value.len(),
+                cf_name_clone
+            ),
             None => info!("Key: {} not found in cf: {}", key, cf_name_clone),
         }
 
@@ -171,7 +178,7 @@ impl RocksDB {
 
             Ok(values)
         })
-            .await??;
+        .await??;
 
         info!(
             "Successfully retrieved {} values from cf: {}",
@@ -184,7 +191,11 @@ impl RocksDB {
 
     /// Asynchronously gets multiple values associated with the provided keys from the specified cf.
     #[instrument(skip(self, keys))]
-    pub async fn multi_get(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<Vec<Option<Vec<u8>>>> {
+    pub async fn multi_get(
+        &self,
+        cf: ColumnFamilyType,
+        keys: &[u64],
+    ) -> Result<Vec<Option<Vec<u8>>>> {
         let db = self.db.clone();
         let keys = keys.to_vec();
         let keys_len = keys.len();
@@ -209,13 +220,12 @@ impl RocksDB {
             }
             Ok(results)
         })
-            .await??;
+        .await??;
 
         info!(
             "multi_get completed for {} keys in column family: {}",
             keys_len, cf_name_clone
         );
-
 
         Ok(results)
     }
@@ -237,9 +247,12 @@ impl RocksDB {
             db.delete_cf(&cf, &key_bytes)?;
             Ok(())
         })
-            .await??;
+        .await??;
 
-        info!("Successfully deleted key: {} from cf: {}", key, cf_name_clone);
+        info!(
+            "Successfully deleted key: {} from cf: {}",
+            key, cf_name_clone
+        );
 
         Ok(())
     }
@@ -253,10 +266,7 @@ impl RocksDB {
         let keys = keys.to_vec();
         let keys_len = keys.len();
 
-        info!(
-            "Deleting {} keys from cf: {}",
-            keys_len, cf_name_clone
-        );
+        info!("Deleting {} keys from cf: {}", keys_len, cf_name_clone);
 
         task::spawn_blocking(move || -> Result<()> {
             let cf = db
@@ -273,7 +283,7 @@ impl RocksDB {
             db.write(batch)?;
             Ok(())
         })
-            .await??;
+        .await??;
 
         info!(
             "Successfully deleted {} keys from cf: {}",
