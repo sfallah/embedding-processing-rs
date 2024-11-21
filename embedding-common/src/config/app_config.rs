@@ -44,7 +44,8 @@ impl AppConfig {
     }
     #[tracing::instrument]
     pub async fn from_file_async(conf_file: String) -> anyhow::Result<Self> {
-        tokio::spawn(async move {
+        let conf_file = conf_file.clone();
+        tokio::task::spawn_blocking(move || {
             Self::from_file(conf_file)
         }).await?
     }
