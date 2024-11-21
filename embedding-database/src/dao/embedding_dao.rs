@@ -16,26 +16,27 @@ pub async fn put_embeddings(
 }
 
 pub async fn get_splits_by_embedding_ids(
-    db: Arc<RocksDB>,
+    db: &Arc<RocksDB>,
     embedding_ids: Vec<u64>,
 ) -> anyhow::Result<Vec<Split>> {
-    let embeddings = db.multi_get(ColumnFamilyType::Embeddings, &embedding_ids)
+    let embeddings = db.multi_get(ColumnFamilyType::Embeddings, &embedding_ids.to_vec())
         .await?;
     let mut split_ids = Vec::new();
     for embed_opt in embeddings.iter() {
-        match embed_opt {
-            Some(embedding) => {
-                let embedding: Embedding = Embedding::unpack(embedding)?;
-                split_ids.push(embedding.data_id);
-            }
-            None => (),
+        if let Some(embedding) = embed_opt {
+            let embedding: Embedding = Embedding::unpack(embedding)?;
+            split_ids.push(embedding.data_id);
         }
     }
-    let splits = db.multi_get(ColumnFamilyType::Splits, &split_ids)
-        .await?
-        .into_iter()
-        .filter_map(|opt| opt)
-        .map(|bytes| Split::unpack(&bytes).unwrap())
-        .collect();
+
+    let raw_splits = db.multi_get(ColumnFamilyType::Splits, &split_ids.to_vec()).await?;
+
+    let mut splits = Vec::new();
+    for split_opt in raw_splits.iter() {
+        if let Some(split) = split_opt {
+            let split: Split = Split::unpack(split)?;
+            splits.push(split);
+        }
+    }
     Ok(splits)
 }

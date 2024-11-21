@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::task;
-use tracing::{debug, error, info, Instrument};
+use tracing::{debug, error, info};
 
 use anyhow::Result;
 use async_channel::Sender;
@@ -31,7 +31,6 @@ use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use uuid::Uuid;
 use embedding_database::dao::embedding_dao::get_splits_by_embedding_ids;
-use embedding_processing::processing::splits;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -83,26 +82,26 @@ async fn run_query(
     top_k: usize,
 ) -> Result<()> {
     let model_config = app_config.model_config;
-    let splitter_config = app_config.splitter_config;
 
     let splits_index =
-        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone())?;
+        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?;
+    let splits_index = Arc::new(splits_index);
+
     //let summaries_index = HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone())?;
 
     let (embed, shutdown, handles, model) =
         app_utils::init(&model_config.gguf_file, model_config.instances).await?;
 
-    //let ctx = init_ctx(splitter_config.max_tokens, splitter_config.merge_level, model.n_embd as usize, model.model_id).await;
 
     let query_embd =
-        async_get_embeddings(embed.clone(), &vec![query.clone()], model.n_embd as usize).await?;
+        async_get_embeddings(embed.clone(), &vec![query.to_string()], model.n_embd as usize).await?;
 
-    let splits_res =
-        HnswIndex::async_query_filter(splits_index.clone(), db.clone(), &user_id, &query_embd, top_k)
+    let (embd_ids, _scores) =
+        splits_index.query_filter(&db, &vec![user_id.clone()], &query_embd.to_vec(), top_k)
             .await?;
-    info!("Splits: {:?}", splits_res);
+    info!("embd_ids: {:?}", embd_ids);
 
-    let splits = get_splits_by_embedding_ids(db.clone(), splits_res.0).await?;
+    let splits = get_splits_by_embedding_ids(&db, embd_ids).await?;
     for split in splits {
         info!("Split: {:?}", split);
     }
@@ -123,9 +122,11 @@ async fn run_process_docs(
     let splitter_config = app_config.splitter_config;
 
     let splits_index =
-        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone())?;
+        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?;
+    let splits_index = Arc::new(splits_index);
     let summaries_index =
-        HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone())?;
+        HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone()).await?;
+    let summaries_index = Arc::new(summaries_index);
 
     let text_files =
         embedding_cli::file_io::list_files(&file_path, &vec!["txt".to_string()]).await?;
@@ -139,7 +140,7 @@ async fn run_process_docs(
         model.n_embd as usize,
         model.model_id,
     )
-    .await;
+        .await;
 
     let futures = text_files.iter().map(|file_path| {
         process_doc(
@@ -166,8 +167,8 @@ async fn run_process_docs(
 //#[tracing::instrument(skip(db, splits_index, summaries_index, ctx, embed))]
 async fn process_doc(
     db: Arc<RocksDB>,
-    splits_index: HnswIndex,
-    summaries_index: HnswIndex,
+    splits_index: Arc<HnswIndex>,
+    summaries_index: Arc<HnswIndex>,
     ctx: Arc<ProcessingContext>,
     embed: Arc<Sender<EmbeddingsRequest>>,
     file_path: &PathBuf,
@@ -182,7 +183,7 @@ async fn process_doc(
         file_path.to_string_lossy().to_string(),
         doc.into_bytes().to_vec(),
     )
-    .await?;
+        .await?;
 
     println!("{:?}", res);
 
@@ -222,7 +223,7 @@ async fn process_doc(
 
             (document, splits, summaries, embeddings, embedding_users)
         })
-        .await?;
+            .await?;
     save_models_to_db(
         &db,
         &document,
@@ -232,26 +233,24 @@ async fn process_doc(
         &embedding_users,
         model.clone(),
     )
-    .await?;
+        .await?;
     add_index(splits_index, summaries_index, &embeddings).await
 }
 
 #[tracing::instrument(skip(splits_index, summaries_index, embeddings))]
 async fn add_index(
-    splits_index: HnswIndex,
-    summaries_index: HnswIndex,
+    splits_index: Arc<HnswIndex>,
+    summaries_index: Arc<HnswIndex>,
     embeddings: &[Embedding],
 ) -> Result<()> {
     let index_futures = embeddings
         .iter()
         .map(|embedding| match embedding.embedding_type {
-            EmbeddingDataType::Split => HnswIndex::async_upsert(
-                splits_index.clone(),
+            EmbeddingDataType::Split => splits_index.upsert(
                 &embedding.embedding,
                 embedding.embedding_id,
             ),
-            EmbeddingDataType::Summary => HnswIndex::async_upsert(
-                summaries_index.clone(),
+            EmbeddingDataType::Summary => summaries_index.upsert(
                 &embedding.embedding,
                 embedding.embedding_id,
             ),
@@ -261,14 +260,14 @@ async fn add_index(
 }
 
 #[tracing::instrument(skip(splits_index, summaries_index))]
-async fn save_index(splits_index: HnswIndex, summaries_index: HnswIndex) -> Result<()> {
+async fn save_index(splits_index: Arc<HnswIndex>, summaries_index: Arc<HnswIndex>) -> Result<()> {
     join_all(vec![
-        HnswIndex::async_save(splits_index.clone()),
-        HnswIndex::async_save(summaries_index.clone()),
+        splits_index.save(),
+        summaries_index.save(),
     ])
-    .await
-    .into_iter()
-    .collect::<Result<()>>()?;
+        .await
+        .into_iter()
+        .collect::<Result<()>>()?;
     Ok(())
 }
 
