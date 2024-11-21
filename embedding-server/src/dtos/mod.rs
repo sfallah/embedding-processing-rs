@@ -4,4 +4,4 @@ pub mod split;
 pub mod summary;
 pub mod zmq_message_header;
 pub mod search_mode;
-mod embedding;
+pub mod embedding;
