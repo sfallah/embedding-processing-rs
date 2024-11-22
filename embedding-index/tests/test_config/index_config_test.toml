@@ -1,0 +1,20 @@
+[index]
+dimensions = 384
+scalar_kind = "F32"
+connectivity = 16
+expansion_add = 32
+expansion_search = 32
+
+[splitter]
+max_tokens = 400
+#hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
+#patterns = [["\n\n"], ["\n"], [".", "!", "?"]]
+
+[model]
+gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
+instances = 2
+#cpu = false
+#ngl = 1000
+
+[database]
+#rocksdb_dir = "rocksdb_dir"

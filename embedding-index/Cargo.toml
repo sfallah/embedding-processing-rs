@@ -6,15 +6,19 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 uuid = { workspace = true }
+tokio = {workspace = true}
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+futures = { workspace = true }
 usearch = "2.16.2"
-embedding-database = { path = "../embedding-database" }
 ndarray = "0.16.1"
 rand = "0.8.5"
 rayon = "1.10.0"
+embedding-common = { path = "../embedding-common" }
+embedding-database = { path = "../embedding-database" }
 
 [dev-dependencies]
 rstest = "0.23.0"
 tempdir = "0.3.7"
 fake = "3.0.1"
 tokio = { version = "1.41.1", features = ["test-util"] }
-embedding-common = { path = "../embedding-common" }

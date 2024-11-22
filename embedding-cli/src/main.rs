@@ -1,11 +1,13 @@
-use tracing::{info, error, Instrument};
-use std::sync::Arc;
-use anyhow::anyhow;
 use clap::Parser;
-use futures::future::{join_all, try_join_all, FutureExt};
+use futures::future::join_all;
 use rayon::prelude::*;
+use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::task;
+use tracing::{debug, error, info, trace};
 
+use anyhow::Result;
+use async_channel::Sender;
 use embedding_common::models::document::Document;
 use embedding_common::models::embedding::{Embedding, EmbeddingDataType, EmbeddingUser};
 use embedding_common::models::split::Split;
@@ -13,74 +15,168 @@ use embedding_common::models::summary::Summary;
 use embedding_common::utils::helpers::get_db_dir;
 
 use embedding_processing::processing::documents::process_document;
-use embedding_processing::services::embeddings::async_get_embeddings;
 use embedding_processing::utils::app_utils;
 
-use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use embedding_database::dao::dao_impl::{put_document, put_embedding, put_embedding_user, put_split, put_summary};
+use embedding_database::dao::dao_impl::{
+    put_document, put_embedding, put_embedding_user, put_model, put_split, put_summary,
+};
 use embedding_database::db::rocksdb_impl::RocksDB;
+use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 
-use embedding_cli::Args;
+use embedding_cli::Cli;
+use embedding_common::config::AppConfig;
 use embedding_common::models::model::Model;
-use uuid::Uuid;
 use embedding_index::hnsw_index::HnswIndex;
-use rayon::prelude::*;
+use embedding_processing::processing::context::ProcessingContext;
+use embedding_processing::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
+use uuid::Uuid;
+use embedding_database::dao::embedding_dao::get_splits_by_embedding_ids;
 
 #[tokio::main]
-async fn main() {
-    let args = Args::parse();
+async fn main() -> Result<()> {
+    let args = Cli::parse();
+    setup_tracing(args.log_level);
+    debug!("{:?}", args);
 
     if let Err(e) = args.validate() {
-        error!("Error: {}", e);
+        error!("Invalid arguments: {}", e);
         std::process::exit(1);
     }
-    setup_tracing(args.log_level.to_tracing_level());
-
     info!("Starting up");
 
-    let db_path_binding = get_db_dir(Some(&args.db_path.unwrap_or_else(|| "rocks_db_dir".to_string())))
-        .unwrap();
+    let app_config = AppConfig::from_file_async(args.config_file).await?;
+
+    let db_config = app_config.clone().database_config;
+
+    let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
     let db_path = db_path_binding.to_str().unwrap();
-    embedding_common::utils::helpers::create_directory(db_path).expect("Failed to create directory");
-    let rocksdb = RocksDB::open(&db_path).await.unwrap();
+    embedding_common::utils::helpers::create_directory(db_path)
+        .expect("Failed to create directory");
+    let rocksdb = RocksDB::open(&db_path).await?;
     let db = Arc::new(rocksdb);
 
-    let user_id = args.user_id.map_or(Uuid::new_v4(), |user_id| {
-        Uuid::parse_str(&user_id).unwrap()
-    });
+    let user_id = args
+        .user_id
+        .map_or(Uuid::new_v4(), |user_id| Uuid::parse_str(&user_id).unwrap());
 
-    run_doc_processing(
-        db,
-        &args.model_path,
-        args.max_tokens,
-        args.merge_level,
-        args.np,
-        args.n_embd,
-        &args.file_path,
-        user_id
-    )
-        .instrument(tracing::info_span!("run_doc_processing"))
-        .await
-        .unwrap();
-
+    info!("User ID: {}", user_id);
+    match args.command {
+        embedding_cli::Commands::Query { query, top_k } => {
+            info!("Querying");
+            run_query(db, user_id, app_config.clone(), query, top_k).await?;
+        }
+        embedding_cli::Commands::Index { ref file_path } => {
+            run_process_docs(db, file_path, user_id, app_config.clone()).await?;
+        }
+    }
     info!("Shutting down");
+    Ok(())
 }
 
-#[tracing::instrument]
-async fn run_doc_processing(
+#[tracing::instrument(skip(db, app_config))]
+async fn run_query(
     db: Arc<RocksDB>,
-    model_path: &str,
-    max_tokens: usize,
-    merge_level: Option<usize>,
-    np: usize,
-    n_embd: usize,
+    user_id: Uuid,
+    app_config: AppConfig,
+    query: String,
+    top_k: usize,
+) -> Result<()> {
+    let model_config = app_config.model_config;
+
+    let splits_index =
+        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?;
+    let splits_index = Arc::new(splits_index);
+
+    //let summaries_index = HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone())?;
+
+    let (embed, shutdown, handles, model) =
+        app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+
+
+    let query_embd =
+        async_get_embeddings(embed.clone(), &vec![query.to_string()], model.n_embd as usize).await?;
+
+    trace!("Query embeddings: {:?}", query_embd.len());
+
+    let (embd_ids, _scores) =
+        splits_index.query_filter(&db, &vec![user_id.clone()], &query_embd.to_vec(), top_k)
+            .await?;
+    info!("embd_ids: {:?}", embd_ids);
+
+    let splits = get_splits_by_embedding_ids(&db, embd_ids).await?;
+    for split in splits {
+        info!("Split: {:?}", split);
+    }
+
+    shutdown.send("shutdown".to_string())?;
+    futures::future::join_all(handles.into_iter()).await;
+    Ok(())
+}
+
+//#[tracing::instrument(skip(db,app_config))]
+async fn run_process_docs(
+    db: Arc<RocksDB>,
     file_path: &std::path::Path,
     user_id: Uuid,
-) -> anyhow::Result<()> {
-    let (embed, shutdown, handles, model) = app_utils::init(&model_path, np).await?;
+    app_config: AppConfig,
+) -> Result<()> {
+    let model_config = app_config.model_config;
+    let splitter_config = app_config.splitter_config;
 
-    let ctx = init_ctx(max_tokens, merge_level, n_embd, model.model_id).await;
+    let splits_index =
+        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?;
+    let splits_index = Arc::new(splits_index);
+    let summaries_index =
+        HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone()).await?;
+    let summaries_index = Arc::new(summaries_index);
 
+    let text_files =
+        embedding_cli::file_io::list_files(&file_path, &vec!["txt".to_string()]).await?;
+
+    let (embed, shutdown, handles, model) =
+        app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+
+    let ctx = init_ctx(
+        splitter_config.max_tokens,
+        splitter_config.merge_level,
+        model.n_embd as usize,
+        model.model_id,
+    )
+        .await;
+
+    let futures = text_files.iter().map(|file_path| {
+        process_doc(
+            db.clone(),
+            splits_index.clone(),
+            summaries_index.clone(),
+            ctx.clone(),
+            embed.clone(),
+            file_path,
+            user_id,
+            model.clone(),
+        )
+    });
+    join_all(futures)
+        .await
+        .into_iter()
+        .collect::<Result<()>>()?;
+    save_index(splits_index, summaries_index).await?;
+    shutdown.send("shutdown".to_string())?;
+    futures::future::join_all(handles.into_iter()).await;
+    Ok(())
+}
+
+//#[tracing::instrument(skip(db, splits_index, summaries_index, ctx, embed))]
+async fn process_doc(
+    db: Arc<RocksDB>,
+    splits_index: Arc<HnswIndex>,
+    summaries_index: Arc<HnswIndex>,
+    ctx: Arc<ProcessingContext>,
+    embed: Arc<Sender<EmbeddingsRequest>>,
+    file_path: &PathBuf,
+    user_id: Uuid,
+    model: Arc<Model>,
+) -> Result<()> {
     let doc = tokio::fs::read_to_string(file_path).await?;
 
     let res = process_document(
@@ -93,55 +189,91 @@ async fn run_doc_processing(
 
     println!("{:?}", res);
 
-    let (document, splits, summaries, embeddings, embedding_users) = task::spawn_blocking(move || {
-        let document = res.to_model();
+    let (document, splits, summaries, embeddings, embedding_users) =
+        task::spawn_blocking(move || {
+            let document = res.to_model();
 
-        let splits: Vec<_> = res.splits.par_iter().map(|split| split.to_model()).collect();
-        let summaries: Vec<_> = res.summaries.par_iter().map(|summary| summary.to_model()).collect();
+            let splits: Vec<_> = res
+                .splits
+                .par_iter()
+                .map(|split| split.to_model())
+                .collect();
+            let summaries: Vec<_> = res
+                .summaries
+                .par_iter()
+                .map(|summary| summary.to_model())
+                .collect();
 
-        let embeddings: Vec<Embedding> = res.splits.par_iter()
-            .filter_map(|split_dto| split_dto.to_embedding_model())
-            .chain(
-                res.summaries.par_iter()
-                    .filter_map(|summary_dto| summary_dto.to_embedding_model())
-            )
-            .collect();
+            let embeddings: Vec<Embedding> = res
+                .splits
+                .par_iter()
+                .filter_map(|split_dto| split_dto.to_embedding_model())
+                .chain(
+                    res.summaries
+                        .par_iter()
+                        .filter_map(|summary_dto| summary_dto.to_embedding_model()),
+                )
+                .collect();
 
-        let embedding_users = embeddings.iter().map(|embedding| {
-            let embed_id = embedding.embedding_id;
-            EmbeddingUser::new(embed_id, user_id)
-        }).collect::<Vec<_>>();
+            let embedding_users = embeddings
+                .iter()
+                .map(|embedding| {
+                    let embed_id = embedding.embedding_id;
+                    EmbeddingUser::new(embed_id, user_id)
+                })
+                .collect::<Vec<_>>();
 
-        (document, splits, summaries, embeddings, embedding_users)
-    }).await?;
+            (document, splits, summaries, embeddings, embedding_users)
+        })
+            .await?;
+    save_models_to_db(
+        &db,
+        &document,
+        &splits,
+        &summaries,
+        &embeddings,
+        &embedding_users,
+        model.clone(),
+    )
+        .await?;
+    add_index(splits_index, summaries_index, &embeddings).await
+}
 
-    save_models_to_db(&db, &document, &splits, &summaries, &embeddings, &embedding_users, model.clone()).await?;
-
-    shutdown.send("shutdown".to_string())?;
-    futures::future::join_all(handles.into_iter()).await;
-
+#[tracing::instrument(skip(splits_index, summaries_index, embeddings))]
+async fn add_index(
+    splits_index: Arc<HnswIndex>,
+    summaries_index: Arc<HnswIndex>,
+    embeddings: &[Embedding],
+) -> Result<()> {
+    let index_futures = embeddings
+        .iter()
+        .map(|embedding| match embedding.embedding_type {
+            EmbeddingDataType::Split => splits_index.upsert(
+                &embedding.embedding,
+                embedding.embedding_id,
+            ),
+            EmbeddingDataType::Summary => summaries_index.upsert(
+                &embedding.embedding,
+                embedding.embedding_id,
+            ),
+        });
+    join_all(index_futures).await;
     Ok(())
 }
 
-async fn create_index(_path:String,n_embd:i32, embeddings: &[Embedding]) -> anyhow::Result<()> {
-    let splits_index = HnswIndex::new(n_embd as usize)?;
-    let summaries_index = HnswIndex::new(n_embd as usize)?;
-    embeddings.iter().for_each(|embedding| {
-        match embedding.embedding_type {
-            EmbeddingDataType::Split => {
-                splits_index.add(&embedding.embedding, embedding.embedding_id).unwrap();
-            }
-            EmbeddingDataType::Summary => {
-                summaries_index.add(&embedding.embedding, embedding.embedding_id).unwrap();
-            }
-        }
-    });
-    splits_index.save("output/splits_index.usearch").map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
-    summaries_index.save("output/summaries_index.usearch").map_err(|e| anyhow!("Failed to save index: {:?}", e))?;
+#[tracing::instrument(skip(splits_index, summaries_index))]
+async fn save_index(splits_index: Arc<HnswIndex>, summaries_index: Arc<HnswIndex>) -> Result<()> {
+    join_all(vec![
+        splits_index.save(),
+        summaries_index.save(),
+    ])
+        .await
+        .into_iter()
+        .collect::<Result<()>>()?;
     Ok(())
 }
 
-
+//#[tracing::instrument(skip(db, model, embeddings, embedding_users, splits, summaries))]
 async fn save_models_to_db(
     db: &Arc<RocksDB>,
     document: &Document,
@@ -150,19 +282,39 @@ async fn save_models_to_db(
     embeddings: &[Embedding],
     embedding_users: &[EmbeddingUser],
     model: Arc<Model>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
+    put_model(db, model.clone().as_ref()).await?;
 
-    let futures = embeddings.iter()
-        .map(|embedding| put_embedding(db, embedding).boxed())
-        .chain(embedding_users.iter().map(|user| put_embedding_user(db, user).boxed()))
-        .chain(splits.iter().map(|split| put_split(db, split).boxed()))
-        .chain(summaries.iter().map(|summary| put_summary(db, summary).boxed()))
-        .chain(std::iter::once(put_document(db, document).boxed()));
+    let embedding_futures = embeddings
+        .iter()
+        .map(|embedding| put_embedding(db, embedding));
+    join_all(embedding_futures)
+        .await
+        .into_iter()
+        .collect::<Result<()>>()?;
 
-    try_join_all(futures).await?;
+    let embedding_user_futures = embedding_users
+        .iter()
+        .map(|embedding_user| put_embedding_user(db, embedding_user));
+
+    join_all(embedding_user_futures)
+        .await
+        .into_iter()
+        .collect::<Result<()>>()?;
+
+    let split_futures = splits.iter().map(|split| put_split(db, split));
+    join_all(split_futures)
+        .await
+        .into_iter()
+        .collect::<Result<()>>()?;
+
+    let summary_futures = summaries.iter().map(|summary| put_summary(db, summary));
+    join_all(summary_futures)
+        .await
+        .into_iter()
+        .collect::<Result<()>>()?;
+
+    put_document(db, document).await?;
 
     Ok(())
 }
-
-
-

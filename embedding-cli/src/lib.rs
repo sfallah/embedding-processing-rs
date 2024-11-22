@@ -1,94 +1,55 @@
-use clap::ValueEnum;
+pub mod file_io;
+
+use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-
-#[derive(clap::Parser, Debug, Clone)]
-pub struct Args {
-    /// Run on CPU rather than on GPU.
-    #[arg(long)]
-    pub cpu: bool,
-
-    /// Number of parallel workers
-    #[arg(long, default_value = "1")]
-    pub np: usize,
-
-    /// RocksDB directory path
-    #[arg(long)]
-    pub db_path: Option<String>,
-
-    /// Max tokens in a split
-    #[arg(long, default_value = "510")]
-    pub max_tokens: usize,
-
-    /// Dimensionality of the embeddings and hidden states.
-    #[arg(long, default_value = "384")]
-    pub n_embd: usize,
-
-    /// Number of GPU layers
-    #[arg(long, default_value = "1000")]
-    pub ngl: usize,
-
-    /// Minibatch size for document insertion
-    #[arg(long, default_value = "8")]
-    pub batch_size: usize,
-
-    /// Merge level for the splits
-    #[arg(long)]
-    pub merge_level: Option<usize>,
-
-    /// The path to the model
-    #[arg(long, default_value = "models/all-minilm-l6-v2-q2_k.gguf")]
-    pub model_path: String,
-
+#[derive(Parser, Debug, Clone)]
+#[command(version, about, long_about = None)]
+#[command(propagate_version = true)]
+pub struct Cli {
     /// Logging level (trace, debug, info, warn, error)
     #[arg(long, default_value = "info", value_enum)]
-    pub log_level: LogLevel,
-
-    /// Path to the text file to process
-    #[arg(long, default_value = "embedding-processing/tests/test_data/superlinear.txt")]
-    pub file_path: PathBuf,
+    pub log_level: tracing::Level,
 
     #[arg(long)]
     pub user_id: Option<String>,
 
-    #[arg(long, default_value = "index_dir")]
-    pub index_dir: Option<String>,
+    #[arg(long, default_value = "config.toml")]
+    pub config_file: String,
 
+    #[command(subcommand)]
+    pub command: Commands,
 }
 
-#[derive(Copy, Clone, Debug, ValueEnum)]
-pub enum LogLevel {
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
+#[derive(Subcommand, Debug, Clone)]
+pub enum Commands {
+    /// Adds files to myapp
+    Index {
+        /// Path to the text file to process
+        #[arg(long, default_value = "embedding-processing/tests/test_data/")]
+        file_path: PathBuf,
+    },
+    Query {
+        /// Path to the text file to process
+        #[arg(long)]
+        query: String,
+
+        #[arg(long, default_value = "10")]
+        top_k: usize,
+    },
 }
 
-impl LogLevel {
-    pub fn to_tracing_level(self) -> tracing::Level {
-        match self {
-            LogLevel::Trace => tracing::Level::TRACE,
-            LogLevel::Debug => tracing::Level::DEBUG,
-            LogLevel::Info => tracing::Level::INFO,
-            LogLevel::Warn => tracing::Level::WARN,
-            LogLevel::Error => tracing::Level::ERROR,
-        }
-    }
-}
-
-impl Args {
+impl Cli {
     pub fn validate(&self) -> Result<(), String> {
-        if let Some(ext) = self.file_path.extension() {
-            if ext != "txt" {
-                return Err(format!(
-                    "Invalid file extension: {}. Only .txt files are allowed.",
-                    ext.to_string_lossy()
-                ));
+        match self.command {
+            Commands::Index { ref file_path } => {
+                if file_path.is_dir() {
+                    Ok(())
+                } else {
+                    Err(format!("{} is not a directory", file_path.display()))
+                }
             }
-        } else {
-            return Err("The file has no extension. Only .txt files are allowed.".to_string());
+            Commands::Query { .. } => Ok(()),
         }
-        Ok(())
     }
 }
