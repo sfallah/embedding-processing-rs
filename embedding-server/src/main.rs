@@ -1,19 +1,15 @@
-use std::error::Error;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use clap::Parser;
-use tracing::{error, info};
-use zeromq::Socket;
-use embedding_common::models::embedding::EmbeddingDataType;
+use tracing::{info};
+use embedding_common::config::AppConfig;
 use embedding_common::utils::helpers::{create_directory, get_db_dir};
 use embedding_database::db::rocksdb_impl::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
-use embedding_database::dao::embedding_dao::get_all_embeddings;
 use embedding_processing::inference::llama_context::LlamaContext;
-use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use embedding_server::{zmq, ServerArgs};
+use embedding_server::{ServerArgs};
 use embedding_server::utils::index_utils::initialize_index_from_db;
 use embedding_server::zmq::server_params::ZmqParams;
 use embedding_server::zmq::server_task::ServerTask;
@@ -23,6 +19,10 @@ use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
 async fn main() -> Result<(), anyhow::Error>{
     // Parse command line arguments
     let args = ServerArgs::parse();
+
+    let app_config = AppConfig::from_file_async(args.config_file).await?;
+
+    let db_config = app_config.clone().database_config;
 
     setup_tracing(args.log_level.to_tracing_level());
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), anyhow::Error>{
     let n_embd = model_instances[0].get_n_embd() as usize;
 
 
-    let db_path_binding = get_db_dir(Some(&args.db_path.unwrap_or_else(|| "rocks_db_dir".to_string())))?;
+    let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
     let db_path = db_path_binding.to_str().unwrap();
     create_directory(db_path).expect("Failed to create directory");
     let rocksdb = RocksDB::open(&db_path).await?;
@@ -79,9 +79,9 @@ async fn main() -> Result<(), anyhow::Error>{
     let db = Arc::new(db);
 
     // Create an HNSW index and initialize it from the database
-    let split_index = Arc::new(HnswIndex::new(n_embd)?);
+    let split_index = Arc::new(HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?);
 
-    let summary_index = Arc::new(HnswIndex::new(n_embd)?);
+    let summary_index = Arc::new(HnswIndex::load_index("summaries".to_string(), app_config.index_config).await?);
 
     initialize_index_from_db(&db, &split_index, &summary_index).await;
 

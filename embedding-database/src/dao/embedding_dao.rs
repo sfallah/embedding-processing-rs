@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use anyhow::Context;
+use futures::future::try_join_all;
 use embedding_common::models::embedding::Embedding;
 use embedding_common::models::split::Split;
 use embedding_common::Serde;
@@ -14,6 +16,25 @@ pub async fn put_embeddings(
     futures::future::join_all(futures).await.into_iter().collect::<anyhow::Result<()>>()?;
     Ok(())
 }
+
+pub async fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embedding>> {
+    let embedding_data_bytes_vec = db
+        .get_all(ColumnFamilyType::Embeddings)
+        .await
+        .context("Failed to get all embeddings")?;
+
+    let futures = embedding_data_bytes_vec.into_iter().map(|embedding_data_bytes| {
+        async move {
+            Embedding::unpack(&embedding_data_bytes)
+                .context("Failed to unpack embedding")
+        }
+    });
+
+    let embeddings_data = try_join_all(futures).await?;
+
+    Ok(embeddings_data)
+}
+
 
 pub async fn get_splits_by_embedding_ids(
     db: &Arc<RocksDB>,

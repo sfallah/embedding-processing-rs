@@ -8,7 +8,6 @@ use embedding_common::models::split::Split;
 use embedding_common::models::summary::Summary;
 use embedding_common::Serde;
 use std::sync::Arc;
-use tracing::info;
 use uuid::Uuid;
 
 /// Stores a `Document` in the database.
