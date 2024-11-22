@@ -6,9 +6,9 @@ use anyhow::Result;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
 use tokio::task;
-use tracing::{error, info};
+use tracing::{info};
 use uuid::Uuid;
-use zeromq::{DealerSocket, RepSocket, Socket, SocketRecv};
+use zeromq::{RepSocket, Socket, SocketRecv};
 use embedding_common::dtos::document_dto::DocumentDto;
 use embedding_common::models::document::Document;
 use embedding_common::models::embedding::{Embedding, EmbeddingUser};
@@ -48,7 +48,7 @@ impl ServerWorker {
 
 pub async fn worker_routine(
     running: Arc<AtomicBool>,
-    mut worker_socket: &mut ServerWorker,
+    worker_socket: &mut ServerWorker,
     zmq_params: &ZmqParams,
     processing_context: Arc<ProcessingContext>,
     model_clone: Arc<Model>,
@@ -156,9 +156,9 @@ pub async fn process_document_insertion_request(
     }
 
     let docs_input: Vec<String> = request.input;
-    let mut doc_urls: Vec<String> = request.doc_urls.unwrap_or(Vec::new());
+    let doc_urls: Vec<String> = request.doc_urls.unwrap_or(Vec::new());
 
-    let mut document_dto = process_document(
+    let document_dto = process_document(
         processing_context,
         embd_req_sender,
         doc_urls[0].to_string(),

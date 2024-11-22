@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use tracing::error;
-use zeromq::{DealerSocket, RepSocket, SocketSend, ZmqMessage};
+use zeromq::{RepSocket, SocketSend, ZmqMessage};
 use embedding_common::dtos::document_dto::DocumentDto;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::Serde;
@@ -8,7 +8,6 @@ use crate::dtos::document::DocumentInsertionResponse;
 use crate::dtos::document_status::DocumentInsertionStatus;
 use crate::dtos::embedding::EmbeddingUsageDto;
 use crate::dtos::zmq_message_header::{ZmqMessageHeader, ZmqMessageStatus, ZmqMessageType};
-use crate::zmq::server_worker::ServerWorker;
 
 
 // Responses

@@ -12,6 +12,9 @@ pub struct ServerArgs {
     #[arg(long)]
     pub cpu: bool,
 
+    #[arg(long, default_value = "config.toml")]
+    pub config_file: String,
+
     // Host of ZeroMQ server
     #[command()]
     #[arg(long, default_value = "127.0.0.1")]
