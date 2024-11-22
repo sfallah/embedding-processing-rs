@@ -17,9 +17,11 @@ serde_json = { workspace = true }
 num_cpus = { workspace = true }
 uuid = { workspace = true }
 embedding-common = { path = "../embedding-common" }
+log = "0.4.22"
 
 [dev-dependencies]
 rstest = "0.23.0"
 fake = "3.0.1"
 tempdir = "0.3.7"
 tokio = { version = "1.41.0", features = ["test-util"] }
+uuid = {workspace = true}

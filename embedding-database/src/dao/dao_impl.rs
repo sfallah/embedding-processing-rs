@@ -1,27 +1,33 @@
+use crate::db::column_families::ColumnFamilyType;
 use crate::db::rocksdb_impl::RocksDB;
+use anyhow::{anyhow, Result};
 use embedding_common::models::document::Document;
 use embedding_common::models::embedding::{Embedding, EmbeddingUser};
+use embedding_common::models::model::Model;
 use embedding_common::models::split::Split;
 use embedding_common::models::summary::Summary;
-use crate::db::column_families::ColumnFamilyType;
-use anyhow::{anyhow, Result};
 use embedding_common::Serde;
 use std::sync::Arc;
+use tracing::info;
 use uuid::Uuid;
-use embedding_common::models::model::Model;
 
 /// Stores a `Document` in the database.
 pub async fn put_document(db: &Arc<RocksDB>, document: &Document) -> Result<()> {
     let document_id = &document.document_id;
-    let data = document.pack().map_err(|e| anyhow!("Failed to pack document: {}", e))?;
-    db.put(ColumnFamilyType::Documents, document_id, &data).await?;
+    let data = document
+        .pack()
+        .map_err(|e| anyhow!("Failed to pack document: {}", e))?;
+    db.put(ColumnFamilyType::Documents, document_id, &data)
+        .await?;
     Ok(())
 }
 
 /// Stores a `Split` in the database.
 pub async fn put_split(db: &Arc<RocksDB>, split: &Split) -> Result<()> {
     let split_id = &split.split_id;
-    let data = split.pack().map_err(|e| anyhow!("Failed to pack split: {}", e))?;
+    let data = split
+        .pack()
+        .map_err(|e| anyhow!("Failed to pack split: {}", e))?;
     db.put(ColumnFamilyType::Splits, split_id, &data).await?;
     Ok(())
 }
@@ -29,29 +35,41 @@ pub async fn put_split(db: &Arc<RocksDB>, split: &Split) -> Result<()> {
 /// Stores a `Summary` in the database.
 pub async fn put_summary(db: &Arc<RocksDB>, summary: &Summary) -> Result<()> {
     let summary_id = &summary.summary_id;
-    let data = summary.pack().map_err(|e| anyhow!("Failed to pack summary: {}", e))?;
-    db.put(ColumnFamilyType::Summaries, summary_id, &data).await?;
+    let data = summary
+        .pack()
+        .map_err(|e| anyhow!("Failed to pack summary: {}", e))?;
+    db.put(ColumnFamilyType::Summaries, summary_id, &data)
+        .await?;
     Ok(())
 }
 
 /// Stores an `Embedding` in the database.
 pub async fn put_embedding(db: &Arc<RocksDB>, embedding: &Embedding) -> Result<()> {
     let embedding_id = &embedding.embedding_id;
-    let data = embedding.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
-    db.put(ColumnFamilyType::Embeddings, embedding_id, &data).await?;
+    let data = embedding
+        .pack()
+        .map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
+    db.put(ColumnFamilyType::Embeddings, embedding_id, &data)
+        .await?;
     Ok(())
 }
 
+#[tracing::instrument(skip(db))]
 pub async fn put_embedding_user(db: &Arc<RocksDB>, embedding_user: &EmbeddingUser) -> Result<()> {
     let embed_id = &embedding_user.embed_id;
-    let data = embedding_user.pack().map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
-    db.put(ColumnFamilyType::EmbeddingUsers, embed_id, &data).await?;
+    let data = embedding_user
+        .pack()
+        .map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
+    db.put(ColumnFamilyType::EmbeddingUsers, embed_id, &data)
+        .await?;
     Ok(())
 }
 
-pub async fn put_model(db: &Arc<RocksDB>, model:&Model) -> Result<()> {
+pub async fn put_model(db: &Arc<RocksDB>, model: &Model) -> Result<()> {
     let model_id = &model.model_id;
-    let data = model.pack().map_err(|e| anyhow!("Failed to pack model: {}", e))?;
+    let data = model
+        .pack()
+        .map_err(|e| anyhow!("Failed to pack model: {}", e))?;
     db.put(ColumnFamilyType::Models, model_id, &data).await?;
     Ok(())
 }
@@ -96,30 +114,27 @@ pub async fn get_summary(db: &Arc<RocksDB>, summary_id: &u64) -> Result<Option<S
 pub async fn get_embedding(db: &Arc<RocksDB>, embedding_id: &u64) -> Result<Option<Embedding>> {
     match db.get(ColumnFamilyType::Embeddings, embedding_id).await? {
         Some(data) => {
-            let embedding =
-                Embedding::unpack(&data).map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
+            let embedding = Embedding::unpack(&data)
+                .map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
             Ok(Some(embedding))
         }
         None => Ok(None),
     }
 }
 
-pub async fn get_embedding_user(db: &Arc<RocksDB>, embed_id: u64) -> Result<Option<EmbeddingUser>> {
-    match db.get(ColumnFamilyType::EmbeddingUsers, &embed_id).await? {
-        Some(data) => {
-            let embedding_user =
-                EmbeddingUser::unpack(&data).map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
-            Ok(Some(embedding_user))
-        }
-        None => Ok(None),
-    }
+pub async fn async_get_embedding_user(
+    db: &Arc<RocksDB>,
+    embed_id: u64,
+) -> Result<Option<EmbeddingUser>> {
+    let db = db.clone();
+    tokio::task::spawn_blocking(move ||{ get_embedding_user(&db, embed_id) }).await?
 }
 
-pub fn get_embedding_user_sync(db: &Arc<RocksDB>, embed_id: u64) -> Result<Option<EmbeddingUser>> {
+pub fn get_embedding_user(db: &Arc<RocksDB>, embed_id: u64) -> Result<Option<EmbeddingUser>> {
     match db.get_sync(ColumnFamilyType::EmbeddingUsers, &embed_id)? {
         Some(data) => {
-            let embedding_user =
-                EmbeddingUser::unpack(&data).map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
+            let embedding_user = EmbeddingUser::unpack(&data)
+                .map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
             Ok(Some(embedding_user))
         }
         None => Ok(None),
@@ -167,7 +182,9 @@ pub async fn get_summaries_of_document(
         None => return Ok(None),
     };
 
-    let summary_bytes = db.multi_get(ColumnFamilyType::Summaries, summary_ids).await?;
+    let summary_bytes = db
+        .multi_get(ColumnFamilyType::Summaries, summary_ids)
+        .await?;
 
     let mut summaries = Vec::with_capacity(summary_bytes.len());
     for option_bytes in summary_bytes {
@@ -196,7 +213,9 @@ pub async fn get_summaries_of_split(
         None => return Ok(None),
     };
 
-    let summary_bytes = db.multi_get(ColumnFamilyType::Summaries, summary_ids).await?;
+    let summary_bytes = db
+        .multi_get(ColumnFamilyType::Summaries, summary_ids)
+        .await?;
 
     let mut summaries = Vec::with_capacity(summary_bytes.len());
     for option_bytes in summary_bytes {
@@ -210,9 +229,14 @@ pub async fn get_summaries_of_split(
     Ok(Some(summaries))
 }
 
-pub fn has_embedding_user(db: Arc<RocksDB>, embed_id: u64, user_uuid: &Uuid) -> Result<bool> {
-    let res = match get_embedding_user_sync(&db.clone(), embed_id) {
-        Ok(opt) => opt.map(|eu| eu.user_uuid == *user_uuid).unwrap_or(false),
+#[tracing::instrument(skip(db))]
+pub fn has_embedding_user(db: &Arc<RocksDB>, embed_id: u64, user_uuids: Vec<Uuid>) -> Result<bool> {
+    let res = match get_embedding_user(&db.clone(), embed_id) {
+        Ok(opt) => {
+            //info!("Embedding user: {:?}", opt);
+            opt.map(|eu| user_uuids.contains(&eu.user_uuid))
+                .unwrap_or(false)
+        }
         Err(_) => false,
     };
     Ok(res)
