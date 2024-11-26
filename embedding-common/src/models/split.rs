@@ -1,4 +1,4 @@
-use crate::prelude::Serde;
+use crate::prelude::{Serde, SplitDto, SummaryDto};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +30,18 @@ impl Split {
             text_content: text_content.to_string(),
             token_len,
             summary_ids,
+        }
+    }
+
+    pub fn to_dto(&self, summaries: Vec<SummaryDto>) -> SplitDto {
+        SplitDto {
+            split_id: self.split_id,
+            sequence_id: self.sequence_id,
+            doc_id: self.doc_id,
+            text_content: self.text_content.clone(),
+            token_len: self.token_len,
+            summaries,
+            embedding: None,
         }
     }
 }

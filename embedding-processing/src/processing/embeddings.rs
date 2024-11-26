@@ -10,9 +10,11 @@ pub async fn process_embedding(
     embed_id: u64,
     sentences: Vec<String>,
     model_id: u64,
+    n_embd: usize,
 ) -> anyhow::Result<EmbeddingDto> {
     trace!("Processing embedding...");
-    let embedding = async_get_embeddings(sender.clone(), &sentences, 384).await?;
+    //FIXME: n_embd is hardcoded to 384
+    let embedding = async_get_embeddings(sender.clone(), &sentences, n_embd).await?;
     trace!("Embedding processed");
     Ok(EmbeddingDto::new(embed_id, embedding, model_id))
 }

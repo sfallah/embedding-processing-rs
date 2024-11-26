@@ -6,6 +6,7 @@ use embedding_common::dtos::summary_dto::SummaryDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;
+use crate::processing::utils;
 
 #[tracing::instrument(skip(ctx, embed_sender, text))]
 pub async fn process_summaries(
@@ -18,7 +19,7 @@ pub async fn process_summaries(
     trace!("Processing summaries...");
     let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes()).await?;
     let splits: Vec<_> = filter_splits(&splits, 4);
-    let sentences: Vec<_> = splits_texts(&splits);
+    let sentences: Vec<_> = utils::splits_texts(&splits);
     trace!("Number of sentences: {}", sentences.len());
 
     let embeddings = async_get_embeddings(embed_sender.clone(), &sentences, ctx.n_embd).await?;
@@ -61,13 +62,6 @@ fn tokens_num(splits: Vec<SplitResultLite>) -> Vec<usize> {
     splits
         .iter()
         .map(|sentence_split| sentence_split.tokens.len())
-        .collect()
-}
-
-fn splits_texts(splits: &Vec<SplitResultLite>) -> Vec<String> {
-    splits
-        .iter()
-        .map(|sentence_split| sentence_split.split_string.clone())
         .collect()
 }
 
