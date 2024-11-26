@@ -33,7 +33,7 @@ pub struct DocumentInsertionResponse {
     /// optional collection of document objects.
     pub documents: Option<Vec<DocumentDto>>,
     /// optional collection of embedding objects.
-    pub embeddings: Option<Vec<EmbeddingDto>>,
+    //pub embeddings: Option<Vec<EmbeddingDto>>,
     /// optional usage statistics associated with the embedding request.
     pub usage: Option<EmbeddingUsageDto>,
 }
@@ -55,7 +55,7 @@ pub struct DocumentQueryRequest {
     /// optional dimensionality of the embeddings.
     pub dimensions: Option<i32>,
     /// optional UUID of the user making the request.
-    pub user: Option<Uuid>,
+    pub user_ids: Vec<Uuid>,
     /// optional boolean for detailed response
     pub verbose: Option<bool>,
 }

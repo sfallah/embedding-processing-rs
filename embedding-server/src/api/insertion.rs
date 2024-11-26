@@ -1,6 +1,6 @@
-use crate::dtos::document::DocumentInsertionRequest;
+use crate::dtos::document::{DocumentInsertionRequest, DocumentInsertionResponse};
 use crate::dtos::zmq_message_header::ZmqMessageHeader;
-use crate::utils::zmq_utils::{send_document_insertion_response, send_exception_response};
+use crate::utils::zmq_utils::send_exception_response;
 use async_channel::Sender;
 use embedding_common::prelude::*;
 use embedding_index::add_to_indices;
@@ -14,6 +14,9 @@ use tracing::info;
 use uuid::Uuid;
 use zeromq::RepSocket;
 use embedding_database::prelude::{save_doc, RocksDB};
+use crate::dtos::document_status::DocumentInsertionStatus;
+use crate::dtos::embedding::EmbeddingUsageDto;
+use crate::utils::zmq_utils;
 
 pub async fn process_document_insertion_request(
     worker_socket: &mut RepSocket,
@@ -67,4 +70,40 @@ pub async fn process_document_insertion_request(
     .await;
 
     info!("Document processed and response sent")
+}
+
+// Responses
+pub async fn send_document_insertion_response(
+    socket: &mut RepSocket,
+    message_header: &mut ZmqMessageHeader,
+    document_dtos: &DocumentDto,
+    verbose: bool,
+) {
+    let mut embeddings_data = Vec::new();
+
+    for (i, _) in document_dtos.splits.iter().enumerate() {
+        let data = EmbeddingDto {
+            embedding_id: 0, // Placeholder
+            embedding: vec![], // Placeholder
+            model_id: 0, // Placeholder
+        };
+        embeddings_data.push(data);
+    }
+
+    let total_tokens = 0;
+
+    let response = DocumentInsertionResponse {
+        status: DocumentInsertionStatus::Success,
+        documents: if verbose {
+            Some(vec![document_dtos.clone()])
+        } else {
+            None
+        },
+        usage: Some(EmbeddingUsageDto {
+            prompt_tokens: total_tokens,
+            total_tokens,
+        }),
+        //embeddings: if verbose { Some(embeddings_data) } else { None },
+    };
+    zmq_utils::send_success_response(socket, response, message_header).await;
 }

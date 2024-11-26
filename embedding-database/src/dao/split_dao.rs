@@ -3,6 +3,7 @@ use crate::db::rocksdb_impl::RocksDB;
 use anyhow::anyhow;
 use embedding_common::prelude::*;
 use std::sync::Arc;
+use crate::dao::summary_dao::get_all_summaries;
 
 /// Stores a `Split` in the database.
 pub async fn put_split(db: &Arc<RocksDB>, split: &Split) -> anyhow::Result<()> {
@@ -40,19 +41,8 @@ pub async fn get_summaries_of_split(
         Some(ids) => ids,
         None => return Ok(None),
     };
-
-    let summary_bytes = db
-        .multi_get(ColumnFamilyType::Summaries, summary_ids)
-        .await?;
-
-    let mut summaries = Vec::with_capacity(summary_bytes.len());
-    for option_bytes in summary_bytes {
-        if let Some(bytes) = option_bytes {
-            let summary =
-                Summary::unpack(&bytes).map_err(|e| anyhow!("Failed to unpack summary: {}", e))?;
-            summaries.push(summary);
-        }
-    }
+    let summaries = get_all_summaries(&db, summary_ids).await?;
 
     Ok(Some(summaries))
 }
+

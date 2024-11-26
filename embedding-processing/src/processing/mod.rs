@@ -4,3 +4,5 @@ mod embeddings;
 pub mod splits;
 pub mod splitter;
 pub mod summaries;
+pub mod query;
+mod utils;

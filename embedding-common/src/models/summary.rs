@@ -1,4 +1,4 @@
-use crate::prelude::Serde;
+use crate::prelude::{Serde, SummaryDto};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +33,19 @@ impl Summary {
             text_content: text_content.to_string(),
             token_len,
             centrality,
+        }
+    }
+
+    pub fn to_dto(&self) -> SummaryDto {
+        SummaryDto {
+            summary_id: self.summary_id,
+            document_id: self.document_id,
+            split_id: self.split_id,
+            split_sequence_id: self.split_sequence_id,
+            text_content: self.text_content.clone(),
+            token_len: self.token_len,
+            centrality: self.centrality,
+            embedding: None,
         }
     }
 }

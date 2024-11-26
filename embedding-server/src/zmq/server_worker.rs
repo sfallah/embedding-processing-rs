@@ -1,8 +1,8 @@
-use crate::api::insertion::process_document_insertion_request;
+use crate::api::insertion::{process_document_insertion_request, send_document_insertion_response};
 use crate::dtos::document::DocumentInsertionRequest;
 use crate::dtos::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
 use crate::utils::zmq_utils::{
-    handle_error_and_respond, send_document_insertion_response, send_exception_response,
+    handle_error_and_respond, send_exception_response,
 };
 use crate::zmq::server_params::ZmqParams;
 use crate::ServerArgs;
@@ -10,7 +10,6 @@ use anyhow::Result;
 use async_channel::Sender;
 use embedding_common::dtos::document_dto::DocumentDto;
 use embedding_common::prelude::*;
-use embedding_common::utils::helpers::{from_epoch_micros, time_millis};
 use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
@@ -85,8 +84,6 @@ pub async fn worker_routine(
                     continue;
                 }
             };
-        let req_ts = from_epoch_micros(message_header.request_ts);
-        let _ = time_millis(&req_ts, "Request receive time");
 
         if messages.len() < 2 && message_header.message_type != ZmqMessageType::HealthCheck {
             let error_message = format!(
