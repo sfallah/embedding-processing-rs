@@ -1,6 +1,6 @@
-use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use async_channel::Sender;
+use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use std::sync::Arc;
 use tracing::trace;
 

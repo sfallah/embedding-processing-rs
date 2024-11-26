@@ -1,8 +1,6 @@
 use crate::utils::{create_dir, from_config, index_file};
 use anyhow::anyhow;
 use embedding_common::config::IndexConfig;
-use embedding_database::dao::dao_impl::has_embedding_user;
-use embedding_database::db::rocksdb_impl::RocksDB;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tokio::task::spawn_blocking;
@@ -11,6 +9,7 @@ use uuid::Uuid;
 
 use anyhow::Result;
 use tracing::{error, info};
+use embedding_database::prelude::{has_embedding_user, RocksDB};
 
 #[derive(Clone)]
 pub struct HnswIndex {
@@ -40,7 +39,12 @@ impl HnswIndex {
                 error!("Failed to load index: {:?}", e);
                 return Err(anyhow!("Failed to load index: {:?}", e));
             }
-            info!("Loaded existing index: {}, size: {}, capacity: {}", index_file, index.size(), index.capacity());
+            info!(
+                "Loaded existing index: {}, size: {}, capacity: {}",
+                index_file,
+                index.size(),
+                index.capacity()
+            );
         } else {
             info!("Created and reserved index for: {}", index_file);
         }
@@ -77,7 +81,7 @@ impl HnswIndex {
                 Err(e) => Err(anyhow!("Failed to get item: {:?}", e)),
             }
         })
-            .await?
+        .await?
     }
 
     pub async fn add(&self, embd: &Vec<f32>, label: u64) -> Result<()> {
@@ -95,7 +99,7 @@ impl HnswIndex {
                 .add(label, &embd)
                 .map_err(|e| anyhow!("Failed to add item: {:?}", e))
         })
-            .await?
+        .await?
     }
 
     #[tracing::instrument(skip(self, embeddings, labels))]
@@ -112,7 +116,11 @@ impl HnswIndex {
                     error!("Failed to reserve index: {:?}", e);
                     return Err(anyhow!("Failed to reserve index: {:?}", e));
                 }
-                info!("Reserved {} more capacity, cur capacity: {}", num, index.capacity());
+                info!(
+                    "Reserved {} more capacity, cur capacity: {}",
+                    num,
+                    index.capacity()
+                );
             }
             for (embd, label) in embeddings.iter().zip(labels.iter()) {
                 if let Err(e) = index.add(*label, embd) {
@@ -123,7 +131,7 @@ impl HnswIndex {
             info!("Added {} items to index", num);
             Ok(())
         })
-            .await?
+        .await?
     }
     pub async fn upsert(&self, embd: &Vec<f32>, label: u64) -> Result<bool> {
         let index = self.index.clone();
@@ -149,10 +157,14 @@ impl HnswIndex {
             }
             Ok(exists)
         })
-            .await?
+        .await?
     }
 
-    pub async fn upsert_batch(&self, embeddings: &Vec<Vec<f32>>, labels: &Vec<u64>) -> Result<Vec<u64>> {
+    pub async fn upsert_batch(
+        &self,
+        embeddings: &Vec<Vec<f32>>,
+        labels: &Vec<u64>,
+    ) -> Result<Vec<u64>> {
         let index = self.index.clone();
         let embeddings = embeddings.clone();
         let labels = labels.clone();
@@ -183,7 +195,7 @@ impl HnswIndex {
             }
             Ok(removed_keys)
         })
-            .await?
+        .await?
     }
 
     pub async fn delete(&self, label: u64) -> Result<usize> {
@@ -194,7 +206,7 @@ impl HnswIndex {
                 .remove(label)
                 .map_err(|e| anyhow::Error::msg(format!("Failed to delete item: {:?}", e)))
         })
-            .await?
+        .await?
     }
 
     #[tracing::instrument(skip(self, db, query, k))]
@@ -219,7 +231,7 @@ impl HnswIndex {
                 })
                 .map_err(|e| anyhow!("Failed to query index: {:?}", e))
         })
-            .await??;
+        .await??;
         Ok((matches.keys, matches.distances))
     }
 
@@ -250,7 +262,8 @@ impl HnswIndex {
                     "{}/backup_{}",
                     old_file_path.parent().unwrap().to_str().unwrap(),
                     file_name
-                ).to_string();
+                )
+                .to_string();
                 if let Err(e) = std::fs::rename(old_file_path.clone(), backup_file.clone()) {
                     let old_file = old_file_path.to_str().unwrap();
                     error!(
@@ -293,7 +306,7 @@ impl HnswIndex {
             }
             Ok(())
         })
-            .await?
+        .await?
     }
 
     pub async fn size(&self) -> Result<usize> {

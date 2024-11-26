@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::split_dto::SplitDto;
-use embedding_common::Serde;
+use embedding_common::prelude::Serde;
 use crate::dtos::document_status::RetrievalStatus;
 
 /// request structure for Split retrieval.

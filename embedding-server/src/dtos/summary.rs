@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use embedding_common::dtos::summary_dto::SummaryDto;
-use embedding_common::models::embedding::Embedding;
-use embedding_common::Serde;
+use embedding_common::prelude::{Embedding, Serde, SummaryDto};
 use crate::dtos::document_status::RetrievalStatus;
 
 /// request structure for Summary retrieval.

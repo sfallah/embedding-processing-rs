@@ -3,7 +3,7 @@ use tracing::error;
 use zeromq::{RepSocket, SocketSend, ZmqMessage};
 use embedding_common::dtos::document_dto::DocumentDto;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
-use embedding_common::Serde;
+use embedding_common::prelude::Serde;
 use crate::dtos::document::DocumentInsertionResponse;
 use crate::dtos::document_status::DocumentInsertionStatus;
 use crate::dtos::embedding::EmbeddingUsageDto;

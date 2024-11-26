@@ -3,7 +3,7 @@ mod tests {
     use anyhow::anyhow;
     use embedding_common::config::AppConfig;
     use embedding_common::models::embedding::EmbeddingUser;
-    use embedding_database::dao::dao_impl::put_embedding_user;
+    use embedding_database::dao::embedding_user_dao::put_embedding_user;
     use embedding_database::db::rocksdb_impl::RocksDB;
     use embedding_index::hnsw_index::HnswIndex;
     use embedding_index::utils::{generate_random_vectors, index_file};
@@ -101,7 +101,6 @@ mod tests {
         Ok(num_overwrittens)
     }
 
-
     #[tokio::test(flavor = "multi_thread")]
     async fn test_read_config() -> anyhow::Result<()> {
         let app_config = read_config().await?;
@@ -191,7 +190,6 @@ mod tests {
 
         check_contained_embeddings(&rocksdb, &index2, &records).await?;
 
-
         let records2 = generate_test_data(num_users, num_user_embeds).await?;
 
         add_records(&rocksdb, &index2, &records2).await?;
@@ -211,7 +209,11 @@ mod tests {
         Ok(())
     }
 
-    async fn check_contained_embeddings(rocksdb: &Arc<RocksDB>, index: &HnswIndex, records: &Vec<(Uuid, Vec<u64>, Vec<Vec<f32>>)>) -> anyhow::Result<()> {
+    async fn check_contained_embeddings(
+        rocksdb: &Arc<RocksDB>,
+        index: &HnswIndex,
+        records: &Vec<(Uuid, Vec<u64>, Vec<Vec<f32>>)>,
+    ) -> anyhow::Result<()> {
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.iter().zip(embeddings.iter()) {
                 let res = index

@@ -1,12 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use fake::{Fake, Faker};
+    use anyhow::Result;
+    use embedding_database::{ColumnFamilyType, RocksDB};
     use fake::faker::lorem::en::*;
+    use fake::{Fake, Faker};
     use tempdir::TempDir;
     use tokio;
-    use embedding_database::db::column_families::ColumnFamilyType;
-    use embedding_database::db::rocksdb_impl::RocksDB;
-    use anyhow::Result;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() -> Result<()> {
@@ -92,9 +91,7 @@ mod tests {
         }
 
         // Act
-        let retrieved_values = rocksdb
-            .multi_get(ColumnFamilyType::Default, &keys)
-            .await?;
+        let retrieved_values = rocksdb.multi_get(ColumnFamilyType::Default, &keys).await?;
 
         // Assert
         for (retrieved, original) in retrieved_values.iter().zip(values.iter()) {
@@ -146,7 +143,9 @@ mod tests {
         }
 
         // Act
-        rocksdb.delete_many(ColumnFamilyType::Default, &keys).await?;
+        rocksdb
+            .delete_many(ColumnFamilyType::Default, &keys)
+            .await?;
 
         // Assert
         for key in &keys {

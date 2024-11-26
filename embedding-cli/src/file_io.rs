@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
-pub async fn list_files(dir_path: &Path, file_extensions: &Vec<String>) -> anyhow::Result<Vec<PathBuf>> {
+pub async fn list_files(
+    dir_path: &Path,
+    file_extensions: &Vec<String>,
+) -> anyhow::Result<Vec<PathBuf>> {
     let mut entries = fs::read_dir(dir_path).await?;
     let mut file_paths: Vec<PathBuf> = Vec::new();
     while let Some(entry) = entries.next_entry().await? {

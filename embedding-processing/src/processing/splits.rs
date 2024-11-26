@@ -1,8 +1,8 @@
-use embedding_common::dtos::split_dto::SplitDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::embeddings::process_embedding;
 use crate::processing::summaries::process_summaries;
 use crate::services::embeddings::EmbeddingsRequest;
+use embedding_common::dtos::split_dto::SplitDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;

@@ -1,6 +1,6 @@
+use serde::Deserialize;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]

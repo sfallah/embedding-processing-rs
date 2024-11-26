@@ -1,5 +1,5 @@
+use crate::prelude::{Embedding, EmbeddingDataType};
 use serde::{Deserialize, Serialize};
-use crate::models::embedding::{Embedding, EmbeddingDataType};
 
 /// represents an individual embedding with metadata.
 #[derive(Serialize, Deserialize, Clone, Debug)]

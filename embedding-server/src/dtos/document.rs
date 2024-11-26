@@ -1,10 +1,10 @@
-use embedding_common::Serde;
 use serde::{Deserialize, Serialize};
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::split_dto::SplitDto;
 use embedding_common::dtos::summary_dto::SummaryDto;
 use uuid::Uuid;
 use embedding_common::dtos::document_dto::DocumentDto;
+use embedding_common::prelude::Serde;
 use crate::dtos::document_status::{DeletionStatus, DocumentInsertionStatus, RetrievalStatus};
 use crate::dtos::embedding::EmbeddingUsageDto;
 use crate::dtos::search_mode::SearchModeType;
