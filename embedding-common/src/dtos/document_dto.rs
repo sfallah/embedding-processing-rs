@@ -1,7 +1,5 @@
+use crate::prelude::{Document, SplitDto, SummaryDto};
 use serde::{Deserialize, Serialize};
-use crate::dtos::split_dto::SplitDto;
-use crate::dtos::summary_dto::SummaryDto;
-use crate::models::document::Document;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct DocumentDto {

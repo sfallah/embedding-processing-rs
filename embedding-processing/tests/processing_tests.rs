@@ -69,9 +69,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_summaries_process(
-        text: String,
-    ) -> anyhow::Result<()> {
+    async fn test_summaries_process(text: String) -> anyhow::Result<()> {
         let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 1).await?;
         let ctx = init_ctx(512, None, 384, model.model_id).await;
         let text = text.clone();
@@ -97,9 +95,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_split_process(
-        text: String,
-    ) -> anyhow::Result<()> {
+    async fn test_split_process(text: String) -> anyhow::Result<()> {
         let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
         let ctx = init_ctx(512, None, 384, model.model_id).await;
         let text = text.clone();
@@ -124,9 +120,7 @@ mod tests {
 
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_document_process(
-        #[future] text_from_file: String,
-    ) -> anyhow::Result<()> {
+    async fn test_document_process(#[future] text_from_file: String) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
         let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
         let ctx = init_ctx(512, None, 384, model.model_id).await;

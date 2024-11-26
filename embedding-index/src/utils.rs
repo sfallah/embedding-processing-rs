@@ -1,9 +1,9 @@
-use std::path::Path;
+use embedding_common::config::IndexConfig;
 use ndarray::{Array, Array1};
 use rand::Rng;
 use rayon::prelude::*;
+use std::path::Path;
 use usearch::{IndexOptions, MetricKind, ScalarKind};
-use embedding_common::config::IndexConfig;
 
 fn metric_kind(conf_metric: embedding_common::config::MetricKind) -> MetricKind {
     match conf_metric {
@@ -37,16 +37,18 @@ pub(crate) fn from_config(index_config: &IndexConfig) -> IndexOptions {
     }
 }
 
-pub fn index_file(base_name: String,index_config: &IndexConfig) -> String {
-    format!("{}/{}__{}_{}_{}_{}_{}_{}.usearch",
-            index_config.index_dir,
-            base_name,
-            index_config.metric_kind.to_string(),
-            index_config.scalar_kind.to_string(),
-            index_config.dimensions,
-            index_config.connectivity,
-            index_config.expansion_add,
-            index_config.expansion_search)
+pub fn index_file(base_name: String, index_config: &IndexConfig) -> String {
+    format!(
+        "{}/{}__{}_{}_{}_{}_{}_{}.usearch",
+        index_config.index_dir,
+        base_name,
+        index_config.metric_kind.to_string(),
+        index_config.scalar_kind.to_string(),
+        index_config.dimensions,
+        index_config.connectivity,
+        index_config.expansion_add,
+        index_config.expansion_search
+    )
 }
 
 pub fn create_dir(dir: &str) -> anyhow::Result<bool> {
@@ -58,7 +60,6 @@ pub fn create_dir(dir: &str) -> anyhow::Result<bool> {
         Ok(false)
     }
 }
-
 
 pub fn norm(array: &Array1<f32>) -> f32 {
     array.pow2().sum().sqrt()

@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use embedding_cli::file_io::list_files;
+    use std::path::Path;
     #[tokio::test(flavor = "multi_thread")]
     async fn test_list_txt_files() -> anyhow::Result<()> {
         let dir_path = Path::new("tests/test_data");

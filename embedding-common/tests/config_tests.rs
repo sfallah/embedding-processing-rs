@@ -26,7 +26,10 @@ mod tests {
         println!("index config: {:?}", splitter_config);
         assert_eq!(splitter_config.max_tokens, 512);
         assert!(splitter_config.hf_model_id.is_some());
-        assert_eq!(splitter_config.hf_model_id.unwrap(), "sentence-transformers/all-MiniLM-L6-v2".to_string());
+        assert_eq!(
+            splitter_config.hf_model_id.unwrap(),
+            "sentence-transformers/all-MiniLM-L6-v2".to_string()
+        );
         assert!(splitter_config.patterns.is_some());
         assert_eq!(splitter_config.patterns.clone().unwrap().len(), 3);
         assert_eq!(splitter_config.patterns.clone().unwrap()[0].len(), 1);
@@ -34,7 +37,9 @@ mod tests {
         assert_eq!(splitter_config.patterns.clone().unwrap()[2].len(), 3);
 
         let text = "This is a test sentence.\n\n This is another test sentence.".to_string();
-        let text_splits: Vec<_>  = text.split(&splitter_config.patterns.clone().unwrap()[0][0]).collect();
+        let text_splits: Vec<_> = text
+            .split(&splitter_config.patterns.clone().unwrap()[0][0])
+            .collect();
         assert_eq!(text_splits.len(), 2);
         assert_eq!(text_splits[0], "This is a test sentence.");
         assert_eq!(text_splits[1], " This is another test sentence.");
@@ -47,7 +52,10 @@ mod tests {
         let app_config = AppConfig::from_file(conf_file)?;
         let model_config = app_config.model_config;
         println!("model config: {:?}", model_config);
-        assert_eq!(model_config.gguf_file, "models/all-minilm-l6-v2-q2_k.gguf".to_string());
+        assert_eq!(
+            model_config.gguf_file,
+            "models/all-minilm-l6-v2-q2_k.gguf".to_string()
+        );
         assert_eq!(model_config.instances, 2);
         assert_eq!(model_config.ngl, 1000);
         Ok(())

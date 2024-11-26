@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use embedding_common::Serde;
+use embedding_common::prelude::Serde;
 
 /// holds some statistics for embeddings.
 #[derive(Serialize, Deserialize, Debug)]

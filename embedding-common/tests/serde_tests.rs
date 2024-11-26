@@ -40,6 +40,8 @@ mod tests {
         EmbeddingUser::unpack::<EmbeddingUser>(&eu_packed).unwrap();
 
         let uuid_bytes = user_uuid.as_bytes();
-        EmbeddingUser::unpack::<EmbeddingUser>(&uuid_bytes.as_slice()).map_err(|e| { anyhow!("Failed to upack e: {e}") }).expect("Failed to unpack");
+        EmbeddingUser::unpack::<EmbeddingUser>(&uuid_bytes.as_slice())
+            .map_err(|e| anyhow!("Failed to upack e: {e}"))
+            .expect("Failed to unpack");
     }
 }

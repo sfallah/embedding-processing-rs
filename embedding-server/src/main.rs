@@ -1,22 +1,23 @@
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use clap::Parser;
-use tracing::{info};
 use embedding_common::config::AppConfig;
 use embedding_common::utils::helpers::{create_directory, get_db_dir};
-use embedding_database::db::rocksdb_impl::RocksDB;
+use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
+use embedding_index::initialize_index_from_db;
 use embedding_processing::inference::llama_context::LlamaContext;
 use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use embedding_server::{ServerArgs};
-use embedding_server::utils::index_utils::initialize_index_from_db;
 use embedding_server::zmq::server_params::ZmqParams;
 use embedding_server::zmq::server_task::ServerTask;
 use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
+use embedding_server::ServerArgs;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use tokio::select;
+use tracing::{error, info};
 
 #[tokio::main]
-async fn main() -> Result<(), anyhow::Error>{
+async fn main() -> Result<(), anyhow::Error> {
     // Parse command line arguments
     let args = ServerArgs::parse();
 
@@ -44,14 +45,7 @@ async fn main() -> Result<(), anyhow::Error>{
         workers: n_workers,
     });
 
-    let no_model_instances = 2 * n_workers;
-    eprintln!("Number of model instances: {}", no_model_instances);
-    let model_instances = (0..no_model_instances)
-        .map(|_| Arc::new(LlamaContext::new(&args.model_path, 600, gpu_layers)))
-        .collect::<Vec<_>>();
-
-    let n_embd = model_instances[0].get_n_embd() as usize;
-
+    let model_config = app_config.model_config;
 
     let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
     let db_path = db_path_binding.to_str().unwrap();
@@ -59,78 +53,88 @@ async fn main() -> Result<(), anyhow::Error>{
     let rocksdb = RocksDB::open(&db_path).await?;
     let db = Arc::new(rocksdb);
 
-    let (embed, shutdown, handles, model) = app_utils::init(&args.model_path, args.np).await?;
-
-    let processing_ctx = init_ctx(args.max_tokens, args.merge_level, n_embd, model.model_id).await;
-
+    let (embed, shutdown_sender, handles, model) =
+        app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+    let processing_ctx = init_ctx(
+        args.max_tokens,
+        args.merge_level,
+        model.n_embd as usize,
+        model.model_id,
+    )
+    .await;
     let clients = ServerTask::init(&args.server_host, args.frontend_port, args.backend_port).await;
 
     // Set up signal handling
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
 
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-        info!("Signal received. Shutting down...");
-    })
-        .expect("Error setting Ctrl-C handler");
+    let shutdown_clone = shutdown_sender.clone();
+    let shut_handle = tokio::spawn(async move {
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            error!("Failed to listen for Ctrl+C event: {}", e);
+        }
+        if let Err(e) = shutdown_clone.send("shutdown".to_string()) {
+            error!("Failed to send shutdown signal: {}", e);
+        }
+        info!("Sent shutdown signal");
+    });
 
     // Create an Arc reference to the database
     let db = Arc::new(db);
 
     // Create an HNSW index and initialize it from the database
-    let split_index = Arc::new(HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?);
+    let split_index = Arc::new(
+        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?,
+    );
 
-    let summary_index = Arc::new(HnswIndex::load_index("summaries".to_string(), app_config.index_config).await?);
+    let summary_index =
+        Arc::new(HnswIndex::load_index("summaries".to_string(), app_config.index_config).await?);
 
     initialize_index_from_db(&db, &split_index, &summary_index).await;
 
     let mut worker_handles = Vec::new();
 
     // Initialize separate workers for each thread
-    let mut workers = Vec::new();
-    for i in 0..n_workers {
-        workers.push(ServerWorker::init(&args.server_host, args.backend_port).await);
-    }
-
-    // Start worker threads
-    for (i, mut worker) in workers.into_iter().enumerate() {
-        let running_clone = running.clone();
+    for _ in 0..n_workers {
+        let mut worker = ServerWorker::init(&args.server_host, args.backend_port).await;
         let processing_ctx = Arc::clone(&processing_ctx);
-        let zmq_params_clone = Arc::clone(&zmq_params);
         let model_clone = Arc::clone(&model);
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);
         let db_clone = Arc::clone(&db);
         let sender_clone = Arc::clone(&embed);
-
+        let shutdown_receiver = shutdown_sender.subscribe();
         let handle = tokio::task::spawn(async move {
             worker_routine(
-                running_clone,
+                shutdown_receiver,
                 &mut worker,
-                &zmq_params_clone,
                 processing_ctx,
                 model_clone,
                 &split_index_clone,
                 &summary_index_clone,
                 &db_clone,
                 sender_clone,
-                n_embd,
             )
-                .await;
+            .await;
         });
 
         worker_handles.push(handle);
     }
 
     // Start the ZMQ proxy
-    zeromq::proxy(clients.frontend, clients.backend, None).await?;
+    let mut shutdown = shutdown_sender.subscribe();
+    select! {
+        _ =  shutdown.recv() => {
+            info!("Shutting down");
+        }
+        _ = zeromq::proxy(clients.frontend, clients.backend, None) => {
+            info!("Proxy exited");
+        }
+    }
 
     // Shut down
-    shutdown.send("shutdown".to_string())?;
     futures::future::join_all(handles).await;
+    info!("embedding routines handles joined");
     futures::future::join_all(worker_handles).await;
+    info!("worker handles joined");
 
     Ok(())
-
 }

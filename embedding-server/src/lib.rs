@@ -5,6 +5,7 @@ pub mod zmq;
 pub mod utils;
 pub mod dtos;
 
+pub mod api;
 
 #[derive(clap::Parser, Debug, Clone)]
 pub struct ServerArgs {

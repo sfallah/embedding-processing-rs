@@ -1,7 +1,6 @@
+use crate::prelude::{Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Summary};
 use serde::{Deserialize, Serialize};
-use crate::dtos::embedding_dto::EmbeddingDto;
-use crate::models::embedding::{Embedding, EmbeddingDataType};
-use crate::models::summary::Summary;
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SummaryDto {
@@ -53,10 +52,13 @@ impl SummaryDto {
     }
     pub fn to_embedding_model(&self) -> Option<Embedding> {
         self.embedding.as_ref().map(|embedding_dto| {
-            embedding_dto.to_model(
-                self.summary_id,
-                EmbeddingDataType::Summary,
-            )
+            embedding_dto.to_model(self.summary_id, EmbeddingDataType::Summary)
         })
+    }
+
+    pub fn to_embedding_user_model(&self, user_id: Uuid) -> Option<EmbeddingUser> {
+        self.embedding
+            .as_ref()
+            .map(|embedding_dto| EmbeddingUser::new(embedding_dto.embedding_id, user_id))
     }
 }

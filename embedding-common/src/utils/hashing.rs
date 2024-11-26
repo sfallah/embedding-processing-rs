@@ -46,5 +46,4 @@ impl DeterministicAHasher {
     pub fn get_hasher(&self) -> AHasher {
         self.state.build_hasher()
     }
-
 }

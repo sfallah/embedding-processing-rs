@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt;
 use uuid::Uuid;
-use embedding_common::Serde;
+use embedding_common::prelude::Serde;
 
 /// Represents the type of messages that can be processed by the ZMQ server.
 #[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Clone, Copy)]

@@ -1,6 +1,7 @@
 use crate::inference::llama_context::LlamaContext;
 use crate::processing::context::ProcessingContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
+use embedding_common::prelude::Model;
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
 use std::ops::Deref;
@@ -9,7 +10,6 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use embedding_common::models::model::Model;
 
 pub async fn init(
     model_path: &str,
@@ -25,7 +25,6 @@ pub async fn init(
     let (shutdown_sender, shutdown_receiver) = broadcast::channel::<String>(1);
     let shutdown_receiver = Arc::new(shutdown_receiver);
     let shutdown_sender = Arc::new(shutdown_sender);
-
 
     let mut n_ctx = None;
     let mut n_embd = None;
@@ -53,7 +52,12 @@ pub async fn init(
     }
     let embed_sender = Arc::new(embedding_sender);
     let hasher = DeterministicAHasher::new(None, None);
-    let model = Model::new(&hasher, model_path.to_string(), n_ctx.unwrap(), n_embd.unwrap());
+    let model = Model::new(
+        &hasher,
+        model_path.to_string(),
+        n_ctx.unwrap(),
+        n_embd.unwrap(),
+    );
     let model = Arc::new(model);
     Ok((embed_sender, shutdown_sender, embed_handles, model))
 }
@@ -62,7 +66,7 @@ pub async fn init_ctx(
     max_tokens: usize,
     merge_level: Option<usize>,
     n_embd: usize,
-    model_id: u64
+    model_id: u64,
 ) -> Arc<ProcessingContext> {
     let splitter_patterns = vec![
         vec!["\n\n".to_string()],
@@ -74,8 +78,13 @@ pub async fn init_ctx(
             ". ".to_string(),
         ],
     ];
-    let nw_splitter =
-        SplitterLiteConfig::new_hf(splitter_patterns.clone(), Some(max_tokens), merge_level, true, None);
+    let nw_splitter = SplitterLiteConfig::new_hf(
+        splitter_patterns.clone(),
+        Some(max_tokens),
+        merge_level,
+        true,
+        None,
+    );
 
     let sentence_splitter = SplitterLiteConfig::new_hf(
         splitter_patterns.clone(),

@@ -1,7 +1,7 @@
-use std::hash::Hasher;
-use crate::Serde;
-use serde::{Deserialize, Serialize};
+use crate::prelude::Serde;
 use crate::utils::hashing::DeterministicAHasher;
+use serde::{Deserialize, Serialize};
+use std::hash::Hasher;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Model {
