@@ -18,10 +18,9 @@ impl EmbeddingDto {
             model_id,
         }
     }
-    pub fn to_model(&self, data_id: u64, embedding_type: EmbeddingDataType) -> Embedding {
+    pub fn to_model(&self, embedding_type: EmbeddingDataType) -> Embedding {
         Embedding::new(
             self.embedding_id,
-            data_id,
             embedding_type,
             self.embedding.clone(),
             self.model_id,

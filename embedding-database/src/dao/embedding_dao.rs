@@ -44,35 +44,6 @@ pub async fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embeddi
     Ok(embeddings_data)
 }
 
-pub async fn get_splits_by_embedding_ids(
-    db: &Arc<RocksDB>,
-    embedding_ids: Vec<u64>,
-) -> anyhow::Result<Vec<Split>> {
-    let embeddings = db
-        .multi_get(ColumnFamilyType::Embeddings, &embedding_ids.to_vec())
-        .await?;
-    let mut split_ids = Vec::new();
-    for embed_opt in embeddings.iter() {
-        if let Some(embedding) = embed_opt {
-            let embedding: Embedding = Embedding::unpack(embedding)?;
-            split_ids.push(embedding.data_id);
-        }
-    }
-
-    let raw_splits = db
-        .multi_get(ColumnFamilyType::Splits, &split_ids.to_vec())
-        .await?;
-
-    let mut splits = Vec::new();
-    for split_opt in raw_splits.iter() {
-        if let Some(split) = split_opt {
-            let split: Split = Split::unpack(split)?;
-            splits.push(split);
-        }
-    }
-    Ok(splits)
-}
-
 /// Retrieves an `Embedding` by its ID.
 pub async fn get_embedding(
     db: &Arc<RocksDB>,

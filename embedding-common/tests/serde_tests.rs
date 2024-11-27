@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use embedding_common::models::embedding::EmbeddingUser;
-    use embedding_common::types::Serde;
     use rand::Rng;
     use uuid::Uuid;
+    use embedding_common::prelude::*;
+
     #[test]
     fn embedding_user_serde() -> anyhow::Result<()> {
         let user_uuid = Uuid::new_v4();

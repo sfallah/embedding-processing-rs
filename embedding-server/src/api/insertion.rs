@@ -1,5 +1,5 @@
-use crate::dtos::document::{DocumentInsertionRequest, DocumentInsertionResponse};
-use crate::dtos::zmq_message_header::ZmqMessageHeader;
+use crate::schema::insertion::DocumentInsertionResponse;
+use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::send_exception_response;
 use async_channel::Sender;
 use embedding_common::prelude::*;
@@ -10,12 +10,13 @@ use embedding_processing::processing::documents::process_document;
 use embedding_processing::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
 use tokio::task;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 use zeromq::RepSocket;
 use embedding_database::prelude::{save_doc, RocksDB};
-use crate::dtos::document_status::DocumentInsertionStatus;
-use crate::dtos::embedding::EmbeddingUsageDto;
+use crate::schema::document_status::DocumentInsertionStatus;
+use crate::schema::embedding::EmbeddingUsageDto;
+use crate::schema::insertion::DocumentInsertionRequest;
 use crate::utils::zmq_utils;
 
 pub async fn process_document_insertion_request(
@@ -39,6 +40,8 @@ pub async fn process_document_insertion_request(
         }
     }
 
+    debug!("insertion request: {:?}", request);
+
     let docs_input: Vec<String> = request.input;
     let doc_urls: Vec<String> = request.doc_urls.unwrap_or(Vec::new());
 
@@ -51,7 +54,9 @@ pub async fn process_document_insertion_request(
     .await
     .unwrap();
 
+
     let user_id = request.user.unwrap_or(Uuid::new_v4());
+    debug!("User ID: {}", user_id);
 
     save_doc(db, &document_dto, user_id)
         .await

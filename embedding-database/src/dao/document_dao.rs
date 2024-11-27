@@ -60,19 +60,19 @@ pub async fn get_splits_of_document(
 pub async fn get_summaries_of_document(
     db: &Arc<RocksDB>,
     document_id: &u64,
-) -> anyhow::Result<Option<Vec<Summary>>> {
-    let document_info = match get_document(&db, document_id).await? {
+) -> anyhow::Result<Vec<Summary>> {
+    let doc = match get_document(&db, document_id).await? {
         Some(doc) => doc,
-        None => return Ok(None),
+        None => return Ok(Vec::new()),
     };
 
-    let summary_ids = match &document_info.summary_ids {
+    let summary_ids = match doc.summary_ids {
         Some(ids) => ids,
-        None => return Ok(None),
+        None => return Ok(Vec::new()),
     };
 
     let summary_bytes = db
-        .multi_get(ColumnFamilyType::Summaries, summary_ids)
+        .multi_get(ColumnFamilyType::Summaries, &summary_ids)
         .await?;
 
     let mut summaries = Vec::with_capacity(summary_bytes.len());
@@ -84,5 +84,5 @@ pub async fn get_summaries_of_document(
         }
     }
 
-    Ok(Some(summaries))
+    Ok(summaries)
 }

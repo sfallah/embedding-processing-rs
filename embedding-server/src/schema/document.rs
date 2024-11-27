@@ -5,76 +5,7 @@ use embedding_common::dtos::summary_dto::SummaryDto;
 use uuid::Uuid;
 use embedding_common::dtos::document_dto::DocumentDto;
 use embedding_common::prelude::Serde;
-use crate::dtos::document_status::{DeletionStatus, DocumentInsertionStatus, RetrievalStatus};
-use crate::dtos::embedding::EmbeddingUsageDto;
-use crate::dtos::search_mode::SearchModeType;
-
-/// request structure for Document insertion.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DocumentInsertionRequest {
-    /// list of input data strings for which documents to be saved.
-    pub input: Vec<String>,
-    /// model name for generating the embeddings.
-    pub model: String,
-    /// optional UUID of the user making the request.
-    pub user: Option<Uuid>,
-    /// optional list of document urls data string to be saved.
-    pub doc_urls: Option<Vec<String>>,
-    /// optional boolean for detailed response
-    pub verbose: Option<bool>,
-}
-impl Serde for DocumentInsertionRequest {}
-
-/// response structure for Document insertion.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DocumentInsertionResponse {
-    /// response status of the operation.
-    pub status: DocumentInsertionStatus,
-    /// optional collection of document objects.
-    pub documents: Option<Vec<DocumentDto>>,
-    /// optional collection of embedding objects.
-    //pub embeddings: Option<Vec<EmbeddingDto>>,
-    /// optional usage statistics associated with the embedding request.
-    pub usage: Option<EmbeddingUsageDto>,
-}
-impl Serde for DocumentInsertionResponse {}
-
-/// request structure for Document querying
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DocumentQueryRequest {
-    /// string to query the index
-    pub input: String,
-    /// specifies the model for embeddings.
-    pub model: String,
-    /// optional search mode for querying the index.
-    pub search_mode: Option<SearchModeType>,
-    /// optional i32 to get k closest query result.
-    pub top_k: Option<i32>,
-    /// optional format for encoding the output embeddings.
-    pub encoding_format: Option<String>,
-    /// optional dimensionality of the embeddings.
-    pub dimensions: Option<i32>,
-    /// optional UUID of the user making the request.
-    pub user_ids: Vec<Uuid>,
-    /// optional boolean for detailed response
-    pub verbose: Option<bool>,
-}
-impl Serde for DocumentQueryRequest {}
-
-/// response structure for Document querying.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DocumentQueryResponse {
-    /// collecton of Document queries to be returned
-    pub documents: Vec<DocumentDto>,
-    /// optional model name for generating the embeddings.
-    pub model: Option<String>,
-    /// optional collection of query embeddings.
-    pub query_embeddings: Option<Vec<f32>>,
-    /// optional usage statistics associated with the embedding request.
-    pub usage: Option<EmbeddingUsageDto>,
-}
-impl Serde for DocumentQueryResponse {}
-
+use crate::schema::document_status::{DeletionStatus, RetrievalStatus};
 /// request structure for Document retrieval.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DocumentRetrievalRequest {

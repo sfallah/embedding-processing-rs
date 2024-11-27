@@ -3,7 +3,7 @@ use clap::ValueEnum;
 
 pub mod zmq;
 pub mod utils;
-pub mod dtos;
+pub mod schema;
 
 pub mod api;
 

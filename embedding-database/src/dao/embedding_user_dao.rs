@@ -33,7 +33,6 @@ pub fn get_embedding_user(
     }
 }
 
-#[tracing::instrument(skip(db))]
 pub fn has_embedding_user(
     db: &Arc<RocksDB>,
     embed_id: u64,

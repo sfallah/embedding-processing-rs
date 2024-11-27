@@ -1,9 +1,8 @@
 use crate::api::insertion::{process_document_insertion_request, send_document_insertion_response};
-use crate::dtos::document::DocumentInsertionRequest;
-use crate::dtos::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
-use crate::utils::zmq_utils::{
-    handle_error_and_respond, send_exception_response,
-};
+use crate::api::query::process_document_query_request;
+use crate::schema::insertion::DocumentInsertionRequest;
+use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
+use crate::utils::zmq_utils::{handle_error_and_respond, send_exception_response};
 use crate::zmq::server_params::ZmqParams;
 use crate::ServerArgs;
 use anyhow::Result;
@@ -102,6 +101,19 @@ pub async fn worker_routine(
         match message_header.message_type {
             ZmqMessageType::DocumentInsertion => {
                 process_document_insertion_request(
+                    &mut worker_socket.worker,
+                    db,
+                    processing_context.clone(),
+                    split_index,
+                    summary_index,
+                    embedding_sender.clone(),
+                    &mut message_header,
+                    &messages.get(1).unwrap().to_vec(),
+                )
+                    .await;
+            }
+            ZmqMessageType::DocumentQuery => {
+                process_document_query_request(
                     &mut worker_socket.worker,
                     db,
                     processing_context.clone(),

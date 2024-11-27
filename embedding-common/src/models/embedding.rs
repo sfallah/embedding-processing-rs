@@ -15,8 +15,6 @@ pub enum EmbeddingDataType {
 pub struct Embedding {
     /// id of the embedding data.
     pub embedding_id: u64,
-    /// id of the data which the embedding belongs to.
-    pub data_id: u64,
     /// data type of the embedding.
     pub embedding_type: EmbeddingDataType,
     /// actual data of the embedding as a vector of floats.
@@ -26,14 +24,12 @@ pub struct Embedding {
 impl Embedding {
     pub fn new(
         embedding_id: u64,
-        data_id: u64,
         embedding_type: EmbeddingDataType,
         embedding: Vec<f32>,
         model_id: u64,
     ) -> Self {
         Embedding {
             embedding_id,
-            data_id,
             embedding_type,
             embedding,
             model_id,
