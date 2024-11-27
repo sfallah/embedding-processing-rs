@@ -134,9 +134,9 @@ pub async fn process_document_query_request(
             }
         };
         let mut split_dto = if let Some(summary_dtos) = split_summary_map.get(&split.split_id) {
-            split.to_dto(summary_dtos.clone())
+            split.to_dto_full(summary_dtos.clone())
         } else {
-            split.to_dto(vec![])
+            split.to_dto_full(vec![])
         };
         if split_query_res.contains_key(&split.split_id) {
             split_dto.query_distance = Some(*split_query_res.get(&split.split_id).unwrap());

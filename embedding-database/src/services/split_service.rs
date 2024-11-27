@@ -1,8 +1,8 @@
-use anyhow::Result;
+use crate::prelude::*;
+use anyhow::{anyhow, Result};
 use embedding_common::prelude::*;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::prelude::*;
 
 pub(crate) async fn save_split(
     db: &Arc<RocksDB>,
@@ -20,4 +20,17 @@ pub(crate) async fn save_split(
         put_embedding_user(db, &embedding_user).await?;
     }
     Ok(())
+}
+
+pub async fn get_split_full(db: &Arc<RocksDB>, split_id: u64) -> Result<Option<SplitDto>> {
+    match get_split(&db, &split_id).await? {
+        Some(split) => {
+            let summary_ids = split.summary_ids.clone().unwrap_or_else(|| Vec::new());
+            let summaries = get_all_summaries(&db, &summary_ids).await?;
+            let summary_dtos: Vec<_> = summaries.iter().map(|s| s.to_dto(None)).collect();
+            let split_dto = split.to_dto_full(summary_dtos);
+            Ok(Some(split_dto))
+        }
+        None => return Ok(None),
+    }
 }
