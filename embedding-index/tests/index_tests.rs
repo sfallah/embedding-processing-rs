@@ -2,9 +2,6 @@
 mod tests {
     use anyhow::anyhow;
     use embedding_common::config::AppConfig;
-    use embedding_common::models::embedding::EmbeddingUser;
-    use embedding_database::dao::embedding_user_dao::put_embedding_user;
-    use embedding_database::db::rocksdb_impl::RocksDB;
     use embedding_index::hnsw_index::HnswIndex;
     use embedding_index::utils::{generate_random_vectors, index_file};
     use rand::{thread_rng, Rng};
@@ -12,6 +9,8 @@ mod tests {
     use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
     use uuid::Uuid;
+    use embedding_common::prelude::EmbeddingUser;
+    use embedding_database::prelude::{put_embedding_user, RocksDB};
 
     async fn read_config() -> anyhow::Result<AppConfig> {
         let config_file = "tests/test_config/index_config_test.toml".to_string();
@@ -219,10 +218,10 @@ mod tests {
                 let res = index
                     .query_filter(&rocksdb, &vec![user_id.clone()], embedding, 4)
                     .await?;
-                assert_eq!(res.0.len(), 4);
-                assert_eq!(res.1.len(), 4);
-                let first_label = res.0[0];
-                let first_dist = res.1[0];
+                println!("embed_id: {}, res: {:?}", embed_id, res);
+                assert_eq!(res.len(), 4);
+                let first_label = res.keys()[0];
+                let first_dist = *res.first().unwrap().1;
                 assert_eq!(first_label, *embed_id);
                 assert_eq!(first_dist, 0.0);
             }
@@ -291,10 +290,9 @@ mod tests {
                 let res = index
                     .query_filter(&rocksdb, &vec![user_id.clone()], embedding, 10)
                     .await?;
-                assert_eq!(res.0.len(), 10);
-                assert_eq!(res.1.len(), 10);
-                let first_label = res.0[0];
-                let first_dist = res.1[0];
+                assert_eq!(res.len(), 10);
+                let first_label = res.keys()[0];
+                let first_dist = *res.first().unwrap().1;
                 println!("embed_id: {}, res: {:?}", embed_id, res);
                 let orig_embd = index.get_by_label(*embed_id).await?;
                 assert_eq!(orig_embd, *embedding);

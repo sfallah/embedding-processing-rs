@@ -16,12 +16,11 @@ pub async fn process_split(
     seq_id: i32,
 ) -> anyhow::Result<SplitDto> {
     let split_id = ctx.hasher.hash(&format!("{}{}", doc_id, seq_id));
-    let embed_id = ctx.hasher.hash(&format!("{}{}", split_id, seq_id));
     trace!("Processing split: {}", split_id);
 
     let embedding = process_embedding(
         embed_sender.clone(),
-        embed_id,
+        split_id,
         vec![split_res.split_string.clone()],
         ctx.model_id,
         ctx.n_embd,

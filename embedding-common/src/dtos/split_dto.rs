@@ -2,6 +2,7 @@ use crate::prelude::{
     Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Split, SummaryDto,
 };
 use serde::{Deserialize, Serialize};
+use std::hash::{Hash, Hasher};
 use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -13,7 +14,22 @@ pub struct SplitDto {
     pub token_len: usize,
     pub summaries: Vec<SummaryDto>,
     pub embedding: Option<EmbeddingDto>,
+    pub query_distance: Option<f32>,
 }
+
+impl Hash for SplitDto {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.split_id.hash(state);
+    }
+}
+
+impl PartialEq for SplitDto {
+    fn eq(&self, other: &Self) -> bool {
+        self.split_id == other.split_id
+    }
+}
+
+impl Eq for SplitDto {}
 
 impl SplitDto {
     pub fn new(
@@ -33,6 +49,7 @@ impl SplitDto {
             token_len,
             summaries,
             embedding,
+            query_distance: None,
         }
     }
     pub fn to_model(&self) -> Split {
@@ -44,20 +61,19 @@ impl SplitDto {
             Some(self.summaries.iter().map(|s| s.summary_id).collect())
         };
 
-        Split {
-            split_id: self.split_id,
-            sequence_id: self.sequence_id,
-            doc_id: self.doc_id,
-            embedding_id,
-            text_content: self.text_content.clone(),
-            token_len: self.token_len,
+        Split::new(
+            self.split_id,
+            self.sequence_id,
+            self.doc_id,
+            &self.text_content,
+            self.token_len,
             summary_ids,
-        }
+        )
     }
     pub fn to_embedding_model(&self) -> Option<Embedding> {
         self.embedding
             .as_ref()
-            .map(|embedding_dto| embedding_dto.to_model(self.split_id, EmbeddingDataType::Split))
+            .map(|embedding_dto| embedding_dto.to_model(EmbeddingDataType::Split))
     }
 
     pub fn to_embedding_user_model(&self, user_id: Uuid) -> Option<EmbeddingUser> {

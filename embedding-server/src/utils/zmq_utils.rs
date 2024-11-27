@@ -4,10 +4,10 @@ use zeromq::{RepSocket, SocketSend, ZmqMessage};
 use embedding_common::dtos::document_dto::DocumentDto;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::prelude::Serde;
-use crate::dtos::document::DocumentInsertionResponse;
-use crate::dtos::document_status::DocumentInsertionStatus;
-use crate::dtos::embedding::EmbeddingUsageDto;
-use crate::dtos::zmq_message_header::{ZmqMessageHeader, ZmqMessageStatus, ZmqMessageType};
+use crate::schema::insertion::DocumentInsertionResponse;
+use crate::schema::document_status::DocumentInsertionStatus;
+use crate::schema::embedding::EmbeddingUsageDto;
+use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageStatus, ZmqMessageType};
 
 
 // Handling responses, successes, errors and exceptions

@@ -58,9 +58,9 @@ pub async fn initialize_index_from_db(db: &Arc<RocksDB>, split_index: &HnswIndex
 
     for embedding in embedding_data {
         if embedding.embedding_type == EmbeddingDataType::Split {
-            split_index.add(&embedding.embedding, embedding.data_id).await.expect("Failed to add split embedding");
+            split_index.upsert(&embedding.embedding, embedding.embedding_id).await.expect("Failed to add split embedding");
         } else {
-            summary_index.add(&embedding.embedding, embedding.data_id).await.expect("Failed to add summary embedding");
+            summary_index.upsert(&embedding.embedding, embedding.embedding_id).await.expect("Failed to add summary embedding");
         }
     }
     Ok::<(), anyhow::Error>(()).expect("TODO: panic message");

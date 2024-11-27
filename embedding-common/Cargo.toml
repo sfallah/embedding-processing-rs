@@ -19,3 +19,4 @@ log = "0.4.22"
 
 [dev-dependencies]
 rand = "0.8.5"
+indexmap = "2.6.0"

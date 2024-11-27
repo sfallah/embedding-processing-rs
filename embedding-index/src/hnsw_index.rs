@@ -8,8 +8,9 @@ use usearch::{new_index, Index};
 use uuid::Uuid;
 
 use anyhow::Result;
-use tracing::{error, info};
 use embedding_database::prelude::{has_embedding_user, RocksDB};
+use indexmap::IndexMap;
+use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct HnswIndex {
@@ -209,14 +210,14 @@ impl HnswIndex {
         .await?
     }
 
-    #[tracing::instrument(skip(self, db, query, k))]
+    #[tracing::instrument(skip(self, db, query))]
     pub async fn query_filter(
         &self,
         db: &Arc<RocksDB>,
         user_uuids: &Vec<Uuid>,
         query: &Vec<f32>,
         k: usize,
-    ) -> Result<(Vec<u64>, Vec<f32>)> {
+    ) -> Result<IndexMap<u64, f32>> {
         let index = self.index.clone();
         let db = db.clone();
         let query = query.clone();
@@ -232,7 +233,11 @@ impl HnswIndex {
                 .map_err(|e| anyhow!("Failed to query index: {:?}", e))
         })
         .await??;
-        Ok((matches.keys, matches.distances))
+        let combined = matches
+            .keys
+            .into_iter()
+            .zip(matches.distances.into_iter());
+        Ok(IndexMap::from_iter(combined))
     }
 
     pub async fn save(&self) -> Result<()> {

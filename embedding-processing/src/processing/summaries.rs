@@ -41,8 +41,7 @@ pub async fn process_summaries(
             let sum_id = ctx
                 .hasher
                 .hash(&format!("{}{}{}", split_id, seq_id, no_tokens));
-            let embd_id = ctx.hasher.hash(&format!("{}{}", sum_id, idx));
-            let embedding = EmbeddingDto::new(embd_id, embeddings.clone(), ctx.model_id);
+            let embedding = EmbeddingDto::new(sum_id, embeddings.clone(), ctx.model_id);
             SummaryDto::new(
                 sum_id,
                 doc_id,
@@ -52,6 +51,7 @@ pub async fn process_summaries(
                 no_tokens,
                 score,
                 Some(embedding),
+                None,
             )
         })
         .collect();

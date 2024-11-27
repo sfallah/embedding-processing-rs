@@ -6,8 +6,9 @@ use rocksdb::{
     Options, WriteBatch,
 };
 use std::sync::Arc;
+use log::debug;
 use tokio::task;
-use tracing::info;
+use tracing::{info, trace};
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -78,7 +79,6 @@ impl RocksDB {
     }
 
     /// Asynchronously puts a key-value pair into the specified cf.
-    #[instrument(skip(self, value))]
     pub async fn put(&self, cf: ColumnFamilyType, key: &u64, value: &[u8]) -> Result<()> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
@@ -87,7 +87,7 @@ impl RocksDB {
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        info!("Putting key: {} into cf: {}", key, cf_name_clone);
+        trace!("Putting key: {} into cf: {}", key, cf_name_clone);
 
         task::spawn_blocking(move || -> Result<()> {
             let cf = db
@@ -98,23 +98,17 @@ impl RocksDB {
         })
         .await??;
 
-        info!(
-            "Successfully put key: {} ({} bytes) into cf: {}",
-            key, value_len, cf_name_clone
-        );
-
         Ok(())
     }
 
     /// Asynchronously gets the value associated with a key from the specified cf.
-    #[instrument(skip(self))]
     pub async fn get(&self, cf: ColumnFamilyType, key: &u64) -> Result<Option<Vec<u8>>> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        info!("Getting key: {} from cf: {}", key, cf_name_clone);
+        debug!("Getting key: {} from cf: {}", key, cf_name_clone);
 
         let result = task::spawn_blocking(move || -> Result<Option<Vec<u8>>> {
             let cf = db
@@ -126,19 +120,18 @@ impl RocksDB {
         .await??;
 
         match &result {
-            Some(value) => info!(
+            Some(value) => debug!(
                 "Successfully got key: {} ({} bytes) from cf: {}",
                 key,
                 value.len(),
                 cf_name_clone
             ),
-            None => info!("Key: {} not found in cf: {}", key, cf_name_clone),
+            None => debug!("Key: {} not found in cf: {}", key, cf_name_clone),
         }
 
         Ok(result)
     }
 
-    #[instrument(skip(self))]
     pub fn get_sync(&self, cf: ColumnFamilyType, key: &u64) -> Result<Option<Vec<u8>>> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
@@ -155,7 +148,6 @@ impl RocksDB {
     }
 
     /// Asynchronously retrieves all values from the specified cf.
-    #[instrument(skip(self))]
     pub async fn get_all(&self, cf: ColumnFamilyType) -> Result<Vec<Vec<u8>>> {
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
@@ -190,7 +182,6 @@ impl RocksDB {
     }
 
     /// Asynchronously gets multiple values associated with the provided keys from the specified cf.
-    #[instrument(skip(self, keys))]
     pub async fn multi_get(
         &self,
         cf: ColumnFamilyType,
@@ -231,7 +222,6 @@ impl RocksDB {
     }
 
     /// Asynchronously deletes a key-value pair from the specified cf.
-    #[instrument(skip(self))]
     pub async fn delete(&self, cf: ColumnFamilyType, key: &u64) -> Result<()> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
@@ -258,7 +248,6 @@ impl RocksDB {
     }
 
     /// Asynchronously deletes multiple key-value pairs from the specified cf.
-    #[instrument(skip(self, keys))]
     pub async fn delete_many(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<()> {
         let db = self.db.clone();
         let cf_name = cf.name().to_string();

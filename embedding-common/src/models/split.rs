@@ -6,7 +6,6 @@ pub struct Split {
     pub split_id: u64,
     pub sequence_id: i32,
     pub doc_id: u64,
-    pub embedding_id: u64,
     pub text_content: String,
     pub token_len: usize,
     pub summary_ids: Option<Vec<u64>>,
@@ -17,7 +16,6 @@ impl Split {
         split_id: u64,
         sequence_id: i32,
         doc_id: u64,
-        embedding_id: u64,
         text_content: &str,
         token_len: usize,
         summary_ids: Option<Vec<u64>>,
@@ -26,7 +24,6 @@ impl Split {
             split_id,
             sequence_id,
             doc_id,
-            embedding_id,
             text_content: text_content.to_string(),
             token_len,
             summary_ids,
@@ -34,15 +31,15 @@ impl Split {
     }
 
     pub fn to_dto(&self, summaries: Vec<SummaryDto>) -> SplitDto {
-        SplitDto {
-            split_id: self.split_id,
-            sequence_id: self.sequence_id,
-            doc_id: self.doc_id,
-            text_content: self.text_content.clone(),
-            token_len: self.token_len,
+        SplitDto::new(
+            self.split_id,
+            self.sequence_id,
+            self.doc_id,
+            &self.text_content,
+            self.token_len,
             summaries,
-            embedding: None,
-        }
+            None,
+        )
     }
 }
 

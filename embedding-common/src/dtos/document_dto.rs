@@ -7,6 +7,7 @@ pub struct DocumentDto {
     pub document_url: String,
     pub splits: Vec<SplitDto>,
     pub summaries: Vec<SummaryDto>,
+    pub top_query_distance: Option<f32>,
 }
 
 impl DocumentDto {
@@ -21,6 +22,7 @@ impl DocumentDto {
             document_url: document_url.to_string(),
             splits,
             summaries,
+            top_query_distance: None,
         }
     }
     pub fn to_model(&self) -> Document {
@@ -31,7 +33,6 @@ impl DocumentDto {
         } else {
             Some(self.summaries.iter().map(|s| s.summary_id).collect())
         };
-
         Document {
             document_id: self.document_id,
             document_url: self.document_url.clone(),

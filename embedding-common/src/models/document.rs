@@ -1,4 +1,5 @@
-use crate::prelude::Serde;
+use crate::dtos::{SplitDto, SummaryDto};
+use crate::prelude::{DocumentDto, Serde, Split};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +18,15 @@ impl Document {
             split_ids: Vec::new(),
             summary_ids: Some(Vec::new()),
         }
+    }
+
+    pub fn to_dto(&self, splits: &Vec<SplitDto>, summaries: &Vec<SummaryDto>) -> DocumentDto {
+        DocumentDto::new(
+            self.document_id,
+            &self.document_url,
+            splits.clone(),
+            summaries.clone(),
+        )
     }
 }
 impl Serde for Document {}

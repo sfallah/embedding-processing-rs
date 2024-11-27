@@ -12,6 +12,8 @@ pub struct SummaryDto {
     pub token_len: usize,
     pub centrality: f32,
     pub embedding: Option<EmbeddingDto>,
+    pub query_distance: Option<f32>,
+
 }
 
 impl SummaryDto {
@@ -24,6 +26,7 @@ impl SummaryDto {
         token_len: usize,
         centrality: f32,
         embedding: Option<EmbeddingDto>,
+        query_distance: Option<f32>
     ) -> Self {
         SummaryDto {
             summary_id,
@@ -34,25 +37,24 @@ impl SummaryDto {
             token_len,
             centrality,
             embedding,
+            query_distance,
         }
     }
     pub fn to_model(&self) -> Summary {
-        let embedding_id = self.embedding.as_ref().map_or(0, |e| e.embedding_id);
 
-        Summary {
-            summary_id: self.summary_id,
-            document_id: self.document_id,
-            split_id: self.split_id,
-            split_sequence_id: self.split_sequence_id,
-            embedding_id,
-            text_content: self.text_content.clone(),
-            token_len: self.token_len,
-            centrality: self.centrality,
-        }
+        Summary::new(
+            self.summary_id,
+            self.document_id,
+            self.split_id,
+            self.split_sequence_id,
+            &self.text_content,
+            self.token_len,
+            self.centrality,
+        )
     }
     pub fn to_embedding_model(&self) -> Option<Embedding> {
         self.embedding.as_ref().map(|embedding_dto| {
-            embedding_dto.to_model(self.summary_id, EmbeddingDataType::Summary)
+            embedding_dto.to_model(EmbeddingDataType::Summary)
         })
     }
 

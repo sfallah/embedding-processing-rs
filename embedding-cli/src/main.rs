@@ -94,12 +94,13 @@ async fn run_query(
 
     trace!("Query embeddings: {:?}", query_embd.len());
 
-    let (embd_ids, _scores) = splits_index
+    let res = splits_index
         .query_filter(&db, &vec![user_id.clone()], &query_embd.to_vec(), top_k)
         .await?;
+    let embd_ids:Vec<_> = res.keys().map(|x|*x).collect();
     info!("embd_ids: {:?}", embd_ids);
 
-    let splits = get_splits_by_embedding_ids(&db, embd_ids).await?;
+    let splits = get_all_splits(&db, &embd_ids).await?;
     for split in splits {
         info!("Split: {:?}", split);
     }
