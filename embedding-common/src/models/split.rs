@@ -30,7 +30,7 @@ impl Split {
         }
     }
 
-    pub fn to_dto(&self, summaries: Vec<SummaryDto>) -> SplitDto {
+    pub fn to_dto_full(&self, summaries: Vec<SummaryDto>) -> SplitDto {
         SplitDto::new(
             self.split_id,
             self.sequence_id,

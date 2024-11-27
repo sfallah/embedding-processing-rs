@@ -58,3 +58,23 @@ pub async fn get_all_splits(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> anyhow::
     }
     Ok(splits)
 }
+
+pub async fn get_all_splits_full(
+    db: &Arc<RocksDB>,
+    split_ids: &Vec<u64>,
+) -> anyhow::Result<Vec<SplitDto>> {
+    let split_bytes = db.multi_get(ColumnFamilyType::Splits, split_ids).await?;
+    let mut splits_dtos = Vec::new();
+    for option_bytes in split_bytes {
+        if let Some(bytes) = option_bytes {
+            let split: Split =
+                Split::unpack(&bytes).map_err(|e| anyhow!("Failed to unpack summary: {}", e))?;
+            let summary_ids = split.summary_ids.clone().unwrap_or_else(|| Vec::new());
+            let summaries = get_all_summaries(&db, &summary_ids).await?;
+            let summary_dtos: Vec<_> = summaries.iter().map(|s| s.to_dto(None)).collect();
+            let split_dto = split.to_dto_full(summary_dtos);
+            splits_dtos.push(split_dto);
+        }
+    }
+    Ok(splits_dtos)
+}
