@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tracing::error;
 use zeromq::RepSocket;
 
-async fn process_document_deletion_request(
+pub async fn process_document_deletion_request(
     worker_socket: &mut RepSocket,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,

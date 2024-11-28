@@ -1,9 +1,9 @@
+use crate::schema::document_status::DocumentInsertionStatus;
+use crate::schema::embedding::EmbeddingUsageDto;
+use embedding_common::dtos::DocumentDto;
 use embedding_common::prelude::Serde;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use embedding_common::dtos::DocumentDto;
-use crate::schema::document_status::DocumentInsertionStatus;
-use crate::schema::embedding::EmbeddingUsageDto;
 
 /// request structure for Document insertion.
 #[derive(Serialize, Deserialize, Debug)]

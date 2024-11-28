@@ -1,14 +1,13 @@
-use std::collections::VecDeque;
-use tracing::error;
-use zeromq::{RepSocket, SocketSend, ZmqMessage};
+use crate::schema::document_status::DocumentInsertionStatus;
+use crate::schema::embedding::EmbeddingUsageDto;
+use crate::schema::insertion::DocumentInsertionResponse;
+use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageStatus, ZmqMessageType};
 use embedding_common::dtos::document_dto::DocumentDto;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::prelude::Serde;
-use crate::schema::insertion::DocumentInsertionResponse;
-use crate::schema::document_status::DocumentInsertionStatus;
-use crate::schema::embedding::EmbeddingUsageDto;
-use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageStatus, ZmqMessageType};
-
+use std::collections::VecDeque;
+use tracing::error;
+use zeromq::{RepSocket, SocketSend, ZmqMessage};
 
 // Handling responses, successes, errors and exceptions
 pub async fn handle_error_and_respond(

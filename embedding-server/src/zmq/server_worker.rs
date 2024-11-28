@@ -1,5 +1,7 @@
+use crate::api::delete::process_document_deletion_request;
 use crate::api::insertion::{process_document_insertion_request, send_document_insertion_response};
 use crate::api::query::process_document_query_request;
+use crate::api::retrieval::process_document_retrieval_request;
 use crate::schema::insertion::DocumentInsertionRequest;
 use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
 use crate::utils::zmq_utils::{handle_error_and_respond, send_exception_response};
@@ -28,6 +30,7 @@ use zeromq::{RepSocket, Socket, SocketRecv};
 
 pub struct ServerWorker {
     pub worker: RepSocket,
+    pub hasher: Arc<DeterministicAHasher>,
 }
 
 impl ServerWorker {
@@ -38,7 +41,8 @@ impl ServerWorker {
             .connect(&endpoint)
             .await
             .expect("Worker failed to connect to backend");
-        ServerWorker { worker }
+        let hasher = Arc::new(DeterministicAHasher::new(None, None));
+        ServerWorker { worker, hasher }
     }
 }
 
@@ -125,7 +129,27 @@ pub async fn worker_routine(
                 )
                     .await;
             }
-
+            ZmqMessageType::DocumentRetrieval => {
+                        process_document_retrieval_request(
+                            &mut worker_socket.worker,
+                            worker_socket.hasher.clone(),
+                            db,
+                            &mut message_header,
+                            &messages.get(1).unwrap().to_vec(),
+                        )
+                            .await;
+                    }
+            ZmqMessageType::DocumentDeletion => {
+                        process_document_deletion_request(
+                            &mut worker_socket.worker,
+                            split_index,
+                            summary_index,
+                            db,
+                            &mut message_header,
+                            &messages.get(1).unwrap().to_vec(),
+                        )
+                            .await;
+                    }
             _ => {
                 let error_message = format!(
                     "Unrecognized message type: {:?}",

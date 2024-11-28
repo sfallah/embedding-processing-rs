@@ -1,5 +1,5 @@
 use crate::dao::document_dao::{delete_document, get_splits_of_document};
-use crate::dao::split_dao::get_all_splits_full;
+use crate::services::split_service::get_all_splits_full;
 use crate::prelude::*;
 use crate::services::split_service::{delete_splits_full, save_split};
 use crate::services::summary_service::{

@@ -1,9 +1,9 @@
-use std::path::PathBuf;
 use clap::ValueEnum;
+use std::path::PathBuf;
 
-pub mod zmq;
-pub mod utils;
 pub mod schema;
+pub mod utils;
+pub mod zmq;
 
 pub mod api;
 
@@ -65,7 +65,10 @@ pub struct ServerArgs {
     pub log_level: LogLevel,
 
     /// Path to the text file to process
-    #[arg(long, default_value = "embedding-processing/tests/test_data/superlinear.txt")]
+    #[arg(
+        long,
+        default_value = "embedding-processing/tests/test_data/superlinear.txt"
+    )]
     pub file_path: PathBuf,
 
     #[arg(long)]

@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use embedding_common::dtos::DocumentDto;
-use embedding_common::prelude::Serde;
 use crate::schema::embedding::EmbeddingUsageDto;
 use crate::schema::search_mode::SearchModeType;
+use embedding_common::dtos::DocumentDto;
+use embedding_common::prelude::Serde;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// request structure for Document querying
 #[derive(Serialize, Deserialize, Debug)]
