@@ -30,6 +30,10 @@ pub async fn get_document(
     }
 }
 
+pub async fn delete_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Result<()> {
+    db.delete(ColumnFamilyType::Documents, document_id).await
+}
+
 /// Retrieves all `Splits` associated with a `Document`.
 pub async fn get_splits_of_document(
     db: &Arc<RocksDB>,

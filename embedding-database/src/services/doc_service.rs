@@ -1,8 +1,10 @@
-use crate::dao::document_dao::get_splits_of_document;
+use crate::dao::document_dao::{delete_document, get_splits_of_document};
 use crate::dao::split_dao::get_all_splits_full;
 use crate::prelude::*;
-use crate::services::split_service::save_split;
-use crate::services::summary_service::{get_all_summaries_full, save_summary};
+use crate::services::split_service::{delete_splits_full, save_split};
+use crate::services::summary_service::{
+    delete_summaries_full, get_all_summaries_full, save_summary,
+};
 use anyhow::anyhow;
 use embedding_common::prelude::*;
 use futures::future::join_all;
@@ -56,4 +58,21 @@ pub async fn get_full_doc(
         return Ok(Some(doc.to_dto(&split_dtos, &summary_dtos)));
     }
     Ok(None)
+}
+
+pub async fn delete_doc_full(db: &Arc<RocksDB>, document_id: u64) -> anyhow::Result<bool> {
+    match get_document(db, &document_id).await {
+        Ok(Some(doc)) => {
+            delete_document(db, &doc.document_id).await?;
+            delete_splits_full(db, &doc.split_ids).await?;
+            delete_summaries_full(db, &doc.summary_ids.clone().unwrap_or_default()).await?;
+            Ok(true)
+        }
+        Ok(None) => Ok(false),
+        Err(e) => {
+            let error_message = format!("Error retrieving document: {:?}", e);
+            error!("{}", error_message);
+            Err(anyhow!(error_message))
+        }
+    }
 }

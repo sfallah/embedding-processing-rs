@@ -2,7 +2,10 @@ use anyhow::Result;
 use embedding_common::prelude::*;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::dao::summary_dao::get_summary;
+use crate::dao::embedding_dao::delete_all_embeddings;
+use crate::dao::embedding_user_dao::delete_all_embedding_users;
+use crate::dao::split_dao::delete_all_splits;
+use crate::dao::summary_dao::{delete_all_summaries, get_summary};
 use crate::prelude::*;
 pub(crate) async fn save_summary(db: &Arc<RocksDB>, dto: &SummaryDto, user_id: Uuid) -> Result<()> {
     let summary = dto.to_model();
@@ -29,5 +32,14 @@ pub async fn get_summary_full(db: &Arc<RocksDB>, summary_id: &u64) -> anyhow::Re
     let summary_dtos = summary.map(|summary| summary.to_dto(None));
     Ok(summary_dtos)
 }
+
+pub async fn delete_summaries_full(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> Result<()> {
+    delete_all_summaries(db, split_ids).await?;
+    delete_all_embeddings(db, split_ids).await?;
+    delete_all_embedding_users(db, split_ids).await
+
+}
+
+
 
 

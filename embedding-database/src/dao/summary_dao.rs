@@ -2,9 +2,7 @@ use crate::db::column_families::ColumnFamilyType;
 use crate::db::rocksdb_impl::RocksDB;
 use anyhow::anyhow;
 use embedding_common::prelude::*;
-use futures::StreamExt;
 use std::sync::Arc;
-use tracing::error;
 
 /// Stores a `Summary` in the database.
 pub async fn put_summary(db: &Arc<RocksDB>, summary: &Summary) -> anyhow::Result<()> {
@@ -45,4 +43,8 @@ pub async fn get_all_summaries(
         }
     }
     Ok(summaries)
+}
+
+pub async fn delete_all_summaries(db: &Arc<RocksDB>, summary_ids: &[u64]) -> anyhow::Result<()> {
+    db.multi_delete(ColumnFamilyType::Summaries, summary_ids).await
 }

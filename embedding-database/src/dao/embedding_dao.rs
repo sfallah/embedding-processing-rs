@@ -58,3 +58,7 @@ pub async fn get_embedding(
         None => Ok(None),
     }
 }
+
+pub async fn delete_all_embeddings(db: &Arc<RocksDB>, embedding_ids: &[u64]) -> anyhow::Result<()> {
+    db.multi_delete(ColumnFamilyType::Embeddings, embedding_ids).await
+}

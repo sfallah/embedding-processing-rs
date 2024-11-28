@@ -3,6 +3,9 @@ use anyhow::{anyhow, Result};
 use embedding_common::prelude::*;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::dao::embedding_dao::delete_all_embeddings;
+use crate::dao::embedding_user_dao::delete_all_embedding_users;
+use crate::dao::split_dao::delete_all_splits;
 
 pub(crate) async fn save_split(
     db: &Arc<RocksDB>,
@@ -33,4 +36,11 @@ pub async fn get_split_full(db: &Arc<RocksDB>, split_id: u64) -> Result<Option<S
         }
         None => return Ok(None),
     }
+}
+
+pub async fn delete_splits_full(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> Result<()> {
+    delete_all_splits(db, split_ids).await?;
+    delete_all_embeddings(db, split_ids).await?;
+    delete_all_embedding_users(db, split_ids).await
+
 }

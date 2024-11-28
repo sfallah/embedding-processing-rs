@@ -27,6 +27,11 @@ pub async fn get_split(db: &Arc<RocksDB>, split_id: &u64) -> anyhow::Result<Opti
     }
 }
 
+pub async fn delete_all_splits(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> anyhow::Result<()> {
+    db.multi_delete(ColumnFamilyType::Splits, split_ids.as_slice())
+        .await
+}
+
 /// Retrieves all `Summaries` associated with a `Split`.
 pub async fn get_summaries_of_split(
     db: &Arc<RocksDB>,

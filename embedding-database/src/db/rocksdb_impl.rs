@@ -248,7 +248,7 @@ impl RocksDB {
     }
 
     /// Asynchronously deletes multiple key-value pairs from the specified cf.
-    pub async fn delete_many(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<()> {
+    pub async fn multi_delete(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<()> {
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
