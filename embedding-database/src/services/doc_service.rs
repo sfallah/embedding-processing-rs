@@ -60,15 +60,15 @@ pub async fn get_full_doc(
     Ok(None)
 }
 
-pub async fn delete_doc_full(db: &Arc<RocksDB>, document_id: u64) -> anyhow::Result<bool> {
+pub async fn delete_doc_full(db: &Arc<RocksDB>, document_id: u64) -> anyhow::Result<Option<Document>> {
     match get_document(db, &document_id).await {
         Ok(Some(doc)) => {
             delete_document(db, &doc.document_id).await?;
             delete_splits_full(db, &doc.split_ids).await?;
             delete_summaries_full(db, &doc.summary_ids.clone().unwrap_or_default()).await?;
-            Ok(true)
+            Ok(Some(doc))
         }
-        Ok(None) => Ok(false),
+        Ok(None) => Ok(None),
         Err(e) => {
             let error_message = format!("Error retrieving document: {:?}", e);
             error!("{}", error_message);

@@ -3,9 +3,10 @@ use crate::schema::document_status::DeletionStatus;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use embedding_common::prelude::*;
-use embedding_database::prelude::{delete_doc_full, get_document, RocksDB};
+use embedding_database::prelude::{delete_doc_full, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
 use std::sync::Arc;
+use tracing::error;
 use zeromq::RepSocket;
 
 async fn process_document_deletion_request(
@@ -26,8 +27,24 @@ async fn process_document_deletion_request(
         }
     };
     match delete_doc_full(db, request.document_id).await {
-        Ok(removed) => {
-            send_document_deletion_response(worker_socket, removed, message_header).await;
+        Ok(Some(doc)) => {
+            for split_id in doc.split_ids {
+                if let Err(e) = split_index.delete(split_id).await {
+                    let error_message = format!("Error deleting split from index: {:?}", e);
+                    error!("{}", &error_message);
+                }
+            }
+            for summary_id in doc.summary_ids.unwrap_or_default() {
+                if let Err(e) = summary_index.delete(summary_id).await {
+                    let error_message = format!("Error deleting summary from index: {:?}", e);
+                    error!("{}", &error_message);
+                }
+            }
+            send_document_deletion_response(worker_socket, true, message_header).await;
+        }
+
+        Ok(None) => {
+            send_document_deletion_response(worker_socket, false, message_header).await;
         }
         Err(e) => {
             let error_message = format!("Error deleting document: {:?}", e);
