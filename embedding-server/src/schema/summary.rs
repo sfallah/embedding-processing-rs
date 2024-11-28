@@ -1,7 +1,7 @@
+use crate::schema::document_status::RetrievalStatus;
+use embedding_common::prelude::{Embedding, Serde, SummaryDto};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use embedding_common::prelude::{Embedding, Serde, SummaryDto};
-use crate::schema::document_status::RetrievalStatus;
 
 /// request structure for Summary retrieval.
 #[derive(Serialize, Deserialize, Debug)]

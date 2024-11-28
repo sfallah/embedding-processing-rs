@@ -1,17 +1,17 @@
 use crate::schema::document::{DocumentRetrievalRequest, DocumentRetrievalResponse};
 use crate::schema::document_status::RetrievalStatus;
 use crate::schema::split::{SplitRetrievalRequest, SplitRetrievalResponse};
+use crate::schema::summary::{SummaryRetrievalRequest, SummaryRetrievalResponse};
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use embedding_common::prelude::*;
 use embedding_database::prelude::*;
 use std::sync::Arc;
 use zeromq::RepSocket;
-use crate::schema::summary::{SummaryRetrievalRequest, SummaryRetrievalResponse};
 
-async fn process_document_retrieval_request(
+pub async fn process_document_retrieval_request(
     worker_socket: &mut RepSocket,
-    hasher: &DeterministicAHasher,
+    hasher: Arc<DeterministicAHasher>,
     db: &Arc<RocksDB>,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
@@ -145,7 +145,9 @@ async fn process_summary_retrieval_request(
     };
 
     match get_summary_full(db, &request.summary_id).await {
-        Ok(summary) => send_summary_retrieval_response(worker_socket, &summary, message_header).await,
+        Ok(summary) => {
+            send_summary_retrieval_response(worker_socket, &summary, message_header).await
+        }
         Err(e) => {
             let error_message = format!("Error occurred during summary retrieval: {:?}", e);
             eprintln!("{}", &error_message);

@@ -1,8 +1,13 @@
+use crate::schema::document_status::DocumentInsertionStatus;
+use crate::schema::embedding::EmbeddingUsageDto;
+use crate::schema::insertion::DocumentInsertionRequest;
 use crate::schema::insertion::DocumentInsertionResponse;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
+use crate::utils::zmq_utils;
 use crate::utils::zmq_utils::send_exception_response;
 use async_channel::Sender;
 use embedding_common::prelude::*;
+use embedding_database::prelude::{save_doc, RocksDB};
 use embedding_index::add_to_indices;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
@@ -13,11 +18,6 @@ use tokio::task;
 use tracing::{debug, info};
 use uuid::Uuid;
 use zeromq::RepSocket;
-use embedding_database::prelude::{save_doc, RocksDB};
-use crate::schema::document_status::DocumentInsertionStatus;
-use crate::schema::embedding::EmbeddingUsageDto;
-use crate::schema::insertion::DocumentInsertionRequest;
-use crate::utils::zmq_utils;
 
 pub async fn process_document_insertion_request(
     worker_socket: &mut RepSocket,
@@ -54,7 +54,6 @@ pub async fn process_document_insertion_request(
     .await
     .unwrap();
 
-
     let user_id = request.user.unwrap_or(Uuid::new_v4());
     debug!("User ID: {}", user_id);
 
@@ -88,9 +87,9 @@ pub async fn send_document_insertion_response(
 
     for (i, _) in document_dtos.splits.iter().enumerate() {
         let data = EmbeddingDto {
-            embedding_id: 0, // Placeholder
+            embedding_id: 0,   // Placeholder
             embedding: vec![], // Placeholder
-            model_id: 0, // Placeholder
+            model_id: 0,       // Placeholder
         };
         embeddings_data.push(data);
     }

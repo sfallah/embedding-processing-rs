@@ -1,9 +1,9 @@
-use serde::{Deserialize, Serialize};
-use uuid::Uuid;
+use crate::schema::document_status::RetrievalStatus;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::split_dto::SplitDto;
 use embedding_common::prelude::Serde;
-use crate::schema::document_status::RetrievalStatus;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// request structure for Split retrieval.
 #[derive(Serialize, Deserialize, Debug)]
