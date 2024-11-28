@@ -29,7 +29,7 @@ pub async fn get_summary(db: &Arc<RocksDB>, summary_id: &u64) -> anyhow::Result<
 
 pub async fn get_all_summaries(
     db: &Arc<RocksDB>,
-    summary_ids: &Vec<u64>,
+    summary_ids: &[u64],
 ) -> anyhow::Result<Vec<Summary>> {
     let summary_bytes = db
         .multi_get(ColumnFamilyType::Summaries, summary_ids)

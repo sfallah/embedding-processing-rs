@@ -1,3 +1,4 @@
+use crate::dtos::EmbeddingDto;
 use crate::prelude::{Serde, SplitDto, SummaryDto};
 use serde::{Deserialize, Serialize};
 
@@ -30,7 +31,11 @@ impl Split {
         }
     }
 
-    pub fn to_dto_full(&self, summaries: Vec<SummaryDto>) -> SplitDto {
+    pub fn to_dto_full(
+        &self,
+        summaries: Vec<SummaryDto>,
+        embedding: Option<EmbeddingDto>,
+    ) -> SplitDto {
         SplitDto::new(
             self.split_id,
             self.sequence_id,
@@ -38,7 +43,7 @@ impl Split {
             &self.text_content,
             self.token_len,
             summaries,
-            None,
+            embedding,
         )
     }
 }

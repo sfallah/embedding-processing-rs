@@ -23,7 +23,9 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let app_config = AppConfig::from_file_async(args.config_file).await?;
 
-    let db_config = app_config.clone().database_config;
+    let model_config = app_config.model_config;
+    let splitter_config = app_config.splitter_config;
+    let db_config = app_config.database_config;
 
     setup_tracing(args.log_level.to_tracing_level());
 
@@ -45,7 +47,6 @@ async fn main() -> Result<(), anyhow::Error> {
         workers: n_workers,
     });
 
-    let model_config = app_config.model_config;
 
     let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
     let db_path = db_path_binding.to_str().unwrap();
@@ -56,8 +57,8 @@ async fn main() -> Result<(), anyhow::Error> {
     let (embed, shutdown_sender, handles, model) =
         app_utils::init(&model_config.gguf_file, model_config.instances).await?;
     let processing_ctx = init_ctx(
-        args.max_tokens,
-        args.merge_level,
+        splitter_config.max_tokens,
+        splitter_config.merge_level,
         model.n_embd as usize,
         model.model_id,
     )

@@ -6,9 +6,7 @@ use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use async_channel::Sender;
 use embedding_common::prelude::*;
-use embedding_database::prelude::{
-    get_all_summaries, get_document, get_split, get_summaries_of_document, RocksDB,
-};
+use embedding_database::prelude::{get_all_summaries, get_all_summaries_full, get_document, get_embedding_full, get_split, get_summaries_of_document, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::query::process_query;
@@ -73,20 +71,18 @@ pub async fn process_document_query_request(
 
         let summary_ids: Vec<u64> = summaries_query_res.keys().map(|x| *x).collect();
 
-        let summaries = get_all_summaries(db, &summary_ids).await.unwrap();
+        let summary_dtos = get_all_summaries_full(db, summary_ids.as_slice(), Some(&summaries_query_res), request.verbose.unwrap_or(false)).await.unwrap();
 
-        for summary in summaries.iter() {
-            let summary_distance = summaries_query_res.get(&summary.summary_id).unwrap();
-            let summary_dto = summary.to_dto(Some(*summary_distance));
-            if split_summary_map.contains_key(&summary.split_id) {
+        for summary_dto in summary_dtos {
+            if split_summary_map.contains_key(&summary_dto.split_id) {
                 split_summary_map
-                    .get_mut(&summary.split_id)
+                    .get_mut(&summary_dto.split_id)
                     .unwrap()
                     .push(summary_dto);
             } else {
                 let mut summary_set = Vec::new();
-                summary_set.push(summary_dto);
-                split_summary_map.insert(summary.split_id, summary_set);
+                summary_set.push(summary_dto.clone());
+                split_summary_map.insert(summary_dto.split_id, summary_set);
             }
         }
     }
@@ -133,10 +129,18 @@ pub async fn process_document_query_request(
                 return;
             }
         };
-        let mut split_dto = if let Some(summary_dtos) = split_summary_map.get(&split.split_id) {
-            split.to_dto_full(summary_dtos.clone())
+
+        let split_embedding: Option<EmbeddingDto> = if request.verbose.unwrap_or(false) {
+            get_embedding_full(db, &split.split_id).await.unwrap()
         } else {
-            split.to_dto_full(vec![])
+            None
+        };
+
+        let mut split_dto = if let Some(summary_dtos) = split_summary_map.get(&split.split_id) {
+            let summary_dtos:Vec<_> = summary_dtos.clone().into_iter().map(|x| x.clone()).collect();
+            split.to_dto_full(summary_dtos, split_embedding)
+        } else {
+            split.to_dto_full(vec![], split_embedding)
         };
         if split_query_res.contains_key(&split.split_id) {
             split_dto.query_distance = Some(*split_query_res.get(&split.split_id).unwrap());
@@ -167,20 +171,14 @@ pub async fn process_document_query_request(
                 return;
             }
         };
-        let doc_summaries = get_summaries_of_document(db, &doc_id).await.unwrap();
-        let doc_summaries_dto = doc_summaries
-            .iter()
-            .map(|x| match summaries_query_res.get(&x.summary_id) {
-                Some(distance) => x.to_dto(Some(*distance)),
-                None => x.to_dto(None),
-            })
-            .collect();
+        let doc_summary_ids = document.summary_ids.unwrap_or(vec![]);
+        let doc_summary_dtos = get_all_summaries_full(db, doc_summary_ids.as_slice(), Some(&summaries_query_res), request.verbose.unwrap_or(false)).await.unwrap();
 
         let new_doc_query = DocumentDto::new(
             document.document_id,
             &document.document_url,
             doc_splits,
-            doc_summaries_dto,
+            doc_summary_dtos,
         );
         docs.push(new_doc_query);
     }
