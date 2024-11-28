@@ -1,4 +1,4 @@
-use crate::prelude::{Serde, SummaryDto};
+use crate::prelude::{EmbeddingDto, Serde, SummaryDto};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +33,11 @@ impl Summary {
         }
     }
 
-    pub fn to_dto(&self, query_distance: Option<f32>) -> SummaryDto {
+    pub fn to_dto(
+        &self,
+        embedding: Option<EmbeddingDto>,
+        query_distance: Option<f32>,
+    ) -> SummaryDto {
         SummaryDto::new(
             self.summary_id,
             self.document_id,
@@ -42,7 +46,7 @@ impl Summary {
             &self.text_content,
             self.token_len,
             self.centrality,
-            None,
+            embedding,
             query_distance,
         )
     }

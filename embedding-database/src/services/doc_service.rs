@@ -41,6 +41,7 @@ pub async fn save_doc(db: &Arc<RocksDB>, dto: &DocumentDto, user_id: Uuid) -> an
 pub async fn get_full_doc(
     db: &Arc<RocksDB>,
     document_id: u64,
+    with_embeddings: bool,
 ) -> anyhow::Result<Option<DocumentDto>> {
     let doc_model = match get_document(db, &document_id).await {
         Ok(doc) => doc,
@@ -51,9 +52,9 @@ pub async fn get_full_doc(
         }
     };
     if let Some(doc) = doc_model {
-        let split_dtos = get_all_splits_full(db, &doc.split_ids).await?;
+        let split_dtos = get_all_splits_full(db, &doc.split_ids, with_embeddings).await?;
         let summary_ids = doc.summary_ids.clone().unwrap_or_default();
-        let summary_dtos = get_all_summaries_full(db, &summary_ids).await?;
+        let summary_dtos = get_all_summaries_full(db, &summary_ids,None, with_embeddings).await?;
         //FIXME: Order the summaries by their order in the document
         return Ok(Some(doc.to_dto(&split_dtos, &summary_dtos)));
     }

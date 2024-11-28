@@ -44,6 +44,25 @@ pub async fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embeddi
     Ok(embeddings_data)
 }
 
+pub async fn get_embeddings(
+    db: &Arc<RocksDB>,
+    embedding_ids: &[u64],
+) -> anyhow::Result<Vec<Embedding>> {
+    let embedding_data_bytes_vec = db
+        .multi_get(ColumnFamilyType::Embeddings, embedding_ids)
+        .await
+        .context("Failed to get all embeddings")?;
+    let mut embeddings = Vec::new();
+    for option_bytes in embedding_data_bytes_vec {
+        if let Some(bytes) = option_bytes {
+            let embedding = Embedding::unpack(&bytes)
+                .map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;
+            embeddings.push(embedding);
+        }
+    }
+    Ok(embeddings)
+}
+
 /// Retrieves an `Embedding` by its ID.
 pub async fn get_embedding(
     db: &Arc<RocksDB>,
@@ -60,5 +79,6 @@ pub async fn get_embedding(
 }
 
 pub async fn delete_all_embeddings(db: &Arc<RocksDB>, embedding_ids: &[u64]) -> anyhow::Result<()> {
-    db.multi_delete(ColumnFamilyType::Embeddings, embedding_ids).await
+    db.multi_delete(ColumnFamilyType::Embeddings, embedding_ids)
+        .await
 }

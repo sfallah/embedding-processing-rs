@@ -8,7 +8,7 @@ expansion_search = 32
 
 [splitter]
 max_tokens = 400
-#hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
+hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
 #patterns = [["\n\n"], ["\n"], [".", "!", "?"]]
 
 [model]

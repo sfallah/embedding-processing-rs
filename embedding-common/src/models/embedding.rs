@@ -1,4 +1,4 @@
-use crate::prelude::Serde;
+use crate::prelude::{EmbeddingDto, Serde};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -34,6 +34,10 @@ impl Embedding {
             embedding,
             model_id,
         }
+    }
+
+    pub fn to_dto(&self) -> EmbeddingDto {
+        EmbeddingDto::new(self.embedding_id, self.embedding.clone(), self.model_id)
     }
 }
 impl Serde for Embedding {}

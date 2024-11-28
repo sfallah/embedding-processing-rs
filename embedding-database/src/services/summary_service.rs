@@ -1,12 +1,15 @@
-use anyhow::Result;
-use embedding_common::prelude::*;
-use std::sync::Arc;
-use uuid::Uuid;
 use crate::dao::embedding_dao::delete_all_embeddings;
 use crate::dao::embedding_user_dao::delete_all_embedding_users;
-use crate::dao::split_dao::delete_all_splits;
-use crate::dao::summary_dao::{delete_all_summaries, get_summary};
-use crate::prelude::*;
+use crate::dao::summary_dao::{delete_all_summaries};
+use crate::services::embedding_service::get_all_embeddings_full;
+use anyhow::Result;
+use embedding_common::prelude::*;
+use std::collections::HashMap;
+use std::sync::Arc;
+use indexmap::IndexMap;
+use uuid::Uuid;
+use crate::prelude::{get_all_summaries, put_embedding, put_embedding_user, put_summary, RocksDB};
+
 pub(crate) async fn save_summary(db: &Arc<RocksDB>, dto: &SummaryDto, user_id: Uuid) -> Result<()> {
     let summary = dto.to_model();
     let embedding = dto.to_embedding_model();
@@ -21,15 +24,31 @@ pub(crate) async fn save_summary(db: &Arc<RocksDB>, dto: &SummaryDto, user_id: U
     Ok(())
 }
 
-pub async fn get_all_summaries_full(db: &Arc<RocksDB>, summary_ids: &Vec<u64>) -> anyhow::Result<Vec<SummaryDto>> {
+pub async fn get_all_summaries_full(
+    db: &Arc<RocksDB>,
+    summary_ids: &[u64],
+    query_res: Option<&IndexMap<u64, f32>>,
+    with_embeddings: bool,
+) -> Result<Vec<SummaryDto>> {
     let summaries = get_all_summaries(db, summary_ids).await?;
-    let summary_dtos:Vec<_> = summaries.iter().map(|summary| summary.to_dto(None)).collect();
-    Ok(summary_dtos)
-}
-
-pub async fn get_summary_full(db: &Arc<RocksDB>, summary_id: &u64) -> anyhow::Result<Option<SummaryDto>> {
-    let summary = get_summary(db, summary_id).await?;
-    let summary_dtos = summary.map(|summary| summary.to_dto(None));
+    let summary_ids: Vec<_> = summaries.iter().map(|s| s.summary_id).collect();
+    let embeddings = if with_embeddings {
+        get_all_embeddings_full(db, &summary_ids).await?
+    } else {
+        vec![]
+    };
+    let embeddings_map: HashMap<u64, EmbeddingDto> =
+        HashMap::from_iter(embeddings.into_iter().map(|embd| (embd.embedding_id, embd)));
+    let summary_dtos: Vec<_> = summaries
+        .iter()
+        .map(|summary| {
+            let embedding = embeddings_map
+                .get(&summary.summary_id)
+                .map(|embd| embd.clone());
+            let query_score = query_res.and_then(|qr| qr.get(&summary.summary_id).cloned());
+            summary.to_dto(embedding, query_score)
+        })
+        .collect();
     Ok(summary_dtos)
 }
 
@@ -37,9 +56,4 @@ pub async fn delete_summaries_full(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> R
     delete_all_summaries(db, split_ids).await?;
     delete_all_embeddings(db, split_ids).await?;
     delete_all_embedding_users(db, split_ids).await
-
 }
-
-
-
-

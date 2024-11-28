@@ -10,10 +10,11 @@ tokio = {workspace = true}
 futures = {workspace = true}
 tracing = {workspace = true}
 anyhow = { workspace = true }
-serde = { workspace = true }
-serde_repr = { workspace = true }
-rmp-serde = { workspace = true }
-serde_json = { workspace = true }
+indexmap = { workspace = true }
+#serde = { workspace = true }
+#serde_repr = { workspace = true }
+#rmp-serde = { workspace = true }
+#serde_json = { workspace = true }
 num_cpus = { workspace = true }
 uuid = { workspace = true }
 embedding-common = { path = "../embedding-common" }
