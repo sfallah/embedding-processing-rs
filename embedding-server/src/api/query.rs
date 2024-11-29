@@ -1,4 +1,3 @@
-use crate::schema::embedding::EmbeddingUsageDto;
 use crate::schema::query::DocumentQueryRequest;
 use crate::schema::query::DocumentQueryResponse;
 use crate::schema::search_mode::SearchModeType;
@@ -144,8 +143,6 @@ pub async fn process_document_query_request(
         message_header,
         &docs,
         &query_embeddings,
-        0,
-        0,
         request.verbose.unwrap_or(false),
     )
     .await;
@@ -157,8 +154,6 @@ async fn send_document_query_response(
     message_header: &mut ZmqMessageHeader,
     documents: &Vec<DocumentDto>,
     query_embeddings: &Vec<f32>,
-    tokens_query: usize,
-    tokens_answer_and_query: usize,
     verbose: bool,
 ) {
     let response = DocumentQueryResponse {
@@ -169,10 +164,6 @@ async fn send_document_query_response(
         } else {
             None
         },
-        usage: Some(EmbeddingUsageDto {
-            prompt_tokens: tokens_query as i32,
-            total_tokens: tokens_answer_and_query as i32,
-        }),
     };
     send_success_response(socket, response, message_header).await
 }

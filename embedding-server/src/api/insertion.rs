@@ -1,7 +1,4 @@
 use crate::schema::document_status::DocumentInsertionStatus;
-use crate::schema::embedding::EmbeddingUsageDto;
-use crate::schema::insertion::DocumentInsertionRequest;
-use crate::schema::insertion::DocumentInsertionResponse;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils;
 use crate::utils::zmq_utils::send_exception_response;
@@ -17,6 +14,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use zeromq::RepSocket;
+use crate::schema::document::{DocumentInsertionRequest, DocumentInsertionResponse};
 
 pub async fn process_document_insertion_request(
     worker_socket: &mut RepSocket,
@@ -82,19 +80,13 @@ pub async fn send_document_insertion_response(
     document_dtos: &DocumentDto,
     verbose: bool,
 ) {
-    let total_tokens = 0;
-
     let response = DocumentInsertionResponse {
         status: DocumentInsertionStatus::Success,
         documents: if verbose {
             Some(vec![document_dtos.clone()])
         } else {
             None
-        },
-        usage: Some(EmbeddingUsageDto {
-            prompt_tokens: total_tokens,
-            total_tokens,
-        }),
+        }
     };
     zmq_utils::send_success_response(socket, response, message_header).await;
 }

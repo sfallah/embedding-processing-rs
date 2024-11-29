@@ -1,9 +1,37 @@
-use crate::schema::document_status::{DeletionStatus, RetrievalStatus};
+use crate::schema::document_status::{DeletionStatus, DocumentInsertionStatus, RetrievalStatus};
 use embedding_common::dtos::document_dto::DocumentDto;
-use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::prelude::Serde;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+/// request structure for Document insertion.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DocumentInsertionRequest {
+    /// list of input data strings for which documents to be saved.
+    pub input: Vec<String>,
+    /// model name for generating the embeddings.
+    pub model: String,
+    /// optional UUID of the user making the request.
+    pub user: Option<Uuid>,
+    /// optional list of document urls data string to be saved.
+    pub doc_urls: Option<Vec<String>>,
+    /// optional boolean for detailed response
+    pub verbose: Option<bool>,
+}
+
+impl Serde for DocumentInsertionRequest {}
+
+/// response structure for Document insertion.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DocumentInsertionResponse {
+    /// response status of the operation.
+    pub status: DocumentInsertionStatus,
+    /// optional collection of document objects.
+    pub documents: Option<Vec<DocumentDto>>,
+}
+
+impl Serde for DocumentInsertionResponse {}
+
 /// request structure for Document retrieval.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DocumentRetrievalRequest {
@@ -25,8 +53,6 @@ pub struct DocumentRetrievalResponse {
     pub status: RetrievalStatus,
     /// optional collection of document object.
     pub document: Option<DocumentDto>,
-    /// optional collection of embedding objects.
-    pub embeddings: Option<Vec<EmbeddingDto>>,
 }
 impl Serde for DocumentRetrievalResponse {}
 
