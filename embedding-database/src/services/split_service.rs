@@ -1,14 +1,13 @@
-use std::collections::HashMap;
 use crate::dao::embedding_dao::delete_all_embeddings;
 use crate::dao::embedding_user_dao::delete_all_embedding_users;
 use crate::dao::split_dao::delete_all_splits;
 use crate::prelude::*;
-use anyhow::{Result};
+use crate::services::embedding_service::get_embeddings_map;
+use anyhow::Result;
 use embedding_common::prelude::*;
+use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::services::embedding_service::get_all_embeddings_full;
-use crate::services::summary_service::get_all_summaries_full;
 
 pub(crate) async fn save_split(
     db: &Arc<RocksDB>,
@@ -33,28 +32,59 @@ pub async fn delete_splits_full(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> Resu
     delete_all_embeddings(db, split_ids).await?;
     delete_all_embedding_users(db, split_ids).await
 }
-
-pub async fn get_all_splits_full(db: &Arc<RocksDB>, split_ids: &Vec<u64>, with_embeddings: bool) -> Result<Vec<SplitDto>> {
+pub async fn get_splits_full(
+    db: &Arc<RocksDB>,
+    split_ids: &[u64],
+    splits_query_res: Option<&IndexMap<u64, f32>>,
+    summary_map: Option<&IndexMap<u64, Vec<SummaryDto>>>,
+    with_embeddings: bool,
+) -> Result<Vec<SplitDto>> {
     let splits = get_all_splits(&db, split_ids).await?;
 
     let split_ids: Vec<_> = splits.iter().map(|s| s.split_id).collect();
-    let embeddings = if with_embeddings {
-        get_all_embeddings_full(db, split_ids.as_slice()).await?
+    let embeddings_map = if with_embeddings {
+        get_embeddings_map(db, split_ids.as_slice()).await?
     } else {
-        vec![]
+        IndexMap::new()
     };
-    let embeddings_map: HashMap<u64, EmbeddingDto> =
-        HashMap::from_iter(embeddings.into_iter().map(|embd| (embd.embedding_id, embd)));
 
+    let summary_map = match summary_map {
+        Some(summary_map) => summary_map,
+        None => {
+            let summary_ids: Vec<_> = splits.iter().flat_map(|split| split.summary_ids.clone().unwrap_or_default()).collect();
+            &get_split_summaries_map(db, summary_ids.as_slice(), None, with_embeddings).await?
+        }
+    };
     let mut splits_dtos = Vec::new();
     for split in splits {
-        let summary_ids = split.summary_ids.clone().unwrap_or_else(|| Vec::new());
-        let summary_dtos = get_all_summaries_full(&db, &summary_ids, None, with_embeddings).await?;
         let embedding = embeddings_map
             .get(&split.split_id)
             .map(|embd| embd.clone());
-        let split_dto = split.to_dto_full(summary_dtos, embedding);
+        let summary_dtos = summary_map
+            .get(&split.split_id).map_or(Vec::new(), |summary_dtos| summary_dtos.clone());
+        let query_score = splits_query_res.and_then(|qr| qr.get(&split.split_id).cloned());
+        let split_dto = split.to_dto_full(summary_dtos, embedding, query_score);
         splits_dtos.push(split_dto);
     }
     Ok(splits_dtos)
+}
+
+pub async fn get_doc_splits_map(
+    db: &Arc<RocksDB>,
+    split_ids: &[u64],
+    splits_query_res: Option<&IndexMap<u64, f32>>,
+    summary_map: Option<&IndexMap<u64, Vec<SummaryDto>>>,
+    with_embeddings: bool,
+) -> Result<IndexMap<u64,Vec<SplitDto>>> {
+    let splits_dtos = get_splits_full(db, split_ids, splits_query_res, summary_map, with_embeddings).await?;
+    let mut split_map:IndexMap<u64,Vec<SplitDto>> = IndexMap::new();
+    for split_dto in splits_dtos {
+        let doc_id = split_dto.doc_id;
+        if split_map.contains_key(&doc_id) {
+            split_map.get_mut(&doc_id).unwrap().push(split_dto);
+        } else {
+            split_map.insert(doc_id, vec![split_dto]);
+        }
+    }
+    Ok(split_map)
 }

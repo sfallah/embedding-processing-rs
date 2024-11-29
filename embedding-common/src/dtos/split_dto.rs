@@ -40,6 +40,7 @@ impl SplitDto {
         token_len: usize,
         summaries: Vec<SummaryDto>,
         embedding: Option<EmbeddingDto>,
+        query_distance: Option<f32>,
     ) -> Self {
         SplitDto {
             split_id,
@@ -49,7 +50,7 @@ impl SplitDto {
             token_len,
             summaries,
             embedding,
-            query_distance: None,
+            query_distance,
         }
     }
     pub fn to_model(&self) -> Split {
