@@ -6,9 +6,8 @@ use rocksdb::{
     Options, WriteBatch,
 };
 use std::sync::Arc;
-use log::debug;
 use tokio::task;
-use tracing::{info, trace};
+use tracing::{debug, info, trace};
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -82,7 +81,6 @@ impl RocksDB {
     pub async fn put(&self, cf: ColumnFamilyType, key: &u64, value: &[u8]) -> Result<()> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
-        let value_len = value.len();
         let value = value.to_vec();
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
@@ -108,7 +106,7 @@ impl RocksDB {
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        debug!("Getting key: {} from cf: {}", key, cf_name_clone);
+        trace!("Getting key: {} from cf: {}", key, cf_name_clone);
 
         let result = task::spawn_blocking(move || -> Result<Option<Vec<u8>>> {
             let cf = db
@@ -138,7 +136,7 @@ impl RocksDB {
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        info!("Getting key: {} from cf: {}", key, cf_name_clone);
+        debug!("Getting key: {} from cf: {}", key, cf_name_clone);
 
         let cf = db
             .cf_handle(&cf_name)
@@ -153,7 +151,7 @@ impl RocksDB {
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        info!("Getting all values from cf: {}", cf_name_clone);
+        debug!("Getting all values from cf: {}", cf_name_clone);
 
         let values = task::spawn_blocking(move || -> Result<Vec<Vec<u8>>> {
             let cf = db
@@ -172,7 +170,7 @@ impl RocksDB {
         })
         .await??;
 
-        info!(
+        debug!(
             "Successfully retrieved {} values from cf: {}",
             values.len(),
             cf_name_clone
@@ -193,7 +191,7 @@ impl RocksDB {
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        info!(
+        debug!(
             "Performing multi_get for {} keys in cf: {}",
             keys_len, cf_name_clone
         );
@@ -213,7 +211,7 @@ impl RocksDB {
         })
         .await??;
 
-        info!(
+        debug!(
             "multi_get completed for {} keys in column family: {}",
             keys_len, cf_name_clone
         );
@@ -228,7 +226,7 @@ impl RocksDB {
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        info!("Deleting key: {} from cf: {}", key, cf_name_clone);
+        debug!("Deleting key: {} from cf: {}", key, cf_name_clone);
 
         task::spawn_blocking(move || -> Result<()> {
             let cf = db
@@ -239,7 +237,7 @@ impl RocksDB {
         })
         .await??;
 
-        info!(
+        debug!(
             "Successfully deleted key: {} from cf: {}",
             key, cf_name_clone
         );
@@ -254,8 +252,7 @@ impl RocksDB {
         let cf_name_clone = cf_name.clone();
         let keys = keys.to_vec();
         let keys_len = keys.len();
-
-        info!("Deleting {} keys from cf: {}", keys_len, cf_name_clone);
+        debug!("Deleting {} keys from cf: {}", keys_len, cf_name_clone);
 
         task::spawn_blocking(move || -> Result<()> {
             let cf = db
@@ -274,7 +271,7 @@ impl RocksDB {
         })
         .await??;
 
-        info!(
+        debug!(
             "Successfully deleted {} keys from cf: {}",
             keys_len, cf_name_clone
         );

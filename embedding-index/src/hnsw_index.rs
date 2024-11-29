@@ -49,11 +49,9 @@ impl HnswIndex {
         } else {
             info!("Created and reserved index for: {}", index_file);
         }
-        if index.capacity() == index.size() || index.capacity() <= 64 {
-            if let Err(e) = index.reserve(index.size() + 64) {
-                error!("Failed to reserve index: {:?}", e);
-                return Err(anyhow!("Failed to reserve index: {:?}", e));
-            }
+        if let Err(e) = index.reserve(index.size() + 64) {
+            error!("Failed to reserve index: {:?}", e);
+            return Err(anyhow!("Failed to reserve index: {:?}", e));
         }
         let inner = Arc::new(Mutex::new(index));
         let index_config = index_config.clone();
@@ -233,10 +231,7 @@ impl HnswIndex {
                 .map_err(|e| anyhow!("Failed to query index: {:?}", e))
         })
         .await??;
-        let combined = matches
-            .keys
-            .into_iter()
-            .zip(matches.distances.into_iter());
+        let combined = matches.keys.into_iter().zip(matches.distances.into_iter());
         Ok(IndexMap::from_iter(combined))
     }
 

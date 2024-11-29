@@ -15,18 +15,6 @@ pub async fn put_summary(db: &Arc<RocksDB>, summary: &Summary) -> anyhow::Result
     Ok(())
 }
 
-/// Retrieves a `Summary` by its ID.
-pub async fn get_summary(db: &Arc<RocksDB>, summary_id: &u64) -> anyhow::Result<Option<Summary>> {
-    match db.get(ColumnFamilyType::Summaries, summary_id).await? {
-        Some(data) => {
-            let summary =
-                Summary::unpack(&data).map_err(|e| anyhow!("Failed to unpack summary: {}", e))?;
-            Ok(Some(summary))
-        }
-        None => Ok(None),
-    }
-}
-
 pub async fn get_all_summaries(
     db: &Arc<RocksDB>,
     summary_ids: &[u64],

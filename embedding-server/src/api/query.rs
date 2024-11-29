@@ -6,14 +6,14 @@ use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use async_channel::Sender;
 use embedding_common::prelude::*;
-use embedding_database::prelude::{get_all_summaries, get_summaries_full, get_document, get_embedding_full, get_split, get_summaries_of_document, RocksDB, get_split_summaries_map, get_doc_splits_map};
+use embedding_database::prelude::{get_summaries_full, get_document, RocksDB, get_split_summaries_map, get_doc_splits_map};
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::query::process_query;
 use embedding_processing::services::embeddings::EmbeddingsRequest;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{IndexMap};
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use zeromq::RepSocket;
 
 // Requests calling embedding model
@@ -32,7 +32,7 @@ pub async fn process_document_query_request(
         Ok(req) => request = req,
         Err(e) => {
             let error_message = format!("Error unpacking DocumentQueryRequest: {:?}", e);
-            eprintln!("{}", &error_message);
+            error!("{}", &error_message);
             send_exception_response(worker_socket, &error_message, message_header).await;
             return;
         }
@@ -103,7 +103,7 @@ pub async fn process_document_query_request(
     let final_split_ids: Vec<_> = splits_min_distances.keys().map(|x| *x).collect();
 
     // Load splits from rocks db
-    let mut doc_split_map: IndexMap<u64, Vec<SplitDto>> = get_doc_splits_map(
+    let doc_split_map: IndexMap<u64, Vec<SplitDto>> = get_doc_splits_map(
         db,
         final_split_ids.as_slice(),
         Some(&split_query_res),
@@ -120,7 +120,7 @@ pub async fn process_document_query_request(
             Ok(None) => continue,
             Err(e) => {
                 let error_message = format!("Error getting document: {:?}", e);
-                eprintln!("{}", &error_message);
+                error!("{}", &error_message);
                 send_exception_response(worker_socket, &error_message, message_header).await;
                 return;
             }

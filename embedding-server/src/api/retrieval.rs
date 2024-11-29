@@ -5,6 +5,7 @@ use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use embedding_common::prelude::*;
 use embedding_database::prelude::*;
 use std::sync::Arc;
+use tracing::error;
 use zeromq::RepSocket;
 
 pub async fn process_document_retrieval_request(
@@ -20,7 +21,7 @@ pub async fn process_document_retrieval_request(
         Ok(req) => request = req,
         Err(e) => {
             let error_message = format!("Error unpacking DocumentRetrievalRequest: {:?}", e);
-            eprintln!("{}", &error_message);
+            error!("{}", &error_message);
             send_exception_response(worker_socket, &error_message, message_header).await;
             return;
         }
@@ -30,7 +31,7 @@ pub async fn process_document_retrieval_request(
     if request.document_id.is_none() && request.document_url.is_none() {
         let error_message =
             "DocumentRetrievalRequest must have either a document_id or document_url";
-        eprintln!("{}", error_message);
+        error!("{}", error_message);
         send_exception_response(worker_socket, error_message, message_header).await;
         return;
     }
@@ -50,7 +51,7 @@ pub async fn process_document_retrieval_request(
         }
         Err(e) => {
             let error_message = format!("Error retrieving document: {:?}", e);
-            eprintln!("{}", &error_message);
+            error!("{}", &error_message);
             send_exception_response(worker_socket, &error_message, message_header).await;
             return;
         }

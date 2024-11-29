@@ -1,32 +1,20 @@
 use crate::api::delete::process_document_deletion_request;
-use crate::api::insertion::{process_document_insertion_request, send_document_insertion_response};
+use crate::api::insertion::{process_document_insertion_request};
 use crate::api::query::process_document_query_request;
 use crate::api::retrieval::process_document_retrieval_request;
-use crate::schema::insertion::DocumentInsertionRequest;
 use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
-use crate::utils::zmq_utils::{handle_error_and_respond, send_exception_response};
-use crate::zmq::server_params::ZmqParams;
-use crate::ServerArgs;
-use anyhow::Result;
-use async_channel::Sender;
-use embedding_common::dtos::document_dto::DocumentDto;
-use embedding_common::prelude::*;
+use crate::utils::zmq_utils::{handle_error_and_respond};
 use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
-use embedding_processing::processing::documents::process_document;
-use embedding_processing::services::embeddings::EmbeddingsRequest;
-use futures::FutureExt;
-use rayon::iter::ParallelIterator;
-use rayon::prelude::IntoParallelRefIterator;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use async_channel::Sender;
 use tokio::sync::broadcast::Receiver;
-use tokio::{select, task};
+use tokio::{select};
 use tracing::info;
-use uuid::Uuid;
 use zeromq::{RepSocket, Socket, SocketRecv};
+use embedding_common::prelude::{DeterministicAHasher, Serde};
+use embedding_processing::services::embeddings::EmbeddingsRequest;
 
 pub struct ServerWorker {
     pub worker: RepSocket,
@@ -50,7 +38,6 @@ pub async fn worker_routine(
     mut shutdown: Receiver<String>,
     worker_socket: &mut ServerWorker,
     processing_context: Arc<ProcessingContext>,
-    model_clone: Arc<Model>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     db: &Arc<RocksDB>,
@@ -58,7 +45,7 @@ pub async fn worker_routine(
 ) {
     loop {
         select! {
-          msg  = worker_socket.worker.recv().fuse() => {
+          msg  = worker_socket.worker.recv() => {
                 let messages = match msg {
                     Ok(messages) => messages,
                     Err(e) => {

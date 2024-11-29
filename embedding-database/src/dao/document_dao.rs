@@ -34,32 +34,6 @@ pub async fn delete_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Re
     db.delete(ColumnFamilyType::Documents, document_id).await
 }
 
-/// Retrieves all `Splits` associated with a `Document`.
-pub async fn get_splits_of_document(
-    db: &Arc<RocksDB>,
-    document_id: &u64,
-) -> anyhow::Result<Option<Vec<Split>>> {
-    let document_info = match get_document(&db, document_id).await? {
-        Some(doc) => doc,
-        None => return Ok(None),
-    };
-
-    let split_bytes = db
-        .multi_get(ColumnFamilyType::Splits, &document_info.split_ids)
-        .await?;
-
-    let mut splits = Vec::with_capacity(split_bytes.len());
-    for option_bytes in split_bytes {
-        if let Some(bytes) = option_bytes {
-            let split =
-                Split::unpack(&bytes).map_err(|e| anyhow!("Failed to unpack split: {}", e))?;
-            splits.push(split);
-        }
-    }
-
-    Ok(Some(splits))
-}
-
 /// Retrieves all `Summaries` associated with a `Document`.
 pub async fn get_summaries_of_document(
     db: &Arc<RocksDB>,

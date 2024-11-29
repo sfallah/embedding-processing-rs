@@ -54,8 +54,6 @@ impl SplitDto {
         }
     }
     pub fn to_model(&self) -> Split {
-        let embedding_id = self.embedding.as_ref().map_or(0, |e| e.embedding_id);
-
         let summary_ids = if self.summaries.is_empty() {
             None
         } else {

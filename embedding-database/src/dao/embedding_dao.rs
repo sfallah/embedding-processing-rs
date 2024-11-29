@@ -16,17 +16,6 @@ pub async fn put_embedding(db: &Arc<RocksDB>, embedding: &Embedding) -> anyhow::
     Ok(())
 }
 
-pub async fn put_embeddings(db: &Arc<RocksDB>, embeddings: Vec<Embedding>) -> anyhow::Result<()> {
-    let futures = embeddings
-        .iter()
-        .map(|embedding| put_embedding(db, embedding));
-    futures::future::join_all(futures)
-        .await
-        .into_iter()
-        .collect::<anyhow::Result<()>>()?;
-    Ok(())
-}
-
 pub async fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embedding>> {
     let embedding_data_bytes_vec = db
         .get_all(ColumnFamilyType::Embeddings)

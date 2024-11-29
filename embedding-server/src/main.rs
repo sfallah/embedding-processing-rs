@@ -4,14 +4,11 @@ use embedding_common::utils::helpers::{create_directory, get_db_dir};
 use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_index::{initialize_index_from_db, save_index};
-use embedding_processing::inference::llama_context::LlamaContext;
 use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use embedding_server::zmq::server_params::ZmqParams;
 use embedding_server::zmq::server_task::ServerTask;
 use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
 use embedding_server::ServerArgs;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::select;
 use tracing::{error, info};
@@ -31,21 +28,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Starting up");
 
+    let zmq_config = app_config.zmq_config;
+
     // Get available workers
     let max_cores = num_cpus::get();
-    let parallel_workers = args.np.max(1).min(max_cores);
-    let gpu_layers = args.ngl;
+    let parallel_workers = zmq_config.zmq_num_workers.max(1).min(max_cores);
 
-    info!("Number of workers: {}", args.np);
-    let n_workers: usize = parallel_workers;
-
-    // Initialize ZeroMQ parameters
-    let zmq_params = Arc::new(ZmqParams {
-        hostname: "127.0.0.1".to_string(),
-        frontend_port: args.frontend_port,
-        backend_port: args.backend_port,
-        workers: n_workers,
-    });
+    info!("Number of workers: {}", parallel_workers);
 
 
     let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
@@ -63,12 +52,12 @@ async fn main() -> Result<(), anyhow::Error> {
         model.model_id,
     )
     .await;
-    let clients = ServerTask::init(&args.server_host, args.frontend_port, args.backend_port).await;
+    let clients = ServerTask::init(&zmq_config.zmq_host, zmq_config.zmq_frontend_port, zmq_config.zmq_backend_port).await;
 
     // Set up signal handling
 
     let shutdown_clone = shutdown_sender.clone();
-    let shut_handle = tokio::spawn(async move {
+    let shutdown_handle = tokio::spawn(async move {
         if let Err(e) = tokio::signal::ctrl_c().await {
             error!("Failed to listen for Ctrl+C event: {}", e);
         }
@@ -94,10 +83,9 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut worker_handles = Vec::new();
 
     // Initialize separate workers for each thread
-    for _ in 0..n_workers {
-        let mut worker = ServerWorker::init(&args.server_host, args.backend_port).await;
+    for _ in 0..parallel_workers {
+        let mut worker = ServerWorker::init(&zmq_config.zmq_host, zmq_config.zmq_backend_port).await;
         let processing_ctx = Arc::clone(&processing_ctx);
-        let model_clone = Arc::clone(&model);
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);
         let db_clone = Arc::clone(&db);
@@ -108,7 +96,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 shutdown_receiver,
                 &mut worker,
                 processing_ctx,
-                model_clone,
                 &split_index_clone,
                 &summary_index_clone,
                 &db_clone,
@@ -137,6 +124,7 @@ async fn main() -> Result<(), anyhow::Error> {
     info!("embedding routines handles joined");
     futures::future::join_all(worker_handles).await;
     info!("worker handles joined");
+    shutdown_handle.await?;
 
     Ok(())
 }
