@@ -1,7 +1,5 @@
 use anyhow::{Context, Result};
-use chrono::{TimeZone, Utc};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
 use std::{env, fs};
 
 /// Creates a directory at the specified path if it does not already exist.

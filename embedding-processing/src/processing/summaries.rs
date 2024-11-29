@@ -31,8 +31,7 @@ pub async fn process_summaries(
     let summaries: Vec<_> = lx_ranks
         .into_iter()
         .take(2)
-        .enumerate()
-        .map(|(idx, (seq_id, score))| {
+        .map(|(seq_id, score)| {
             let sentence = sentences.get(seq_id).unwrap().clone();
             let no_tokens = *no_tokens.get(seq_id).unwrap();
             let i = seq_id * ctx.n_embd;

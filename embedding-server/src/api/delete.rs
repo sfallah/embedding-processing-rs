@@ -21,7 +21,7 @@ pub async fn process_document_deletion_request(
         Ok(req) => req,
         Err(e) => {
             let error_message = format!("Error unpacking DocumentDeletionRequest: {:?}", e);
-            eprintln!("{}", &error_message);
+            error!("{}", &error_message);
             send_exception_response(worker_socket, &error_message, message_header).await;
             return;
         }
@@ -48,7 +48,7 @@ pub async fn process_document_deletion_request(
         }
         Err(e) => {
             let error_message = format!("Error deleting document: {:?}", e);
-            eprintln!("{}", &error_message);
+            error!("{}", &error_message);
             send_exception_response(worker_socket, &error_message, message_header).await;
         }
     }

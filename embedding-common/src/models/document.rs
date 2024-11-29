@@ -1,5 +1,5 @@
 use crate::dtos::{SplitDto, SummaryDto};
-use crate::prelude::{DocumentDto, Serde, Split};
+use crate::prelude::{DocumentDto, Serde};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -3,6 +3,7 @@ use embedding_common::prelude::Serde;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::fmt;
+use tracing::error;
 use uuid::Uuid;
 
 /// Represents the type of messages that can be processed by the ZMQ server.
@@ -94,7 +95,7 @@ impl ZmqMessageHeader {
     /// Constructs a new `ZmqMessageHeader` with the specified message type and current timestamp.
     pub fn new(message_type: ZmqMessageType) -> Self {
         let timestamp = Utc::now().timestamp_nanos_opt().unwrap_or_else(|| {
-            eprintln!("Failed to get timestamp!");
+            error!("Failed to get timestamp!");
             0
         }) as u64;
 
@@ -134,7 +135,7 @@ impl ZmqMessageHeader {
     /// Updates the response timestamp to the current time.
     pub fn set_response_ts(&mut self) {
         let timestamp = Utc::now().timestamp_nanos_opt().unwrap_or_else(|| {
-            eprintln!("Failed to obtain a valid timestamp");
+            error!("Failed to obtain a valid timestamp");
             0
         }) as u64;
 

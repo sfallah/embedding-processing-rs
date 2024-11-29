@@ -1,9 +1,7 @@
 use clap::Parser;
 use futures::future::join_all;
-use rayon::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::task;
 use tracing::{debug, error, info, trace};
 
 use anyhow::Result;

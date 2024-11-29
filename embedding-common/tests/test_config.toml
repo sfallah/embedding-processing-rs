@@ -18,4 +18,12 @@ instances = 2
 #cpu = true
 #ngl = 32
 
+[database]
+rocksdb_dir = "test_rocksdb_dir"
+
+[zmq]
+zmq_host = "127.0.0.1"
+zmq_frontend_port = 5556
+zmq_backend_port = 5560
+zmq_num_workers = 2
 

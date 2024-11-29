@@ -1,6 +1,4 @@
-use crate::config::model_config::ModelConfig;
-use crate::config::splitter_config::SplitterConfig;
-use crate::config::{DatabaseConfig, IndexConfig};
+use crate::config::*;
 use anyhow::anyhow;
 use config::Config;
 use serde::Deserialize;
@@ -18,6 +16,8 @@ pub struct AppConfig {
     pub model_config: ModelConfig,
     #[serde(rename = "database")]
     pub database_config: DatabaseConfig,
+    #[serde(rename = "zmq")]
+    pub zmq_config: ZmqConfig,
 }
 
 impl AppConfig {

@@ -14,8 +14,7 @@ use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
-use tokio::task;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 use zeromq::RepSocket;
 
@@ -34,7 +33,7 @@ pub async fn process_document_insertion_request(
         Ok(req) => request = req,
         Err(e) => {
             let error_message = format!("Error unpacking DocumentInsertionRequest: {:?}", e);
-            eprintln!("{}", &error_message);
+            error!("{}", &error_message);
             send_exception_response(worker_socket, &error_message, message_header).await;
             return;
         }
@@ -83,17 +82,6 @@ pub async fn send_document_insertion_response(
     document_dtos: &DocumentDto,
     verbose: bool,
 ) {
-    let mut embeddings_data = Vec::new();
-
-    for (i, _) in document_dtos.splits.iter().enumerate() {
-        let data = EmbeddingDto {
-            embedding_id: 0,   // Placeholder
-            embedding: vec![], // Placeholder
-            model_id: 0,       // Placeholder
-        };
-        embeddings_data.push(data);
-    }
-
     let total_tokens = 0;
 
     let response = DocumentInsertionResponse {
@@ -107,7 +95,6 @@ pub async fn send_document_insertion_response(
             prompt_tokens: total_tokens,
             total_tokens,
         }),
-        //embeddings: if verbose { Some(embeddings_data) } else { None },
     };
     zmq_utils::send_success_response(socket, response, message_header).await;
 }

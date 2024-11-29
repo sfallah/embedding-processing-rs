@@ -1,4 +1,4 @@
-use crate::dao::document_dao::{delete_document, get_splits_of_document};
+use crate::dao::document_dao::{delete_document};
 use crate::services::split_service::get_splits_full;
 use crate::prelude::*;
 use crate::services::split_service::{delete_splits_full, save_split};

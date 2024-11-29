@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use async_channel::Sender;
 use tracing::trace;
-use embedding_common::dtos::EmbeddingDto;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
 use crate::processing::utils;
