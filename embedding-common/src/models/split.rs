@@ -35,6 +35,7 @@ impl Split {
         &self,
         summaries: Vec<SummaryDto>,
         embedding: Option<EmbeddingDto>,
+        query_score: Option<f32>,
     ) -> SplitDto {
         SplitDto::new(
             self.split_id,
@@ -44,6 +45,7 @@ impl Split {
             self.token_len,
             summaries,
             embedding,
+            query_score,
         )
     }
 }

@@ -18,7 +18,9 @@ pub use crate::dao::summary_dao::get_all_summaries;
 pub use crate::services::doc_service::save_doc;
 pub use crate::services::doc_service::get_full_doc;
 pub use crate::services::doc_service::delete_doc_full;
-pub use crate::services::summary_service::get_all_summaries_full;
+pub use crate::services::summary_service::get_summaries_full;
+pub use crate::services::summary_service::get_split_summaries_map;
 pub use crate::services::embedding_service::get_embedding_full;
+pub use crate::services::split_service::get_doc_splits_map;
 
 pub use crate::dao::embedding_dao::get_all_embeddings;

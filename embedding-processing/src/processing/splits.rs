@@ -42,5 +42,6 @@ pub async fn process_split(
         split_res.tokens.len(),
         summaries,
         Some(embedding),
+        None,
     ))
 }

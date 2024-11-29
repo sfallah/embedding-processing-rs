@@ -51,7 +51,7 @@ pub async fn get_summaries_of_split(
     Ok(Some(summaries))
 }
 
-pub async fn get_all_splits(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> anyhow::Result<Vec<Split>> {
+pub async fn get_all_splits(db: &Arc<RocksDB>, split_ids: &[u64]) -> anyhow::Result<Vec<Split>> {
     let split_bytes = db.multi_get(ColumnFamilyType::Splits, split_ids).await?;
     let mut splits = Vec::new();
     for option_bytes in split_bytes {

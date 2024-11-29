@@ -1,9 +1,9 @@
 use crate::dao::document_dao::{delete_document, get_splits_of_document};
-use crate::services::split_service::get_all_splits_full;
+use crate::services::split_service::get_splits_full;
 use crate::prelude::*;
 use crate::services::split_service::{delete_splits_full, save_split};
 use crate::services::summary_service::{
-    delete_summaries_full, get_all_summaries_full, save_summary,
+    delete_summaries_full, get_summaries_full, save_summary,
 };
 use anyhow::anyhow;
 use embedding_common::prelude::*;
@@ -52,9 +52,9 @@ pub async fn get_full_doc(
         }
     };
     if let Some(doc) = doc_model {
-        let split_dtos = get_all_splits_full(db, &doc.split_ids, with_embeddings).await?;
+        let split_dtos = get_splits_full(db, &doc.split_ids,None,None, with_embeddings).await?;
         let summary_ids = doc.summary_ids.clone().unwrap_or_default();
-        let summary_dtos = get_all_summaries_full(db, &summary_ids,None, with_embeddings).await?;
+        let summary_dtos = get_summaries_full(db, &summary_ids, None, with_embeddings).await?;
         //FIXME: Order the summaries by their order in the document
         return Ok(Some(doc.to_dto(&split_dtos, &summary_dtos)));
     }
