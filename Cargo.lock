@@ -841,12 +841,10 @@ dependencies = [
  "embedding-index",
  "embedding-processing",
  "futures",
- "rayon",
  "rstest",
  "tempfile",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 

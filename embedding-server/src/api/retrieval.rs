@@ -67,12 +67,10 @@ async fn send_document_retrieval_response(
         Some(doc) => DocumentRetrievalResponse {
             status: RetrievalStatus::Success,
             document: Some(doc.clone()),
-            embeddings: None,
         },
         None => DocumentRetrievalResponse {
             status: RetrievalStatus::Error,
             document: None,
-            embeddings: None,
         },
     };
 
