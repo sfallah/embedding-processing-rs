@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+use tracing::info;
 
 /// Creates a directory at the specified path if it does not already exist.
 ///
@@ -17,9 +18,9 @@ pub fn create_directory(path: &str) -> Result<()> {
     if !path.exists() {
         fs::create_dir_all(path)
             .with_context(|| format!("Failed to create directory at {:?}", path))?;
-        println!("Directory created at {:?}", path);
+        info!("Directory created at {:?}", path);
     } else {
-        println!("Directory already exists at {:?}", path);
+        info!("Directory already exists at {:?}", path);
     }
     Ok(())
 }
