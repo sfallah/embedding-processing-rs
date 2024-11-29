@@ -36,7 +36,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Number of workers: {}", parallel_workers);
 
-
     let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
     let db_path = db_path_binding.to_str().unwrap();
     create_directory(db_path).expect("Failed to create directory");
@@ -45,14 +44,33 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let (embed, shutdown_sender, handles, model) =
         app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+
+    let splitter_max_tokens = if model.n_ctx - 2 <= splitter_config.max_tokens as i32 {
+        info!(
+            "Model context size ({}) does not match max tokens ({})",
+            model.n_ctx,
+            splitter_config.max_tokens - 2
+        );
+        let new_max_tokens = ((model.n_ctx - 2) as f32 * 0.8) as usize;
+        info!("Setting max tokens to {}", new_max_tokens);
+        new_max_tokens
+    } else {
+        splitter_config.max_tokens
+    };
+
     let processing_ctx = init_ctx(
-        splitter_config.max_tokens,
+        splitter_max_tokens,
         splitter_config.merge_level,
         model.n_embd as usize,
         model.model_id,
     )
     .await;
-    let clients = ServerTask::init(&zmq_config.zmq_host, zmq_config.zmq_frontend_port, zmq_config.zmq_backend_port).await;
+    let clients = ServerTask::init(
+        &zmq_config.zmq_host,
+        zmq_config.zmq_frontend_port,
+        zmq_config.zmq_backend_port,
+    )
+    .await;
 
     // Set up signal handling
 
@@ -84,7 +102,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Initialize separate workers for each thread
     for _ in 0..parallel_workers {
-        let mut worker = ServerWorker::init(&zmq_config.zmq_host, zmq_config.zmq_backend_port).await;
+        let mut worker =
+            ServerWorker::init(&zmq_config.zmq_host, zmq_config.zmq_backend_port).await;
         let processing_ctx = Arc::clone(&processing_ctx);
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);
