@@ -1,14 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use embedding_database::async_get_embedding_user;
-    use embedding_database::RocksDB;
-    use embedding_database::{has_embedding_user, put_embedding_user};
     use fake::{rand, Rng};
     use std::sync::Arc;
     use std::vec;
     use tempdir::TempDir;
     use uuid::Uuid;
     use embedding_common::prelude::EmbeddingUser;
+    use embedding_database::prelude::{async_get_embedding_user, has_embedding_user, put_embedding_user, RocksDB};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() -> anyhow::Result<()> {

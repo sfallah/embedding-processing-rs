@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use embedding_database::{ColumnFamilyType, RocksDB};
     use fake::faker::lorem::en::*;
     use fake::{Fake, Faker};
     use tempdir::TempDir;
     use tokio;
+    use embedding_database::prelude::{ColumnFamilyType, RocksDB};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_put() -> Result<()> {
@@ -144,7 +144,7 @@ mod tests {
 
         // Act
         rocksdb
-            .delete_many(ColumnFamilyType::Default, &keys)
+            .multi_delete(ColumnFamilyType::Default, &keys)
             .await?;
 
         // Assert
