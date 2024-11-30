@@ -49,13 +49,6 @@ pub fn has_embedding_user(
     Ok(res)
 }
 
-pub async fn async_get_embedding_user(
-    db: &Arc<RocksDB>,
-    embed_id: u64,
-) -> anyhow::Result<Option<EmbeddingUser>> {
-    let db = db.clone();
-    tokio::task::spawn_blocking(move || get_embedding_user(&db, embed_id)).await?
-}
 
 pub async fn delete_all_embedding_users(db: &Arc<RocksDB>, embedding_ids: &[u64]) -> anyhow::Result<()> {
     db.multi_delete(ColumnFamilyType::EmbeddingUsers, embedding_ids).await

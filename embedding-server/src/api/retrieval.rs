@@ -45,7 +45,7 @@ pub async fn process_document_retrieval_request(
         document_id = hasher.hash(&document_url);
     }
 
-    match get_full_doc(db, document_id, request.verbose.unwrap_or(false)).await {
+    match get_full_doc(db, document_id, request.verbose.unwrap_or(false), None).await {
         Ok(doc_dto) => {
             send_document_retrieval_response(worker_socket, &doc_dto, message_header).await
         }

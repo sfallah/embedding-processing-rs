@@ -1,6 +1,6 @@
-use crate::dao::embedding_dao::delete_all_embeddings;
-use crate::dao::embedding_user_dao::delete_all_embedding_users;
-use crate::dao::split_dao::delete_all_splits;
+use crate::dao::embedding_dao::{delete_all_embeddings, put_embedding};
+use crate::dao::embedding_user_dao::{delete_all_embedding_users, put_embedding_user};
+use crate::dao::split_dao::{delete_all_splits, get_all_splits, put_split};
 use crate::prelude::*;
 use crate::services::embedding_service::get_embeddings_map;
 use anyhow::Result;
@@ -8,6 +8,7 @@ use embedding_common::prelude::*;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::db::rocksdb_impl::RocksDB;
 
 pub(crate) async fn save_split(
     db: &Arc<RocksDB>,

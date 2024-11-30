@@ -1,10 +1,8 @@
-use crate::dao::document_dao::{delete_document};
+use crate::dao::document_dao::{delete_document, get_document, put_document};
+use crate::db::rocksdb_impl::RocksDB;
 use crate::services::split_service::get_splits_full;
-use crate::prelude::*;
 use crate::services::split_service::{delete_splits_full, save_split};
-use crate::services::summary_service::{
-    delete_summaries_full, get_summaries_full, save_summary,
-};
+use crate::services::summary_service::{delete_summaries_full, get_summaries_full, save_summary};
 use anyhow::anyhow;
 use embedding_common::prelude::*;
 use futures::future::join_all;
@@ -42,6 +40,7 @@ pub async fn get_full_doc(
     db: &Arc<RocksDB>,
     document_id: u64,
     with_embeddings: bool,
+    split_dtos: Option<Vec<SplitDto>>,
 ) -> anyhow::Result<Option<DocumentDto>> {
     let doc_model = match get_document(db, &document_id).await {
         Ok(doc) => doc,
@@ -52,7 +51,8 @@ pub async fn get_full_doc(
         }
     };
     if let Some(doc) = doc_model {
-        let split_dtos = get_splits_full(db, &doc.split_ids,None,None, with_embeddings).await?;
+        let split_dtos = split_dtos
+            .unwrap_or(get_splits_full(db, &doc.split_ids, None, None, with_embeddings).await?);
         let summary_ids = doc.summary_ids.clone().unwrap_or_default();
         let summary_dtos = get_summaries_full(db, &summary_ids, None, with_embeddings).await?;
         //FIXME: Order the summaries by their order in the document
@@ -61,7 +61,10 @@ pub async fn get_full_doc(
     Ok(None)
 }
 
-pub async fn delete_doc_full(db: &Arc<RocksDB>, document_id: u64) -> anyhow::Result<Option<Document>> {
+pub async fn delete_doc_full(
+    db: &Arc<RocksDB>,
+    document_id: u64,
+) -> anyhow::Result<Option<Document>> {
     match get_document(db, &document_id).await {
         Ok(Some(doc)) => {
             delete_document(db, &doc.document_id).await?;
