@@ -197,13 +197,23 @@ impl HnswIndex {
         .await?
     }
 
-    pub async fn delete(&self, label: u64) -> Result<usize> {
+    pub async fn delete(&self, labels: &Vec<u64>) -> Result<usize> {
         let index = self.index.clone();
+        let labels = labels.clone();
+        let index_name = self.index_name.clone();
         spawn_blocking(move || {
             let index = index.lock().unwrap();
-            index
-                .remove(label)
-                .map_err(|e| anyhow::Error::msg(format!("Failed to delete item: {:?}", e)))
+            let mut count = 0;
+            for label in labels {
+                if let Err(e) = index.remove(label) {
+                    error!(
+                        "Failed to delete item: {:?}, from: {:?}, error: {:?}",
+                        label, index_name, e
+                    );
+                }
+                count += 1;
+            }
+            Ok(count)
         })
         .await?
     }

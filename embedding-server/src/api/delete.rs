@@ -28,17 +28,18 @@ pub async fn process_document_deletion_request(
     };
     match delete_doc_full(db, request.document_id).await {
         Ok(Some(doc)) => {
-            for split_id in doc.split_ids {
-                if let Err(e) = split_index.delete(split_id).await {
-                    let error_message = format!("Error deleting split from index: {:?}", e);
-                    error!("{}", &error_message);
-                }
+            if let Err(e) = split_index.delete(&doc.split_ids).await {
+                let error_message = format!("Error deleting split from index: {:?}", e);
+                error!("{}", &error_message);
+                send_exception_response(worker_socket, &error_message, message_header).await;
             }
-            for summary_id in doc.summary_ids.unwrap_or_default() {
-                if let Err(e) = summary_index.delete(summary_id).await {
-                    let error_message = format!("Error deleting summary from index: {:?}", e);
-                    error!("{}", &error_message);
-                }
+            if let Err(e) = summary_index
+                .delete(&doc.summary_ids.unwrap_or_default())
+                .await
+            {
+                let error_message = format!("Error deleting summary from index: {:?}", e);
+                error!("{}", &error_message);
+                send_exception_response(worker_socket, &error_message, message_header).await;
             }
             send_document_deletion_response(worker_socket, true, message_header).await;
         }
