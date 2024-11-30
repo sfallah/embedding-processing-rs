@@ -34,33 +34,3 @@ pub async fn delete_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Re
     db.delete(ColumnFamilyType::Documents, document_id).await
 }
 
-/// Retrieves all `Summaries` associated with a `Document`.
-pub async fn get_summaries_of_document(
-    db: &Arc<RocksDB>,
-    document_id: &u64,
-) -> anyhow::Result<Vec<Summary>> {
-    let doc = match get_document(&db, document_id).await? {
-        Some(doc) => doc,
-        None => return Ok(Vec::new()),
-    };
-
-    let summary_ids = match doc.summary_ids {
-        Some(ids) => ids,
-        None => return Ok(Vec::new()),
-    };
-
-    let summary_bytes = db
-        .multi_get(ColumnFamilyType::Summaries, &summary_ids)
-        .await?;
-
-    let mut summaries = Vec::with_capacity(summary_bytes.len());
-    for option_bytes in summary_bytes {
-        if let Some(bytes) = option_bytes {
-            let summary =
-                Summary::unpack(&bytes).map_err(|e| anyhow!("Failed to unpack summary: {}", e))?;
-            summaries.push(summary);
-        }
-    }
-
-    Ok(summaries)
-}

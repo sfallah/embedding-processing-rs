@@ -1,16 +1,18 @@
-use crate::schema::query::DocumentQueryRequest;
-use crate::schema::query::DocumentQueryResponse;
+use crate::schema::document::DocumentQueryRequest;
+use crate::schema::document::DocumentQueryResponse;
 use crate::schema::search_mode::SearchModeType;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use async_channel::Sender;
 use embedding_common::prelude::*;
-use embedding_database::prelude::{get_summaries_full, get_document, RocksDB, get_split_summaries_map, get_doc_splits_map};
+use embedding_database::prelude::{
+    get_doc_splits_map, get_full_doc, get_split_summaries_map, RocksDB,
+};
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::query::process_query;
 use embedding_processing::services::embeddings::EmbeddingsRequest;
-use indexmap::{IndexMap};
+use indexmap::IndexMap;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 use zeromq::RepSocket;
@@ -38,6 +40,8 @@ pub async fn process_document_query_request(
     }
     debug!("query request: {:?}", request);
 
+    let with_embeddings = request.verbose.unwrap_or(false);
+
     let search_mode: SearchModeType = request
         .search_mode
         .unwrap_or(SearchModeType::SplitAndSummary);
@@ -53,23 +57,31 @@ pub async fn process_document_query_request(
 
     // 1. Search for the query in the indexes
     // Search for summary indexes in summary index
-    let mut summaries_query_res: IndexMap<u64, f32> = IndexMap::new();
+    let top_k = request.top_k.unwrap_or(5) as usize;
+    info!("Searching for query in indexes, top_k: {}", top_k);
     let mut split_summary_map: IndexMap<u64, Vec<SummaryDto>> = IndexMap::new();
     if search_mode == SearchModeType::SummaryOnly || search_mode == SearchModeType::SplitAndSummary
     {
-        summaries_query_res = summary_index
+        let summaries_query_res = summary_index
             .query_filter(
                 db,
                 &request.user_ids,
                 &query_embeddings,
-                request.top_k.unwrap_or(5) as usize,
+                top_k,
             )
             .await
             .unwrap();
-        debug!("Summary query results: {:?}", summaries_query_res);
+        info!("Summary query results: {:?}", summaries_query_res);
 
         let summary_ids: Vec<u64> = summaries_query_res.keys().map(|x| *x).collect();
-        split_summary_map = get_split_summaries_map(db, summary_ids.as_slice(), Some(&summaries_query_res), request.verbose.unwrap_or(false)).await.unwrap();
+        split_summary_map = get_split_summaries_map(
+            db,
+            summary_ids.as_slice(),
+            Some(&summaries_query_res),
+            with_embeddings,
+        )
+        .await
+        .unwrap();
     }
 
     // Search for split indexes in hnswlib index
@@ -80,11 +92,11 @@ pub async fn process_document_query_request(
                 db,
                 &request.user_ids,
                 &query_embeddings,
-                request.top_k.unwrap_or(5) as usize,
+                top_k,
             )
             .await
             .unwrap();
-        debug!("Split query results: {:?}", split_query_res);
+        info!("Split query results: {:?}", split_query_res);
     }
 
     let splits_min_distances = split_summary_map.iter().map(|(k, v)| {
@@ -107,33 +119,31 @@ pub async fn process_document_query_request(
         final_split_ids.as_slice(),
         Some(&split_query_res),
         Some(&split_summary_map),
-        request.verbose.unwrap_or(false),
-    ).await.unwrap();
-
+        with_embeddings,
+    )
+    .await
+    .unwrap();
 
     // Load documents from rocks db
     let mut docs: Vec<DocumentDto> = Vec::new();
     for (doc_id, doc_splits) in doc_split_map.into_iter() {
-        let document = match get_document(db, &doc_id).await {
-            Ok(Some(document)) => document,
-            Ok(None) => continue,
-            Err(e) => {
-                let error_message = format!("Error getting document: {:?}", e);
-                error!("{}", &error_message);
+        let doc_dto = get_full_doc(db, doc_id, with_embeddings, Some(doc_splits)).await;
+        match doc_dto {
+            Ok(Some(doc)) => docs.push(doc),
+            Ok(None) => {
+                let error_message = format!("Document not found for id: {}", doc_id);
+                error!("{}", error_message);
                 send_exception_response(worker_socket, &error_message, message_header).await;
-                return;
             }
-        };
-        let doc_summary_ids = document.summary_ids.unwrap_or(vec![]);
-        let doc_summary_dtos = get_summaries_full(db, doc_summary_ids.as_slice(), Some(&summaries_query_res), request.verbose.unwrap_or(false)).await.unwrap();
-
-        let new_doc_query = DocumentDto::new(
-            document.document_id,
-            &document.document_url,
-            doc_splits,
-            doc_summary_dtos,
-        );
-        docs.push(new_doc_query);
+            Err(e) => {
+                let error_message = format!(
+                    "Error retrieving document, id: {:?}, error: {:?}",
+                    doc_id, e
+                );
+                error!("{}", error_message);
+                send_exception_response(worker_socket, &error_message, message_header).await;
+            }
+        }
     }
     info!("Sending response for document query");
 
@@ -143,7 +153,7 @@ pub async fn process_document_query_request(
         message_header,
         &docs,
         &query_embeddings,
-        request.verbose.unwrap_or(false),
+        with_embeddings,
     )
     .await;
 }

@@ -1,6 +1,5 @@
 pub mod document;
 pub mod document_status;
-pub mod query;
 pub mod search_mode;
 pub mod split;
 pub mod summary;

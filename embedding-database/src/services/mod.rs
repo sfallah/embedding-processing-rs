@@ -1,4 +1,5 @@
-pub mod doc_service;
-pub mod split_service;
-pub mod summary_service;
-pub mod embedding_service;
+pub(crate) mod doc_service;
+pub(crate) mod split_service;
+pub(crate) mod summary_service;
+pub(crate) mod embedding_service;
+pub(crate) mod embedding_user_service;

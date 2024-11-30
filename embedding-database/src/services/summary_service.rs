@@ -1,13 +1,13 @@
-use crate::dao::embedding_dao::delete_all_embeddings;
-use crate::dao::embedding_user_dao::delete_all_embedding_users;
-use crate::dao::summary_dao::delete_all_summaries;
-use crate::prelude::{get_all_summaries, put_embedding, put_embedding_user, put_summary, RocksDB};
+use crate::dao::embedding_dao::{delete_all_embeddings, put_embedding};
+use crate::dao::embedding_user_dao::{delete_all_embedding_users, put_embedding_user};
+use crate::dao::summary_dao::{delete_all_summaries, get_all_summaries, put_summary};
 use crate::services::embedding_service::get_embeddings_map;
 use anyhow::Result;
 use embedding_common::prelude::*;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
+use crate::db::rocksdb_impl::RocksDB;
 
 pub(crate) async fn save_summary(db: &Arc<RocksDB>, dto: &SummaryDto, user_id: Uuid) -> Result<()> {
     let summary = dto.to_model();

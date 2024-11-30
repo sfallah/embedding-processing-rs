@@ -98,7 +98,7 @@ async fn run_query(
     let embd_ids:Vec<_> = res.keys().map(|x|*x).collect();
     info!("embd_ids: {:?}", embd_ids);
 
-    let splits = get_all_splits(&db, &embd_ids).await?;
+    let splits = get_splits_full(&db, &embd_ids, None, None, false).await?;
     for split in splits {
         info!("Split: {:?}", split);
     }
@@ -194,10 +194,10 @@ async fn process_doc(
 async fn save_to_db(
     db: &Arc<RocksDB>,
     dto: &DocumentDto,
-    model: Arc<Model>,
+    _model: Arc<Model>,
     user_id: Uuid,
 ) -> Result<()> {
-    put_model(db, model.clone().as_ref()).await?;
+    //put_model(db, model.clone().as_ref()).await?;
     save_doc(db, dto, user_id).await?;
     Ok(())
 }

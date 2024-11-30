@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use embedding_common::prelude::*;
 use std::sync::Arc;
 
+#[allow(unused)]
 pub async fn put_model(db: &Arc<RocksDB>, model: &Model) -> anyhow::Result<()> {
     let model_id = &model.model_id;
     let data = model
