@@ -1,6 +1,6 @@
 use crate::dao::document_dao::{delete_document, get_document, put_document};
 use crate::db::rocksdb_impl::RocksDB;
-use crate::services::split_service::get_splits_full;
+use crate::services::split_service::{delete_split_full, get_splits_full};
 use crate::services::split_service::{delete_splits_full, save_split};
 use crate::services::summary_service::{delete_summaries_full, get_summaries_full, save_summary};
 use anyhow::anyhow;
@@ -13,26 +13,17 @@ use uuid::Uuid;
 //#[tracing::instrument(skip(db, model, embeddings, embedding_users, splits, summaries))]
 pub async fn save_doc(db: &Arc<RocksDB>, dto: &DocumentDto, user_id: Uuid) -> anyhow::Result<()> {
     let document = dto.to_model();
-    put_document(db, &document).await?;
-
     let split_futures = dto
         .splits
         .iter()
         .map(|split| save_split(db, split, user_id));
+
     join_all(split_futures)
         .await
         .into_iter()
         .collect::<anyhow::Result<()>>()?;
 
-    let summary_futures = dto
-        .summaries
-        .iter()
-        .map(|summary| save_summary(db, summary, user_id));
-    join_all(summary_futures)
-        .await
-        .into_iter()
-        .collect::<anyhow::Result<()>>()?;
-
+    put_document(db, &document).await?;
     Ok(())
 }
 
@@ -68,8 +59,14 @@ pub async fn delete_doc_full(
     match get_document(db, &document_id).await {
         Ok(Some(doc)) => {
             delete_document(db, &doc.document_id).await?;
-            delete_splits_full(db, &doc.split_ids).await?;
-            delete_summaries_full(db, &doc.summary_ids.clone().unwrap_or_default()).await?;
+            let split_ids = doc.split_ids.clone();
+            let split_futures = split_ids
+                .iter()
+                .map(|split_id| delete_split_full(db, split_id));
+            let _deleted_splits :Vec<anyhow::Result<Option<Split>>> = join_all(split_futures)
+                .await
+                .into_iter()
+                .collect();
             Ok(Some(doc))
         }
         Ok(None) => Ok(None),

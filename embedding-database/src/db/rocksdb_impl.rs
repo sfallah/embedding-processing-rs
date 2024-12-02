@@ -1,18 +1,17 @@
 use crate::db::column_families::ColumnFamilyType;
+use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
-use rocksdb::{
-    ColumnFamilyDescriptor, DBCompressionType, DBWithThreadMode, IteratorMode, MultiThreaded,
-    Options, WriteBatch,
-};
+use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, DBWithThreadMode, IteratorMode, MultiThreaded, OptimisticTransactionDB, Options, WriteBatch, WriteBatchWithTransaction};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task;
-use tracing::{debug, info, trace};
 use tracing::instrument;
+use tracing::{debug, info, trace};
 
 #[derive(Debug)]
 pub struct RocksDB {
-    pub db: Arc<DBWithThreadMode<MultiThreaded>>,
+    pub db: Arc<OptimisticTransactionDB<MultiThreaded>>,
 }
 
 impl RocksDB {
@@ -38,7 +37,7 @@ impl RocksDB {
         key_bytes
     }
 
-    fn open_column_families(path: &str, cfs: Vec<&str>) -> Result<DBWithThreadMode<MultiThreaded>> {
+    fn open_column_families(path: &str, cfs: Vec<&str>) -> Result<OptimisticTransactionDB<MultiThreaded>> {
         let opts = Self::configure_options();
         let cf_descriptors: Vec<_> = cfs
             .into_iter()
@@ -46,7 +45,7 @@ impl RocksDB {
             .collect();
 
         let db =
-            DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(&opts, path, cf_descriptors)?;
+            OptimisticTransactionDB::<MultiThreaded>::open_cf_descriptors(&opts, path, cf_descriptors)?;
         Ok(db)
     }
 
@@ -67,7 +66,7 @@ impl RocksDB {
 
         info!("Opening RocksDB at path: {}", path);
 
-        let db = task::spawn_blocking(move || -> Result<DBWithThreadMode<MultiThreaded>> {
+        let db = task::spawn_blocking(move || -> Result<OptimisticTransactionDB<MultiThreaded>> {
             Self::open_column_families(&path, cfs)
         })
         .await??;
@@ -259,7 +258,7 @@ impl RocksDB {
                 .cf_handle(&cf_name)
                 .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
 
-            let mut batch = WriteBatch::default();
+            let mut batch = WriteBatchWithTransaction::default();
 
             for key in keys {
                 let key_bytes = Self::key_to_bytes(&key);
@@ -275,6 +274,60 @@ impl RocksDB {
             "Successfully deleted {} keys from cf: {}",
             keys_len, cf_name_clone
         );
+
+        Ok(())
+    }
+
+    pub async fn save_records(&self, records: Arc<Vec<DbRecordValue>>) -> Result<()> {
+        let db = self.db.clone();
+        let records = records.clone();
+        task::spawn_blocking(move || -> Result<()> {
+            let mut cf_map = HashMap::new();
+            let mut batch = WriteBatchWithTransaction::default();
+            for record in records.iter() {
+                let cf = if !cf_map.contains_key(&record.cf_type) {
+                    let cf = db
+                        .cf_handle(&record.cf_type.name())
+                        .ok_or_else(|| anyhow!("Column family '{}' not found", record.cf_type.name()))?;
+                    cf_map.insert(record.cf_type, cf.clone());
+                    cf
+                } else {
+                    cf_map.get(&record.cf_type).unwrap().clone()
+                };
+                let key_bytes = Self::key_to_bytes(&record.key);
+                batch.put_cf(&cf, key_bytes, &record.value);
+            }
+            db.write(batch)?;
+            Ok(())
+        })
+        .await??;
+
+        Ok(())
+    }
+
+    pub async fn delete_records(&self, records: Arc<Vec<DbRecordKey>>) -> Result<()> {
+        let db = self.db.clone();
+        let records = records.clone();
+        task::spawn_blocking(move || -> Result<()> {
+            let mut cf_map = HashMap::new();
+            let mut batch = WriteBatchWithTransaction::default();
+            for record in records.iter() {
+                let cf = if !cf_map.contains_key(&record.cf_type) {
+                    let cf = db
+                        .cf_handle(&record.cf_type.name())
+                        .ok_or_else(|| anyhow!("Column family '{}' not found", record.cf_type.name()))?;
+                    cf_map.insert(record.cf_type, cf.clone());
+                    cf
+                } else {
+                    cf_map.get(&record.cf_type).unwrap().clone()
+                };
+                let key_bytes = Self::key_to_bytes(&record.key);
+                batch.delete_cf(&cf, key_bytes);
+            }
+            db.write(batch)?;
+            Ok(())
+        })
+            .await??;
 
         Ok(())
     }

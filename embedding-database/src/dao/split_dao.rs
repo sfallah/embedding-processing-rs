@@ -3,6 +3,7 @@ use crate::db::rocksdb_impl::RocksDB;
 use anyhow::anyhow;
 use embedding_common::prelude::*;
 use std::sync::Arc;
+use tracing::error;
 
 /// Stores a `Split` in the database.
 pub async fn put_split(db: &Arc<RocksDB>, split: &Split) -> anyhow::Result<()> {
@@ -13,7 +14,6 @@ pub async fn put_split(db: &Arc<RocksDB>, split: &Split) -> anyhow::Result<()> {
     db.put(ColumnFamilyType::Splits, split_id, &data).await?;
     Ok(())
 }
-
 
 pub async fn delete_all_splits(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> anyhow::Result<()> {
     db.multi_delete(ColumnFamilyType::Splits, split_ids.as_slice())
@@ -33,3 +33,17 @@ pub async fn get_all_splits(db: &Arc<RocksDB>, split_ids: &[u64]) -> anyhow::Res
     Ok(splits)
 }
 
+pub async fn get_split(db: &Arc<RocksDB>, split_id: u64) -> anyhow::Result<Option<Split>> {
+    let split_bytes = db.get(ColumnFamilyType::Splits, &split_id).await?;
+    match split_bytes {
+        None => Ok(None),
+        Some(bytes) => match Split::unpack(&bytes) {
+            Ok(split) => Ok(Some(split)),
+            Err(e) => {
+                let error_message = format!("Failed to unpack split: {}", e);
+                error!("{}", error_message);
+                Err(anyhow!(error_message))
+            }
+        },
+    }
+}

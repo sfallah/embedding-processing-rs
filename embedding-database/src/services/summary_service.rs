@@ -1,24 +1,78 @@
-use crate::dao::embedding_dao::{delete_all_embeddings, put_embedding};
-use crate::dao::embedding_user_dao::{delete_all_embedding_users, put_embedding_user};
-use crate::dao::summary_dao::{delete_all_summaries, get_all_summaries, put_summary};
-use crate::services::embedding_service::get_embeddings_map;
+use crate::dao::embedding_dao::delete_all_embeddings;
+use crate::dao::embedding_user_dao::delete_all_embedding_users;
+use crate::dao::summary_dao::{delete_all_summaries, get_all_summaries};
+use crate::db::column_families::ColumnFamilyType;
+use crate::db::db_record::{DbRecordKey, DbRecordValue};
+use crate::db::rocksdb_impl::RocksDB;
+use crate::services::embedding_service::{get_embeddings_map, to_embedding_record};
+use crate::services::embedding_user_service::to_embedding_user_record;
 use anyhow::Result;
 use embedding_common::prelude::*;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::db::rocksdb_impl::RocksDB;
 
 pub(crate) async fn save_summary(db: &Arc<RocksDB>, dto: &SummaryDto, user_id: Uuid) -> Result<()> {
+    let mut db_records = Vec::new();
     let summary = dto.to_model();
     let embedding = dto.to_embedding_model();
     let embedding_user = dto.to_embedding_user_model(user_id);
-    put_summary(db, &summary).await?;
     if let Some(embedding) = embedding {
-        put_embedding(db, &embedding).await?;
+        let embedding_record = to_embedding_record(&embedding).await?;
+        db_records.push(embedding_record);
     }
     if let Some(embedding_user) = embedding_user {
-        put_embedding_user(db, &embedding_user).await?;
+        let embedding_user_record = to_embedding_user_record(&embedding_user).await?;
+        db_records.push(embedding_user_record);
+    }
+    let summary_record = DbRecordValue::new(
+        ColumnFamilyType::Summaries,
+        summary.summary_id,
+        summary.pack()?,
+    );
+    db_records.push(summary_record);
+    db.save_records(Arc::new(db_records)).await?;
+    Ok(())
+}
+
+pub(crate) async fn save_summary_aux(
+    dtos: &Vec<SummaryDto>,
+    user_id: Uuid,
+    db_records: &mut Vec<DbRecordValue>,
+) -> Result<()> {
+    for dto in dtos {
+        let summary = dto.to_model();
+        let embedding = dto.to_embedding_model();
+        let embedding_user = dto.to_embedding_user_model(user_id);
+        if let Some(embedding) = embedding {
+            let embedding_record = to_embedding_record(&embedding).await?;
+            db_records.push(embedding_record);
+        }
+        if let Some(embedding_user) = embedding_user {
+            let embedding_user_record = to_embedding_user_record(&embedding_user).await?;
+            db_records.push(embedding_user_record);
+        }
+        let summary_record = DbRecordValue::new(
+            ColumnFamilyType::Summaries,
+            summary.summary_id,
+            summary.pack()?,
+        );
+        db_records.push(summary_record);
+    }
+    Ok(())
+}
+
+pub(crate) async  fn delete_summaries_aux(
+    summary_ids: &Vec<u64>,
+    db_records: &mut Vec<DbRecordKey>,
+) -> Result<()> {
+    for summary_id in summary_ids {
+        let summary_key = DbRecordKey::new(ColumnFamilyType::Summaries, *summary_id);
+        db_records.push(summary_key);
+        let embedding_key = DbRecordKey::new(ColumnFamilyType::Embeddings, *summary_id);
+        db_records.push(embedding_key);
+        let embedding_user_key = DbRecordKey::new(ColumnFamilyType::EmbeddingUsers, *summary_id);
+        db_records.push(embedding_user_key);
     }
     Ok(())
 }
@@ -43,7 +97,8 @@ pub async fn get_summaries_full(
             let embedding = embeddings_map
                 .get(&summary.summary_id)
                 .map(|embd| embd.clone());
-            let query_score = summaries_query_res.and_then(|qr| qr.get(&summary.summary_id).cloned());
+            let query_score =
+                summaries_query_res.and_then(|qr| qr.get(&summary.summary_id).cloned());
             summary.to_dto(embedding, query_score)
         })
         .collect();
