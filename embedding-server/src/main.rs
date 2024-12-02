@@ -3,7 +3,7 @@ use embedding_common::config::AppConfig;
 use embedding_common::utils::helpers::{create_directory, get_db_dir};
 use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
-use embedding_index::{initialize_index_from_db, save_index};
+use embedding_index::{initialize_index_from_db};
 use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_server::zmq::server_task::ServerTask;
