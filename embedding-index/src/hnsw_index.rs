@@ -63,10 +63,34 @@ impl HnswIndex {
     }
 
     #[tracing::instrument]
+    pub fn create_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
+        let options = from_config(&index_config);
+        let index = match new_index(&options) {
+            Err(e) => {
+                error!("Failed to create index: {:?}", e);
+                return Err(anyhow!("Failed to create index: {:?}", e));
+            }
+            Ok(index) => index,
+        };
+
+        if let Err(e) = index.reserve(index.size() + 64) {
+            error!("Failed to reserve index: {:?}", e);
+            return Err(anyhow!("Failed to reserve index: {:?}", e));
+        }
+        let inner = Arc::new(Mutex::new(index));
+        let index_config = index_config.clone();
+        Ok(Self {
+            index: inner,
+            index_name,
+            index_config,
+        })
+    }
+
+    #[tracing::instrument]
     pub async fn load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
         let index_config = index_config.clone();
         let index_name = index_name.clone();
-        spawn_blocking(move || HnswIndex::create_load_index(index_name, index_config)).await?
+        spawn_blocking(move || HnswIndex::create_index(index_name, index_config)).await?
     }
 
     pub async fn get_by_label(&self, label: u64) -> Result<Vec<f32>> {
