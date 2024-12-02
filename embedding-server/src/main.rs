@@ -96,7 +96,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let summary_index =
         Arc::new(HnswIndex::load_index("summaries".to_string(), app_config.index_config).await?);
 
-    initialize_index_from_db(&db, &split_index, &summary_index).await;
+    initialize_index_from_db(&db, &split_index, &summary_index).await?;
 
     let mut worker_handles = Vec::new();
 
@@ -130,7 +130,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut shutdown = shutdown_sender.subscribe();
     select! {
         _ =  shutdown.recv() => {
-                save_index(split_index, summary_index).await?;
             info!("Shutting down");
         }
         _ = zeromq::proxy(clients.frontend, clients.backend, None) => {
