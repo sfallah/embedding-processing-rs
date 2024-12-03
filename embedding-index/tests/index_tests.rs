@@ -81,7 +81,7 @@ mod tests {
         }
         rocksdb.save_records(Arc::new(db_records.clone())).await?;
         index
-            .add_batch_records(Arc::new(index_records.clone()))
+            .upsert_batch_records(Arc::new(index_records.clone()))
             .await?;
         Ok(())
     }
@@ -112,15 +112,17 @@ mod tests {
         let index_config = app_config.index_config;
         println!("index_config: {:?}", index_config);
         let index_file = index_file("summaries".to_string(), &index_config);
+        let scalar_kind = index_config.scalar_kind;
         assert_eq!(
             index_file,
-            "index_dir/summaries__L2sq_F32_384_16_32_32.usearch"
+            format!("index_dir/summaries__L2sq_{:?}_384_16_32_32.usearch", scalar_kind)
         );
         println!("index_file: {:?}", index_file);
         Ok(())
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[tracing::instrument]
     async fn index_filter_test() -> anyhow::Result<()> {
         setup_tracing(Level::INFO);
         let db_temp_dir = tempdir::TempDir::new("test_embedding_users")?;
