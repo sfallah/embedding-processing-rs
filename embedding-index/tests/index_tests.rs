@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use std::f32;
     use anyhow::anyhow;
     use embedding_common::config::AppConfig;
     use embedding_common::prelude::EmbeddingUser;
@@ -12,6 +13,8 @@ mod tests {
     use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
     use uuid::Uuid;
+    use simsimd::{ SpatialSimilarity};
+
 
     async fn read_config() -> anyhow::Result<AppConfig> {
         let config_file = "tests/test_config/index_config_test.toml".to_string();
@@ -95,7 +98,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn index_add_test() -> anyhow::Result<()> {
         let config = read_config().await?;
-        let index = HnswIndex::load_index("test_index".to_string(), config.index_config).await?;
+        let index = HnswIndex::async_create_index("test_index".to_string(), config.index_config).await?;
 
         let embeddings = generate_random_vectors(2, 384);
         let embedding1 = embeddings.get(0).ok_or(anyhow!("No embeddings"))?;
@@ -135,7 +138,7 @@ mod tests {
         app_config.index_config.index_dir = index_path.to_string();
 
         let index =
-            HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone()).await?;
+            HnswIndex::async_create_index("summaries".to_string(), app_config.index_config.clone()).await?;
 
         let num_users = 2;
         let num_user_embeds = 10;
@@ -168,7 +171,7 @@ mod tests {
         index.save().await?;
 
         let index2 =
-            HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone()).await?;
+            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone()).await?;
         let size2 = index2.size().await?;
         assert_eq!(size2, num_users * num_user_embeds);
         println!("Old Size: {:?}", size2);
@@ -186,7 +189,7 @@ mod tests {
         index2.save().await?;
 
         let index3 =
-            HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone()).await?;
+            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone()).await?;
         let size4 = index3.size().await?;
         assert_eq!(size4, num_users * num_user_embeds * 2);
         println!("Reload Size: {:?}", size4);
@@ -223,7 +226,7 @@ mod tests {
         let rocksdb = Arc::new(RocksDB::open(db_path).await?);
 
         let app_config = read_config().await?;
-        let index = HnswIndex::load_index("summaries".to_string(), app_config.index_config).await?;
+        let index = HnswIndex::async_create_index("summaries".to_string(), app_config.index_config).await?;
 
         let mut user_ids = vec![];
         for _ in 0..4 {
@@ -271,6 +274,10 @@ mod tests {
                 let first_dist = *res.first().unwrap().1;
                 println!("embed_id: {}, res: {:?}", embed_id, res);
                 let orig_embd = index.get_by_label(*embed_id).await?;
+                // convert to f16 and back again to f32
+                let embedding:Vec<f32> = embedding.iter().map(|f| half::f16::from_f32(*f).to_f32()).collect();
+                let sim =f32::l2sq(orig_embd.as_slice(), embedding.as_slice());
+                println!("sim: {:?}", sim);
                 assert_eq!(orig_embd, *embedding);
 
                 assert_eq!(
