@@ -3,7 +3,8 @@ use embedding_common::config::AppConfig;
 use embedding_common::utils::helpers::{create_directory, get_db_dir};
 use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
-use embedding_index::{initialize_index_from_db};
+use embedding_index::initialize_index_from_db;
+//use embedding_index::save_index;
 use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_server::zmq::server_task::ServerTask;
@@ -90,11 +91,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Create an HNSW index and initialize it from the database
     let split_index = Arc::new(
-        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?,
+        HnswIndex::async_create_index("splits".to_string(), app_config.index_config.clone()).await?,
     );
 
     let summary_index =
-        Arc::new(HnswIndex::load_index("summaries".to_string(), app_config.index_config).await?);
+        Arc::new(HnswIndex::async_create_index("summaries".to_string(), app_config.index_config).await?);
 
     initialize_index_from_db(&db, &split_index, &summary_index).await?;
 
@@ -130,6 +131,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut shutdown = shutdown_sender.subscribe();
     select! {
         _ =  shutdown.recv() => {
+            //save_index(split_index, summary_index).await?;
             info!("Shutting down");
         }
         _ = zeromq::proxy(clients.frontend, clients.backend, None) => {
