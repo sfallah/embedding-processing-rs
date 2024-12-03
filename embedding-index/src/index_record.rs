@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct IndexRecord {
     pub label: u64,
     pub embedding: Vec<f32>,

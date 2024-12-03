@@ -1,5 +1,6 @@
 use crate::db::column_families::ColumnFamilyType;
 
+#[derive(Debug, Clone)]
 pub struct DbRecordValue {
     pub cf_type: ColumnFamilyType,
     pub key: u64,
@@ -16,6 +17,7 @@ impl DbRecordValue {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct DbRecordKey {
     pub cf_type: ColumnFamilyType,
     pub key: u64,
