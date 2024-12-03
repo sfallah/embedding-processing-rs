@@ -1,4 +1,5 @@
 pub use crate::db::rocksdb_impl::RocksDB;
+pub use crate::db::column_families::ColumnFamilyType;
 pub use crate::services::doc_service::save_doc;
 pub use crate::services::doc_service::get_full_doc;
 pub use crate::services::doc_service::delete_doc_full;
