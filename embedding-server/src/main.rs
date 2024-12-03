@@ -28,7 +28,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     info!("Starting up");
 
-    let zmq_config = app_config.zmq_config;
+    let zmq_config = Arc::new(app_config.zmq_config);
 
     // Get available workers
     let max_cores = num_cpus::get();
@@ -103,7 +103,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Initialize separate workers for each thread
     for _ in 0..parallel_workers {
         let mut worker =
-            ServerWorker::init(&zmq_config.zmq_host, zmq_config.zmq_backend_port).await;
+            ServerWorker::init(zmq_config.clone()).await;
         let processing_ctx = Arc::clone(&processing_ctx);
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);

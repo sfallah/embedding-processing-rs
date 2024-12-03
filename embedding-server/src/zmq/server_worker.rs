@@ -13,24 +13,28 @@ use tokio::sync::broadcast::Receiver;
 use tokio::{select};
 use tracing::info;
 use zeromq::{RepSocket, Socket, SocketRecv};
+use embedding_common::config::ZmqConfig;
 use embedding_common::prelude::{DeterministicAHasher, Serde};
 use embedding_processing::services::embeddings::EmbeddingsRequest;
+use crate::api::health::process_health_check;
 
 pub struct ServerWorker {
     pub worker: RepSocket,
+    pub zmq_config: Arc<ZmqConfig>,
     pub hasher: Arc<DeterministicAHasher>,
 }
 
 impl ServerWorker {
-    pub async fn init(host: &str, port: usize) -> Self {
+    pub async fn init(zmq_config: Arc<ZmqConfig>) -> Self {
         let mut worker = RepSocket::new();
-        let endpoint = format!("tcp://{}:{}", host, port);
+        let endpoint = format!("tcp://{}:{}", zmq_config.zmq_host, zmq_config.zmq_backend_port);
         worker
             .connect(&endpoint)
             .await
             .expect("Worker failed to connect to backend");
         let hasher = Arc::new(DeterministicAHasher::new(None, None));
-        ServerWorker { worker, hasher }
+        let zmq_config = zmq_config.clone();
+        ServerWorker { worker, zmq_config, hasher }
     }
 }
 
@@ -137,6 +141,9 @@ pub async fn worker_routine(
                         )
                             .await;
                     }
+                    ZmqMessageType::HealthCheck => {
+                process_health_check(&mut worker_socket.worker, &mut message_header, worker_socket.zmq_config.clone()).await;
+            }
             _ => {
                 let error_message = format!(
                     "Unrecognized message type: {:?}",
