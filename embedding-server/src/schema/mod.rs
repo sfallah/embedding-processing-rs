@@ -4,3 +4,4 @@ pub mod search_mode;
 pub mod split;
 pub mod summary;
 pub mod zmq_message_header;
+pub mod health_check;
