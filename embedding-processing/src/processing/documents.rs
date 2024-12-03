@@ -38,26 +38,6 @@ pub async fn process_document(
         .for_each(|res| {
             split_dtos.push(res.expect("Failed to process split"));
         });
-    /*
-    for (seq_id, split) in splits.iter().enumerate() {
-        let split = Arc::new(split.clone());
-        let ctx = ctx.clone();
-        let embed_sender = embed_sender.clone();
-        let handle = tokio::spawn(async move {
-            process_split(ctx.clone(), split, embed_sender, doc_id, seq_id as i32)
-                .await
-                .expect("Failed to process split")
-        });
-        handles.push(handle);
-    }
-    futures::future::join_all(handles.into_iter())
-        .await
-        .into_iter()
-        .for_each(|res| {
-            split_dtos.push(res.expect("Failed to process split"));
-        });
-
-     */
 
     let summaries: Vec<_> = split_dtos
         .iter()
@@ -68,6 +48,6 @@ pub async fn process_document(
         doc_id,
         url.as_str(),
         split_dtos,
-        summaries,
+        Some(summaries),
     ))
 }

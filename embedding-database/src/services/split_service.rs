@@ -1,6 +1,4 @@
-use crate::dao::embedding_dao::delete_all_embeddings;
-use crate::dao::embedding_user_dao::delete_all_embedding_users;
-use crate::dao::split_dao::{delete_all_splits, get_all_splits, get_split};
+use crate::dao::split_dao::{get_all_splits, get_split};
 use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use crate::db::rocksdb_impl::RocksDB;
@@ -39,12 +37,6 @@ pub(crate) async fn save_split(
     save_summary_aux(&split_dto.summaries, user_id, &mut db_records).await?;
     db.save_records(Arc::new(db_records)).await?;
     Ok(())
-}
-
-pub async fn delete_splits_full(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> Result<()> {
-    delete_all_splits(db, split_ids).await?;
-    delete_all_embeddings(db, split_ids).await?;
-    delete_all_embedding_users(db, split_ids).await
 }
 
 pub async fn delete_split_full(db: &Arc<RocksDB>, split_id: &u64) -> anyhow::Result<Option<Split>> {

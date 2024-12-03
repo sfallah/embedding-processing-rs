@@ -4,6 +4,7 @@ pub use crate::services::doc_service::get_full_doc;
 pub use crate::services::doc_service::delete_doc_full;
 pub use crate::services::embedding_service::get_all_embeddings;
 pub use crate::services::embedding_user_service::has_embedding_user;
+pub use crate::services::embedding_user_service::to_embedding_user_record;
 pub use crate::services::summary_service::get_summaries_full;
 pub use crate::services::summary_service::get_split_summaries_map;
 pub use crate::services::embedding_service::get_embedding_full;

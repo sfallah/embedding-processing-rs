@@ -2,7 +2,7 @@ use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
-use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, DBWithThreadMode, IteratorMode, MultiThreaded, OptimisticTransactionDB, Options, WriteBatch, WriteBatchWithTransaction};
+use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, IteratorMode, MultiThreaded, OptimisticTransactionDB, Options, WriteBatchWithTransaction};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task;
@@ -305,7 +305,7 @@ impl RocksDB {
         Ok(())
     }
 
-    pub async fn delete_records(&self, records: Arc<Vec<DbRecordKey>>) -> Result<()> {
+    pub(crate) async fn delete_records(&self, records: Arc<Vec<DbRecordKey>>) -> Result<()> {
         let db = self.db.clone();
         let records = records.clone();
         task::spawn_blocking(move || -> Result<()> {

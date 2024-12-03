@@ -71,7 +71,7 @@ pub async fn process_document_query_request(
             )
             .await
             .unwrap();
-        info!("Summary query results: {:?}", summaries_query_res);
+        debug!("Summary query results: {:?}", summaries_query_res);
 
         let summary_ids: Vec<u64> = summaries_query_res.keys().map(|x| *x).collect();
         split_summary_map = get_split_summaries_map(
@@ -96,7 +96,7 @@ pub async fn process_document_query_request(
             )
             .await
             .unwrap();
-        info!("Split query results: {:?}", split_query_res);
+        debug!("Split query results: {:?}", split_query_res);
     }
 
     let splits_min_distances = split_summary_map.iter().map(|(k, v)| {

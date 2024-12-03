@@ -6,7 +6,7 @@ pub struct DocumentDto {
     pub document_id: u64,
     pub document_url: String,
     pub splits: Vec<SplitDto>,
-    pub summaries: Vec<SummaryDto>,
+    pub summaries: Option<Vec<SummaryDto>>,
 }
 
 impl DocumentDto {
@@ -14,7 +14,7 @@ impl DocumentDto {
         document_id: u64,
         document_url: &str,
         splits: Vec<SplitDto>,
-        summaries: Vec<SummaryDto>,
+        summaries: Option<Vec<SummaryDto>>,
     ) -> Self {
         DocumentDto {
             document_id,
@@ -26,11 +26,7 @@ impl DocumentDto {
     pub fn to_model(&self) -> Document {
         let split_ids = self.splits.iter().map(|s| s.split_id).collect();
 
-        let summary_ids = if self.summaries.is_empty() {
-            None
-        } else {
-            Some(self.summaries.iter().map(|s| s.summary_id).collect())
-        };
+        let summary_ids = self.summaries.clone().map(|summary_dto| summary_dto.iter().map(|s| s.summary_id).collect());
         Document {
             document_id: self.document_id,
             document_url: self.document_url.clone(),

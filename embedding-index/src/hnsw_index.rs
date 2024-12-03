@@ -7,6 +7,7 @@ use tokio::task::spawn_blocking;
 use usearch::{new_index, Index};
 use uuid::Uuid;
 
+use crate::index_record::IndexRecord;
 use anyhow::Result;
 use embedding_database::prelude::{has_embedding_user, RocksDB};
 use indexmap::IndexMap;
@@ -156,6 +157,48 @@ impl HnswIndex {
         })
         .await?
     }
+
+    #[tracing::instrument(skip(self, records))]
+    pub async fn upsert_batch_records(&self, records: Arc<Vec<IndexRecord>>) -> Result<()> {
+        let index = self.index.clone();
+        let records = records.clone();
+        spawn_blocking(move || {
+            let index = index.lock().unwrap();
+
+            for record in records.iter() {
+                if index.contains(record.label) {
+                    if let Err(e) = index.remove(record.label) {
+                        let error_message = format!("Failed to delete existing item: {:?}", e);
+                        error!("{}", error_message);
+                        return Err(anyhow!("{}", error_message));
+                    }
+                }
+            }
+            let num = records.len();
+            if index.capacity() <= index.size() + num {
+                let num = if num > 64 { num } else { 64 };
+                if let Err(e) = index.reserve(index.size() + num) {
+                    error!("Failed to reserve index: {:?}", e);
+                    return Err(anyhow!("Failed to reserve index: {:?}", e));
+                }
+                info!(
+                    "Reserved {} more capacity, cur capacity: {}",
+                    num,
+                    index.capacity()
+                );
+            }
+            for record in records.iter() {
+                if let Err(e) = index.add(record.label, record.embedding.as_slice()) {
+                    error!("Failed to add item: {:?}", e);
+                    return Err(anyhow!("Failed to add item: {:?}", e));
+                }
+            }
+            info!("Added {} items to index", num);
+            Ok(())
+        })
+        .await?
+    }
+
     pub async fn upsert(&self, embd: &Vec<f32>, label: u64) -> Result<bool> {
         let index = self.index.clone();
         let embd = embd.clone();
