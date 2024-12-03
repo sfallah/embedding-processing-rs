@@ -48,8 +48,3 @@ pub fn has_embedding_user(
     };
     Ok(res)
 }
-
-
-pub async fn delete_all_embedding_users(db: &Arc<RocksDB>, embedding_ids: &[u64]) -> anyhow::Result<()> {
-    db.multi_delete(ColumnFamilyType::EmbeddingUsers, embedding_ids).await
-}

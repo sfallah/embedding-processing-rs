@@ -1,6 +1,4 @@
-use crate::dao::embedding_dao::delete_all_embeddings;
-use crate::dao::embedding_user_dao::delete_all_embedding_users;
-use crate::dao::summary_dao::{delete_all_summaries, get_all_summaries};
+use crate::dao::summary_dao::{get_all_summaries};
 use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use crate::db::rocksdb_impl::RocksDB;
@@ -12,28 +10,6 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub(crate) async fn save_summary(db: &Arc<RocksDB>, dto: &SummaryDto, user_id: Uuid) -> Result<()> {
-    let mut db_records = Vec::new();
-    let summary = dto.to_model();
-    let embedding = dto.to_embedding_model();
-    let embedding_user = dto.to_embedding_user_model(user_id);
-    if let Some(embedding) = embedding {
-        let embedding_record = to_embedding_record(&embedding).await?;
-        db_records.push(embedding_record);
-    }
-    if let Some(embedding_user) = embedding_user {
-        let embedding_user_record = to_embedding_user_record(&embedding_user).await?;
-        db_records.push(embedding_user_record);
-    }
-    let summary_record = DbRecordValue::new(
-        ColumnFamilyType::Summaries,
-        summary.summary_id,
-        summary.pack()?,
-    );
-    db_records.push(summary_record);
-    db.save_records(Arc::new(db_records)).await?;
-    Ok(())
-}
 
 pub(crate) async fn save_summary_aux(
     dtos: &Vec<SummaryDto>,
@@ -122,10 +98,4 @@ pub async fn get_split_summaries_map(
         }
     }
     Ok(summary_map)
-}
-
-pub async fn delete_summaries_full(db: &Arc<RocksDB>, split_ids: &Vec<u64>) -> Result<()> {
-    delete_all_summaries(db, split_ids).await?;
-    delete_all_embeddings(db, split_ids).await?;
-    delete_all_embedding_users(db, split_ids).await
 }

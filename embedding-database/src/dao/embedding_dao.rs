@@ -5,16 +5,6 @@ use embedding_common::prelude::*;
 use futures::future::try_join_all;
 use std::sync::Arc;
 
-/// Stores an `Embedding` in the database.
-pub async fn put_embedding(db: &Arc<RocksDB>, embedding: &Embedding) -> anyhow::Result<()> {
-    let embedding_id = &embedding.embedding_id;
-    let data = embedding
-        .pack()
-        .map_err(|e| anyhow!("Failed to pack embedding: {}", e))?;
-    db.put(ColumnFamilyType::Embeddings, embedding_id, &data)
-        .await?;
-    Ok(())
-}
 
 pub async fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embedding>> {
     let embedding_data_bytes_vec = db
@@ -65,9 +55,4 @@ pub async fn get_embedding(
         }
         None => Ok(None),
     }
-}
-
-pub async fn delete_all_embeddings(db: &Arc<RocksDB>, embedding_ids: &[u64]) -> anyhow::Result<()> {
-    db.multi_delete(ColumnFamilyType::Embeddings, embedding_ids)
-        .await
 }

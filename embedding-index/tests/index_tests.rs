@@ -2,15 +2,16 @@
 mod tests {
     use anyhow::anyhow;
     use embedding_common::config::AppConfig;
+    use embedding_common::prelude::EmbeddingUser;
+    use embedding_database::prelude::{to_embedding_user_record, RocksDB};
     use embedding_index::hnsw_index::HnswIndex;
+    use embedding_index::index_record::IndexRecord;
     use embedding_index::utils::{generate_random_vectors, index_file};
     use rand::{thread_rng, Rng};
     use std::sync::Arc;
     use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
     use uuid::Uuid;
-    use embedding_common::prelude::EmbeddingUser;
-    use embedding_database::prelude::{put_embedding_user, RocksDB};
 
     async fn read_config() -> anyhow::Result<AppConfig> {
         let config_file = "tests/test_config/index_config_test.toml".to_string();
@@ -61,43 +62,28 @@ mod tests {
         index: &HnswIndex,
         records: &Vec<(Uuid, Vec<u64>, Vec<Vec<f32>>)>,
     ) -> anyhow::Result<()> {
+        let mut db_records = Vec::new();
+        let mut index_records = Vec::new();
         for (user_id, embed_ids, embeddings) in records.iter() {
-            add_embedding_users(&rocksdb, user_id, embed_ids, embeddings).await?;
-            index.add_batch(embeddings, embed_ids).await?;
-        }
-        Ok(())
-    }
+            for (embed_id, embedding) in embed_ids.iter().zip(embeddings.iter()) {
+                {
+                    let embedding_user = EmbeddingUser {
+                        user_uuid: *user_id,
+                        embed_id: *embed_id,
+                    };
+                    let db_record = to_embedding_user_record(&embedding_user).await?;
+                    db_records.push(db_record);
 
-    async fn add_embedding_users(
-        rocksdb: &&Arc<RocksDB>,
-        user_id: &Uuid,
-        embed_ids: &Vec<u64>,
-        embeddings: &Vec<Vec<f32>>,
-    ) -> anyhow::Result<()> {
-        for (embed_id, _) in embed_ids.iter().zip(embeddings.iter()) {
-            let embedding_user = EmbeddingUser {
-                user_uuid: *user_id,
-                embed_id: *embed_id,
-            };
-            put_embedding_user(&rocksdb, &embedding_user)
-                .await
-                .map_err(|e| anyhow!("Failed to put embedding user: {}", e))?;
+                    let index_record = IndexRecord::new(*embed_id, embedding.clone());
+                    index_records.push(index_record);
+                }
+            }
         }
+        rocksdb.save_records(Arc::new(db_records.clone())).await?;
+        index
+            .add_batch_records(Arc::new(index_records.clone()))
+            .await?;
         Ok(())
-    }
-
-    async fn upsert_records(
-        rocksdb: &Arc<RocksDB>,
-        index: &HnswIndex,
-        records: &Vec<(Uuid, Vec<u64>, Vec<Vec<f32>>)>,
-    ) -> anyhow::Result<usize> {
-        let mut num_overwrittens = 0;
-        for (user_id, embed_ids, embeddings) in records.iter() {
-            add_embedding_users(&rocksdb, user_id, embed_ids, embeddings).await?;
-            let overwrittens = index.upsert_batch(embeddings, embed_ids).await?;
-            num_overwrittens += overwrittens.len();
-        }
-        Ok(num_overwrittens)
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -169,8 +155,7 @@ mod tests {
         println!("Capacity: {:?}", capacity);
 
         // reinsert records
-        let num_overwritten = upsert_records(&rocksdb, &index, &records).await?;
-        assert_eq!(num_overwritten, num_users * num_user_embeds);
+        add_records(&rocksdb, &index, &records).await?;
         let size = index.size().await?;
         assert_eq!(size, num_users * num_user_embeds);
         println!("After reinsert Size: {:?}", size);
@@ -272,18 +257,7 @@ mod tests {
             })
             .collect();
 
-        for (user_id, embed_ids, embeddings) in records.iter() {
-            for (embed_id, _) in embed_ids.iter().zip(embeddings.iter()) {
-                let embedding_user = EmbeddingUser {
-                    user_uuid: *user_id,
-                    embed_id: *embed_id,
-                };
-                put_embedding_user(&rocksdb, &embedding_user)
-                    .await
-                    .map_err(|e| anyhow!("Failed to put embedding user: {}", e))?;
-            }
-            index.add_batch(embeddings, embed_ids).await?;
-        }
+        add_records(&rocksdb, &index, &records).await?;
 
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.into_iter().zip(embeddings.into_iter()) {

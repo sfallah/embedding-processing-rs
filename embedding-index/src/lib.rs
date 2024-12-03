@@ -6,7 +6,10 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 pub mod hnsw_index;
+pub mod index_record;
 pub mod utils;
+
+use index_record::IndexRecord;
 
 #[tracing::instrument(skip(splits_index, summaries_index, doc_dto))]
 pub async fn add_to_indices(
@@ -14,21 +17,36 @@ pub async fn add_to_indices(
     summaries_index: Arc<HnswIndex>,
     doc_dto: &DocumentDto,
 ) -> anyhow::Result<()> {
-    let splits_futures = doc_dto.splits.iter().flat_map(|split| {
-        split
-            .embedding
-            .as_ref()
-            .map(|embd| splits_index.upsert(&embd.embedding, embd.embedding_id))
-    });
-    join_all(splits_futures).await;
+    let mut split_entries = Vec::new();
+    let mut summary_entries = Vec::new();
+    for split_dto in doc_dto.splits.iter() {
+        match split_dto.embedding.as_ref() {
+            Some(embd) => {
+                split_entries.push(IndexRecord::new(embd.embedding_id, embd.embedding.clone()));
+            }
+            None => {
+                error!("Split embedding is missing");
+            }
+        }
+        for summary_dto in split_dto.summaries.iter() {
+            match summary_dto.embedding.as_ref() {
+                Some(embd) => {
+                    summary_entries
+                        .push(IndexRecord::new(embd.embedding_id, embd.embedding.clone()));
+                }
+                None => {
+                    error!("Summary embedding is missing");
+                }
+            }
+        }
+    }
 
-    let summaries_futures = doc_dto.summaries.iter().flat_map(|summary| {
-        summary
-            .embedding
-            .as_ref()
-            .map(|embd| summaries_index.upsert(&embd.embedding, embd.embedding_id))
-    });
-    join_all(summaries_futures).await;
+    splits_index
+        .upsert_batch_records(Arc::new(split_entries))
+        .await?;
+    summaries_index
+        .upsert_batch_records(Arc::new(summary_entries))
+        .await?;
     Ok(())
 }
 
@@ -81,13 +99,19 @@ pub async fn initialize_index_from_db(
             summary_embeddings.push(embedding.embedding);
         }
     }
-    if let Err(e) = split_index.add_batch(&split_embeddings, &split_labels).await {
+    if let Err(e) = split_index
+        .add_batch(&split_embeddings, &split_labels)
+        .await
+    {
         error!("Failed to add split embeddings: {}", e);
     } else {
         split_no = split_labels.len();
     }
 
-    if let Err(e) = summary_index.add_batch(&summary_embeddings, &summary_labels).await {
+    if let Err(e) = summary_index
+        .add_batch(&summary_embeddings, &summary_labels)
+        .await
+    {
         error!("Failed to add summary embeddings: {}", e);
     } else {
         summary_no = summary_labels.len();

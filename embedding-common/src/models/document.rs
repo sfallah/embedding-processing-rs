@@ -20,7 +20,7 @@ impl Document {
         }
     }
 
-    pub fn to_dto(&self, splits: &Vec<SplitDto>, summaries: &Vec<SummaryDto>) -> DocumentDto {
+    pub fn to_dto(&self, splits: &Vec<SplitDto>, summaries: Option<Vec<SummaryDto>>) -> DocumentDto {
         DocumentDto::new(
             self.document_id,
             &self.document_url,
