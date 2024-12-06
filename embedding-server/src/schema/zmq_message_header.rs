@@ -16,16 +16,8 @@ pub enum ZmqMessageType {
     DocumentQuery = 2,
     /// Message type for retrieval operations for documents.
     DocumentRetrieval = 3,
-    /// Message type for retrieval operations for splits of document.
-    DocumentSplitsRetrieval = 4,
-    /// Message type for retrieval operations for summaries of document.
-    DocumentSummariesRetrieval = 5,
     /// Message type for retrieval operations for summaries of document.
     DocumentDeletion = 6,
-    /// Message type for retrieval operations for splits.
-    SplitRetrieval = 7,
-    /// Message type for retrieval operations for splits.
-    SummaryRetrieval = 8,
     /// Message type for health check operations, used to verify the operational status of the server.
     HealthCheck = 9,
     /// Represents an undefined or unrecognized message type, used as a fallback or error state.
@@ -39,11 +31,7 @@ impl fmt::Display for ZmqMessageType {
             ZmqMessageType::DocumentInsertion => "DocumentInsertion",
             ZmqMessageType::DocumentQuery => "DocumentQuery",
             ZmqMessageType::DocumentRetrieval => "DocumentRetrieval",
-            ZmqMessageType::DocumentSplitsRetrieval => "DocumentSplitsRetrieval",
-            ZmqMessageType::DocumentSummariesRetrieval => "DocumentSummariesRetrieval",
             ZmqMessageType::DocumentDeletion => "DocumentDeletion",
-            ZmqMessageType::SplitRetrieval => "SplitRetrieval",
-            ZmqMessageType::SummaryRetrieval => "SummaryRetrieval",
             ZmqMessageType::HealthCheck => "HealthCheck",
             ZmqMessageType::Unknown => "UNKNOWN",
         };
