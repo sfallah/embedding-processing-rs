@@ -88,10 +88,17 @@ impl HnswIndex {
     }
 
     #[tracing::instrument]
-    pub async fn load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
+    pub async fn async_create_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
         let index_config = index_config.clone();
         let index_name = index_name.clone();
         spawn_blocking(move || HnswIndex::create_index(index_name, index_config)).await?
+    }
+
+    #[tracing::instrument]
+    pub async fn async_load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
+        let index_config = index_config.clone();
+        let index_name = index_name.clone();
+        spawn_blocking(move || HnswIndex::create_load_index(index_name, index_config)).await?
     }
 
     pub async fn get_by_label(&self, label: u64) -> Result<Vec<f32>> {

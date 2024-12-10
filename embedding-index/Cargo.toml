@@ -20,7 +20,7 @@ embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }
 
 [dev-dependencies]
-rstest = "0.23.0"
 tempdir = "0.3.7"
-fake = "3.0.1"
 tokio = { version = "1.41.1", features = ["test-util"] }
+simsimd = "6.2.1"
+half = "=2.4.1"

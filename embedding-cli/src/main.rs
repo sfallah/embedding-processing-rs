@@ -75,7 +75,7 @@ async fn run_query(
     let model_config = app_config.model_config;
 
     let splits_index =
-        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?;
+        HnswIndex::async_create_index("splits".to_string(), app_config.index_config.clone()).await?;
     let splits_index = Arc::new(splits_index);
 
     //let summaries_index = HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone())?;
@@ -119,10 +119,10 @@ async fn run_process_docs(
     let splitter_config = app_config.splitter_config;
 
     let splits_index =
-        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?;
+        HnswIndex::async_create_index("splits".to_string(), app_config.index_config.clone()).await?;
     let splits_index = Arc::new(splits_index);
     let summaries_index =
-        HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone()).await?;
+        HnswIndex::async_create_index("summaries".to_string(), app_config.index_config.clone()).await?;
     let summaries_index = Arc::new(summaries_index);
 
     let text_files =
