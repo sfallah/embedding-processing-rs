@@ -1,3 +1,4 @@
+use crate::schema::document::{DocumentInsertionRequest, DocumentInsertionResponse};
 use crate::schema::document_status::DocumentInsertionStatus;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils;
@@ -14,7 +15,6 @@ use std::sync::Arc;
 use tracing::{debug, error, info};
 use uuid::Uuid;
 use zeromq::RepSocket;
-use crate::schema::document::{DocumentInsertionRequest, DocumentInsertionResponse};
 
 pub async fn process_document_insertion_request(
     worker_socket: &mut RepSocket,
@@ -39,14 +39,11 @@ pub async fn process_document_insertion_request(
 
     debug!("insertion request: {:?}", request);
 
-    let docs_input: Vec<String> = request.input;
-    let doc_urls: Vec<String> = request.doc_urls.unwrap_or(Vec::new());
-
     let document_dto = process_document(
         processing_context,
         embd_req_sender,
-        doc_urls[0].to_string(),
-        docs_input[0].clone().into_bytes().to_vec(),
+        request.doc_url.to_string(),
+        request.input.clone().into_bytes().to_vec(),
     )
     .await
     .unwrap();
@@ -77,16 +74,16 @@ pub async fn process_document_insertion_request(
 pub async fn send_document_insertion_response(
     socket: &mut RepSocket,
     message_header: &mut ZmqMessageHeader,
-    document_dtos: &DocumentDto,
+    document_dto: &DocumentDto,
     verbose: bool,
 ) {
     let response = DocumentInsertionResponse {
         status: DocumentInsertionStatus::Success,
-        documents: if verbose {
-            Some(vec![document_dtos.clone()])
+        document: if verbose {
+            Some(document_dto.clone())
         } else {
             None
-        }
+        },
     };
     zmq_utils::send_success_response(socket, response, message_header).await;
 }
