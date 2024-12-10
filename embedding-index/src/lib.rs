@@ -100,7 +100,7 @@ pub async fn initialize_index_from_db(
         }
     }
     if let Err(e) = split_index
-        .add_batch(&split_embeddings, &split_labels)
+        .upsert_batch(&split_embeddings, &split_labels)
         .await
     {
         error!("Failed to add split embeddings: {}", e);
@@ -109,7 +109,7 @@ pub async fn initialize_index_from_db(
     }
 
     if let Err(e) = summary_index
-        .add_batch(&summary_embeddings, &summary_labels)
+        .upsert_batch(&summary_embeddings, &summary_labels)
         .await
     {
         error!("Failed to add summary embeddings: {}", e);

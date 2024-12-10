@@ -1,9 +1,10 @@
 use clap::Parser;
 use embedding_common::config::AppConfig;
 use embedding_common::utils::helpers::{create_directory, get_db_dir};
-use embedding_database::prelude::RocksDB;
+use embedding_database::prelude::{put_model, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
-use embedding_index::{initialize_index_from_db};
+use embedding_index::initialize_index_from_db;
+//use embedding_index::save_index;
 use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_server::zmq::server_task::ServerTask;
@@ -44,6 +45,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let (embed, shutdown_sender, handles, model) =
         app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+
+    put_model(&db, &model).await?;
 
     let splitter_max_tokens = if model.n_ctx - 2 <= splitter_config.max_tokens as i32 {
         info!(
@@ -90,11 +93,13 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Create an HNSW index and initialize it from the database
     let split_index = Arc::new(
-        HnswIndex::load_index("splits".to_string(), app_config.index_config.clone()).await?,
+        HnswIndex::async_create_index("splits".to_string(), app_config.index_config.clone())
+            .await?,
     );
 
-    let summary_index =
-        Arc::new(HnswIndex::load_index("summaries".to_string(), app_config.index_config).await?);
+    let summary_index = Arc::new(
+        HnswIndex::async_create_index("summaries".to_string(), app_config.index_config).await?,
+    );
 
     initialize_index_from_db(&db, &split_index, &summary_index).await?;
 
@@ -102,8 +107,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Initialize separate workers for each thread
     for _ in 0..parallel_workers {
-        let mut worker =
-            ServerWorker::init(zmq_config.clone()).await;
+        let mut worker = ServerWorker::init(zmq_config.clone()).await;
         let processing_ctx = Arc::clone(&processing_ctx);
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);
@@ -130,6 +134,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut shutdown = shutdown_sender.subscribe();
     select! {
         _ =  shutdown.recv() => {
+            //save_index(split_index, summary_index).await?;
             info!("Shutting down");
         }
         _ = zeromq::proxy(clients.frontend, clients.backend, None) => {
