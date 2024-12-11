@@ -1,0 +1,141 @@
+image: # Custom image built with docker/Dockerfile.builder
+  name: public.ecr.aws/h7r6l8b8/qimia-ai-dind-aws:latest
+
+stages:
+  - version # Gives a version number
+  - build # Builds and pushes the image to ECR with the version taken from the previous step
+  - deploy # Sets the ECR's latest to the previous step's pushed image, makes a force redeployment of ECS service.
+
+
+variables:
+  AWS_REGION: eu-central-1
+  AWS_PROFILE: oidc
+  DOCKER_TLS_CERTDIR: "/certs"
+
+
+.dev-tags: &dev-tags
+  tags:
+    - gitlab-org-docker
+
+version:
+  stage: version
+  script:
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        echo "$CI_COMMIT_TAG-prod" > .version
+      elif [[ $CI_COMMIT_BRANCH == release/* ]] || [[ $CI_COMMIT_BRANCH == hotfix/* ]]; then
+        echo "$CI_COMMIT_SHORT_SHA-preprod" > .version
+      else
+        echo "$CI_COMMIT_SHORT_SHA" > .version
+      fi
+    - echo done
+  <<: *dev-tags
+  only:
+    - dev
+    - merge_requests
+    - tags
+    - /^release\/.+$/
+    - /^hotfix\/.+$/
+  artifacts:
+    paths:
+      - .version
+
+.aws_init:
+  id_tokens:
+    OIDC_TOKEN:
+      aud: https://gitlab.com
+  before_script: # Authenticate to the AWS Role
+    - mkdir -p ~/.aws
+    - echo "${OIDC_TOKEN}" > /tmp/web_identity_token
+    - echo -e "[profile oidc]\nrole_arn=arn:aws:iam::906856305748:role/dev-qimia-ai-infra\nweb_identity_token_file=/tmp/web_identity_token" > ~/.aws/config
+    - aws sts get-caller-identity
+    - mkdir -p ci_cd/aws/$ENV/
+    - touch ci_cd/aws/$ENV/ci_vars
+
+.build: &build
+  extends: .aws_init
+  stage: build
+  when: manual # Otherwise we write 700MBs to ECR every commit. Which adds up!
+  services:
+    - docker:24.0.6-dind # Make sure we can build docker images within docker images
+  variables:
+    ENV: $CI_ENVIRONMENT_NAME
+  needs:
+    - version
+  script:
+    - touch ci_cd/aws/$ENV/ci_vars
+    - sh ci_cd/aws/build_and_push.sh
+  artifacts:
+    expire_in: 7 days
+    paths:
+      - ./build-artifacts/
+
+build-dev:
+  extends: .build
+  variables:
+      CUDA_VERSION: "$AWS_CUDA_VERSION"
+  environment:
+    name: dev
+  <<: *dev-tags
+  only:
+    - dev
+    - merge_requests
+    - tags
+    - /^release\/.+$/
+    - /^hotfix\/.+$/
+
+build-push-docker-hub:
+  stage: build
+  when: manual
+  parallel:
+      matrix:
+        - CUDA_VERSION:
+            - ""
+            - "11.7.1"
+            - "12.2.2"
+  services:
+    - docker:24.0.6-dind
+  variables:
+    ENV: $CI_ENVIRONMENT_NAME
+  needs:
+    - version
+  script:
+    - sh ci_cd/dockerhub/build_and_push.sh
+  <<: *dev-tags
+  artifacts:
+    expire_in: 7 days
+    paths:
+      - ./build-artifacts/
+  only:
+    - dev
+    - merge_requests
+    - tags
+    - /^release\/.+$/
+    - /^hotfix\/.+$/
+
+.deploy:
+  extends: .aws_init
+  stage: deploy
+  when: manual
+  services:
+    - docker:24.0.6-dind
+  variables:
+    ENV: $CI_ENVIRONMENT_NAME
+    CUDA_VERSION: "$AWS_CUDA_VERSION"
+  script:
+    - source ci_cd/aws/deploy.sh
+
+deploy-dev:
+  extends: .deploy
+  needs:
+    - version
+    - build-dev
+  <<: *dev-tags
+  environment:
+    name: dev
+  only:
+    - dev
+    - /^release\/.+$/
+    - /^hotfix\/.+$/
+    - merge_requests
+    - tags
