@@ -55,14 +55,10 @@ RUN apt-get update && \
 RUN apt-get update && apt-get install -y libgtest-dev
 
 
-RUN if [ "${CUDA_DOCKER_ARCH}" != "default" ]; then \
-    export CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH}"; \
-    fi && \
-    apt-get update && \
-    mkdir -p /usr/src/llama.cpp && \
+RUN mkdir -p /usr/src/llama.cpp && \
     git clone --branch Release_b4153 https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
     cd /usr/src/llama.cpp && \
-    cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . && \
+    cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . && \
     cmake --build build --config Release && \
     cmake --install build --prefix /usr/local/llama
 
