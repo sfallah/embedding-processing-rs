@@ -23,7 +23,7 @@ if [ -z "$CUDA_VERSION" ]
 else
 
     echo "Compiling for CUDA $CUDA_VERSION"
-    REPO_NAME="qimia/embedding-server-candle-cuda"
+    REPO_NAME="qimia/qimia-ai-embedding-cuda"
     docker build --no-cache \
       --build-arg CUDA_VERSION="$CUDA_VERSION" \
       --tag $REPO_NAME:$IMAGE_VERSION \
