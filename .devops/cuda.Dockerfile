@@ -72,6 +72,7 @@ COPY ./embedding-database ./embedding-database
 COPY ./embedding-index ./embedding-index
 COPY ./embedding-processing ./embedding-processing
 COPY ./embedding-server ./embedding-server
+COPY ./.devops/starter.sh ./.devops/starter.sh
 COPY Cargo.toml ./
 COPY Cargo.lock ./
 
@@ -102,7 +103,7 @@ RUN GITLAB_TOKEN=$(cat /gitlab.token) && GITLAB_USERNAME=$(cat /gitlab.username)
 
 COPY --from=planner /usr/src/app/recipe.json recipe.json
 COPY --from=build-deps /usr/local/llama/lib /usr/lib
-COPY --from=build-deps /app/.devops/starter.sh /app/starter.sh
+COPY --from=build-deps /usr/src/app/.devops/starter.sh /app/starter.sh
 
 RUN cargo chef cook --release --no-default-features --recipe-path recipe.json && sccache -s
 
