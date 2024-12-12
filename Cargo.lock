@@ -123,9 +123,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.91"
+version = "1.0.94"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c042108f3ed77fd83760a5fd79b53be043192bb3b9dba91d8c574c0ada7850c8"
+checksum = "c1fd03a028ef38ba2276dce7e33fcd6369c158a1bca17946c4b1b701891c1ff7"
 
 [[package]]
 name = "arraydeque"
@@ -1598,8 +1598,9 @@ checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
 [[package]]
 name = "llama-cxx-rs"
 version = "0.1.0"
-source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git?branch=feat%2Fllama_cpp_release_b3921#ddbec82d7f68f4825f82678cac8794bd11a04ff6"
+source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git?branch=feat%2Fapi-abstraction-b4153_saba#cc260a9ef66e461f5b3b8c1d7dc4bce273462b75"
 dependencies = [
+ "anyhow",
  "cxx",
  "cxx-build",
  "rayon",

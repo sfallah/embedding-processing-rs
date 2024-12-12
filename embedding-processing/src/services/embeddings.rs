@@ -1,5 +1,5 @@
-use crate::inference::llama_context::LlamaContext;
 use std::sync::Arc;
+use llama_cxx_rs::LlamaContext;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::Sender;
 use tracing::{debug, error, info, trace};
@@ -74,8 +74,16 @@ pub async fn async_embeddings_routine(
                     Ok(EmbeddingsRequest {seq_id,n_embd, texts, sender}) => {
                         debug!("Received embeddings request");
                         let ctx = Arc::clone(&ctx);
-                        let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings_flat(&texts)).await {
-                            Ok(embedding) => embedding,
+                        let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings(&texts,false)).await {
+                            Ok(embedding) => {
+                                match embedding {
+                                    Ok(embedding) => embedding,
+                                    Err(e) => {
+                                        error!("Failed to get embeddings: {:?}", e);
+                                        continue;
+                                    }
+                                }
+                            }
                             Err(_) => {
                                 error!("Failed to get embeddings");
                             continue;

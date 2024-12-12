@@ -1,0 +1,5 @@
+.dockerignore
+.git
+.devops/cuda.Dockerfile
+.dockerignore/DOCKER.md
+.dockerignore/Dockerfile
