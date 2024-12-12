@@ -10,7 +10,7 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = "1.0.82"
+anyhow = "1.0.94"
 clap = { version = "4.5.21", features = ["derive"] }
 ctrlc = "3.4.4"
 tracing = "0.1.40"

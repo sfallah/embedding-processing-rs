@@ -1,4 +1,3 @@
-use crate::inference::llama_context::LlamaContext;
 use crate::processing::context::ProcessingContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
 use embedding_common::prelude::Model;
@@ -6,6 +5,7 @@ use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
 use std::ops::Deref;
 use std::sync::Arc;
+use llama_cxx_rs::LlamaContext;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::Level;
@@ -31,7 +31,7 @@ pub async fn init(
 
     let mut embed_handles = Vec::new();
     for _ in 0..embed_workers {
-        let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000));
+        let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000, 4, false)?);
 
         if n_ctx.is_none() {
             n_ctx = Some(model_instance.get_n_ctx());
