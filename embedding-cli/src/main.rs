@@ -81,7 +81,7 @@ async fn run_query(
     //let summaries_index = HnswIndex::load_index("summaries".to_string(), app_config.index_config.clone())?;
 
     let (embed, shutdown, handles, model) =
-        app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+        app_utils::init(model_config.clone()).await?;
 
     let query_embd = async_get_embeddings(
         embed.clone(),

@@ -44,7 +44,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let db = Arc::new(rocksdb);
 
     let (embed, shutdown_sender, handles, model) =
-        app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+        app_utils::init(model_config.clone()).await?;
 
     put_model(&db, &model).await?;
 
