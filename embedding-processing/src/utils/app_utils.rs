@@ -10,10 +10,10 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
+use embedding_common::config::ModelConfig;
 
 pub async fn init(
-    model_path: &str,
-    embed_workers: usize,
+    model_config: ModelConfig,
 ) -> anyhow::Result<(
     Arc<async_channel::Sender<EmbeddingsRequest>>,
     Arc<broadcast::Sender<String>>,
@@ -30,8 +30,8 @@ pub async fn init(
     let mut n_embd = None;
 
     let mut embed_handles = Vec::new();
-    for _ in 0..embed_workers {
-        let model_instance = Arc::new(LlamaContext::new(model_path, 512, 1000, 4, false)?);
+    for _ in 0..model_config.instances {
+        let model_instance = Arc::new(LlamaContext::new(model_config.gguf_file.as_str(), 512, 1000, 4, model_config.verbose)?);
 
         if n_ctx.is_none() {
             n_ctx = Some(model_instance.get_n_ctx());
@@ -54,7 +54,7 @@ pub async fn init(
     let hasher = DeterministicAHasher::new(None, None);
     let model = Model::new(
         &hasher,
-        model_path.to_string(),
+        model_config.gguf_file.clone(),
         n_ctx.unwrap(),
         n_embd.unwrap(),
     );

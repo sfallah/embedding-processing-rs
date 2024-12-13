@@ -16,6 +16,7 @@ gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
 instances = 2
 #cpu = false
 #ngl = 1000
+#verbose = true
 
 [database]
 #rocksdb_dir = "rocksdb_dir"
