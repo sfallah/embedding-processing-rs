@@ -1,2 +1,7 @@
 [net]
 git-fetch-with-cli = true
+
+[env]
+LLAMA_PATH = "/usr/local/llama_b4153"
+LD_LIBRARY_PATH = "${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}"
+DYLD_LIBRARY_PATH = "/usr/local/llama_b4153/lib:${DYLD_LIBRARY_PATH}"

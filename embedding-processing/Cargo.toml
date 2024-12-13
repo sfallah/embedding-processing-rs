@@ -12,20 +12,18 @@ tracing-subscriber = { workspace = true }
 
 ahash = {workspace = true}
 chrono = "0.4.38"
-cxx = "1.0.128"
 async-channel = {workspace = true}
 
 
 fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }
 lexrank-ndarray = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/lexrank-ndarray.git", branch = "main" }
-llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git", branch = "feat/api-abstraction-b4153_saba" }
+llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git", branch = "feat/api-abstraction-b4153" }
 rayon = "1.10.0"
 
 embedding-common = { path = "../embedding-common" }
 
 [dev-dependencies]
 rstest = "0.23.0"
-tempfile = "3.10.1"
 criterion = { version = "0.5.1", features = ["async_tokio"] }
 tokio = { version = "1.41.0", features = ["test-util"] }
 
@@ -35,6 +33,8 @@ harness = false
 
 [features]
 default = []
+cuda = ["llama-cxx-rs/cuda"]
+metal = ["llama-cxx-rs/metal"]
 accelerate = ["lexrank-ndarray/accelerate"]
 blas = ["lexrank-ndarray/blas"]
 mkl = ["lexrank-ndarray/mkl"]
