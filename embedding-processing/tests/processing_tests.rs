@@ -9,6 +9,7 @@ mod tests {
     use rstest::{fixture, rstest};
     use std::sync::Arc;
     use tracing::{debug, Level};
+    use embedding_common::config::ModelConfig;
 
     const MODEL_PATH: &str = "../models/all-minilm-l6-v2-q2_k.gguf";
 
@@ -42,7 +43,8 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_embeddings() -> anyhow::Result<()> {
-        let (embed, shutdown, handles, _model) = init(MODEL_PATH, 1).await?;
+        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
+        let (embed, shutdown, handles, _model) = init(model_config).await?;
 
         let text = "This is a test text".to_string();
         let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
@@ -70,7 +72,8 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_summaries_process(text: String) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 1).await?;
+        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
+        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
         let ctx = init_ctx(512, None, 384, model.model_id).await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
@@ -96,7 +99,8 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_split_process(text: String) -> anyhow::Result<()> {
-        let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
+        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
+        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
         let ctx = init_ctx(512, None, 384, model.model_id).await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
@@ -122,7 +126,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_document_process(#[future] text_from_file: String) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
-        let (embed_sender, shutdown, handles, model) = init(MODEL_PATH, 2).await?;
+        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
+        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
         let ctx = init_ctx(512, None, 384, model.model_id).await;
         let embed_sender = embed_sender.clone();
         let doc = process_document(
