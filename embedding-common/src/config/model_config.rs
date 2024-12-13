@@ -15,6 +15,18 @@ pub struct ModelConfig {
     pub verbose: bool,
 }
 
+impl ModelConfig {
+    pub fn new(gguf_file: String, instances: usize, verbose: bool) -> Self {
+        ModelConfig {
+            gguf_file,
+            cpu: false,
+            instances,
+            ngl: 1000,
+            verbose,
+        }
+    }
+}
+
 fn default_instances() -> usize {
     1
 }

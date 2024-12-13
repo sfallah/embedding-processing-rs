@@ -129,7 +129,7 @@ async fn run_process_docs(
         embedding_cli::file_io::list_files(&file_path, &vec!["txt".to_string()]).await?;
 
     let (embed, shutdown, handles, model) =
-        app_utils::init(&model_config.gguf_file, model_config.instances).await?;
+        app_utils::init(model_config.clone()).await?;
 
     let ctx = init_ctx(
         splitter_config.max_tokens,
