@@ -1,5 +1,5 @@
 [index]
-dimensions = 1024
+dimensions = 384
 scalar_kind = "F16"
 connectivity = 16
 expansion_add = 32
