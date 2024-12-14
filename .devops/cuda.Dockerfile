@@ -1,7 +1,9 @@
 # Base Build Stage
 ARG UBUNTU_VERSION=22.04
 ARG CUDA_VERSION=12.2.2
+ARG LLAMA_CPP_VERSION=b4153
 ARG BASE_CUDA_DEV_CONTAINER=nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION}
+ARG LLAMA_CPP_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 
 FROM ${BASE_CUDA_DEV_CONTAINER} AS base-builder
 
@@ -43,12 +45,19 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /usr/src/llama.cpp && \
-    git clone --branch Release_b4153 https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
+    git clone --branch Release_${LLAMA_CPP_VERSION} https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
     cd /usr/src/llama.cpp && \
     cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
     -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . && \
     cmake --build build --config Release && \
-    cmake --install build --prefix /usr/local/llama
+    cmake --install build --prefix ${LLAMA_CPP_PATH} \
+
+# Planner Stage
+FROM build-deps AS planner
+
+COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
+ENV LLAMA_PATH = "${LLAMA_CPP_PATH}"
+ENV LD_LIBRARY_PATH = "${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}"
 
 # Application Build Stage
 WORKDIR /usr/src/app
