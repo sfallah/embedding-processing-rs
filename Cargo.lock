@@ -1755,7 +1755,7 @@ checksum = "4ee93343901ab17bd981295f2cf0026d4ad018c7c31ba84549a4ddbb47a45104"
 [[package]]
 name = "llama-cxx-rs"
 version = "0.1.0"
-source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git?branch=feat%2Fapi-abstraction-b4153#537cccc8bbfaa3afb839a87cb26357ae6319bdf2"
+source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git?branch=feat%2Fapi-abstraction-b4153#003754f273918f58456d7f36eab4a19ca10fdb5e"
 dependencies = [
  "anyhow",
  "cxx",
