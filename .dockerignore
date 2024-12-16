@@ -3,3 +3,6 @@
 .devops/cuda.Dockerfile
 .dockerignore/DOCKER.md
 .dockerignore/Dockerfile
+models
+ci_cd
+target

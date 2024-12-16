@@ -20,7 +20,7 @@ else
 fi
 
 if [ -z "$3" ]; then
-  CUDA_DOCKER_ARCH="61,75,89"
+  CUDA_DOCKER_ARCH="61"
 else
   CUDA_DOCKER_ARCH="$3"
 fi
