@@ -12,7 +12,7 @@ tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 indexmap = { workspace = true }
 #usearch = { version = "2.16.6", features = ["simsimd", "fp16lib"] }
-usearch = "2.16.6"
+usearch = { version = "2.16.7", default-features = false, features = ["fp16lib"] }
 ndarray = "0.16.1"
 rand = "0.8.5"
 rayon = "1.10.0"
