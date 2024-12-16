@@ -32,9 +32,7 @@ FROM base-builder AS build-deps
 COPY gitlab.token /run/secrets/gitlab.token
 COPY gitlab.username /run/secrets/gitlab.username
 
-RUN --mount=type=secret,id=gitlab_token,required \
-    --mount=type=secret,id=gitlab_username,required \
-    git config --global url."https://$(cat /run/secrets/gitlab.username):$(cat /run/secrets/gitlab.token)@gitlab.com/".insteadOf "https://gitlab.com/"
+RUN git config --global url."https://$(cat /run/secrets/gitlab.username):$(cat /run/secrets/gitlab.token)@gitlab.com/".insteadOf "https://gitlab.com/"
 
 ARG CUDA_DOCKER_ARCH=75
 ENV LD_LIBRARY_PATH=/usr/local/lib

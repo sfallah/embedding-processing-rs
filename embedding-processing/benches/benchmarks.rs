@@ -2,12 +2,14 @@ use criterion::{criterion_main, Criterion};
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::utils::app_utils::{init, init_ctx};
 use std::fs;
+use embedding_common::config::ModelConfig;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
     c.bench_function("embeddings_splits_batch", |b| {
         let rt = tokio::runtime::Runtime::new().unwrap();
+        let model_config = ModelConfig::new("../models/all-minilm-l6-v2-q2_k.gguf".to_string(), 2, false);
         let (embed_sender, _shutdown, _handle, model) = rt
-            .block_on(init("../models/all-minilm-l6-v2-q2_k.gguf", 2))
+            .block_on(init(model_config))
             .unwrap();
         let proc_ctx = rt.block_on(init_ctx(512, None, 384, model.model_id));
         b.to_async(rt).iter(|| {
