@@ -50,7 +50,7 @@ RUN mkdir -p /usr/src/llama.cpp && \
     cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
     -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . && \
     cmake --build build --config Release && \
-    cmake --install build --prefix ${LLAMA_CPP_PATH} \
+    cmake --install build --prefix ${LLAMA_CPP_PATH}
 
 # Planner Stage
 FROM build-deps AS planner
