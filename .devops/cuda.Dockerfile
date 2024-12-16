@@ -59,8 +59,8 @@ RUN mkdir -p /usr/src/llama.cpp && \
 FROM build-deps AS planner
 
 COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
-ENV LLAMA_PATH = "${LLAMA_CPP_PATH}"
-ENV LD_LIBRARY_PATH = "${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}"
+ENV LLAMA_PATH=${LLAMA_CPP_PATH}
+ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
 
 # Application Build Stage
 WORKDIR /usr/src/app
@@ -75,8 +75,8 @@ WORKDIR /usr/src/app
 COPY --from=planner /usr/src/app/recipe.json recipe.json
 COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
 
-ENV LLAMA_PATH = "${LLAMA_CPP_PATH}"
-ENV LD_LIBRARY_PATH = "${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}"
+#ENV LLAMA_PATH ="${LLAMA_CPP_PATH}"
+#ENV LD_LIBRARY_PATH ="${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}"
 
 RUN cargo chef cook --release --no-default-features --recipe-path recipe.json
 
@@ -91,7 +91,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends sse3-support wg
 WORKDIR /usr/src/app
 
 COPY ./.devops/starter.sh .
-COPY --from=builder /usr/src/app/target/release/embedding-server-rs /usr/local/bin/embedding-server-rs
+COPY --from=builder /usr/src/app/target/release/embedding-server /usr/local/bin/embedding-server
 
 EXPOSE 5556
 CMD ["bash", "starter.sh"]

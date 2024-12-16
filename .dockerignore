@@ -6,3 +6,6 @@
 models
 ci_cd
 target
+index_dir
+rocks_db_dir
+.gitlab-ci.yml
