@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eu
 echo "Starting embedding server"
 ls -la /usr/local/bin/embedding-server
 nvidia-smi
