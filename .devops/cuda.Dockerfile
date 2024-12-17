@@ -3,7 +3,8 @@ ARG UBUNTU_VERSION=22.04
 ARG CUDA_VERSION=12.2.2
 ARG BASE_CUDA_DEV_CONTAINER=nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VERSION}
 
-FROM --platform=linux/amd64 ${BASE_CUDA_DEV_CONTAINER} AS base-builder
+
+FROM ${BASE_CUDA_DEV_CONTAINER} AS base-builder
 
 ENV SCCACHE=0.5.4
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache
@@ -11,8 +12,11 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install dependencies
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    build-essential pkg-config libgflags-dev clang openssh-client git curl cmake ninja-build \
+    build-essential cmake clang libclang-dev libjemalloc-dev g++-12 gcc-12 \
+    pkg-config libgflags-dev openssh-client git curl cmake ninja-build \
     libssl-dev python3 sse3-support \
+    && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 \
+    && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install and configure sccache
@@ -34,12 +38,10 @@ RUN git config --global url."https://$(cat /run/secrets/gitlab.username):$(cat /
 
 ARG CUDA_DOCKER_ARCH=75
 ARG LLAMA_CPP_VERSION=b4153
+
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
 ENV LLAMA_CPP_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-
-RUN echo ${LLAMA_CPP_BRANCH}
-RUN echo ${LLAMA_CPP_PATH}
 
 
 # Additional dependencies for Llama build
@@ -59,6 +61,7 @@ RUN mkdir -p /usr/src/llama.cpp && \
 FROM build-deps AS planner
 
 COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
+
 ENV LLAMA_PATH=${LLAMA_CPP_PATH}
 ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
 
@@ -72,11 +75,12 @@ FROM build-deps AS builder
 
 WORKDIR /usr/src/app
 
+ARG LLAMA_CPP_VERSION=b4153
+ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
+ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
+
 COPY --from=planner /usr/src/app/recipe.json recipe.json
 COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
-
-#ENV LLAMA_PATH ="${LLAMA_CPP_PATH}"
-#ENV LD_LIBRARY_PATH ="${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}"
 
 RUN cargo chef cook --release --no-default-features --recipe-path recipe.json
 
@@ -85,13 +89,21 @@ RUN cargo build --release --bin embedding-server --no-default-features
 # Final Runtime Stage
 FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
 
+ARG LLAMA_CPP_VERSION=b4153
+ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
+ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
+
 RUN apt-get update && apt-get install -y --no-install-recommends sse3-support wget libssl-dev libssl3 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 
-COPY ./.devops/starter.sh .
+COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
+
+COPY ./.devops/starter.sh /usr/src/app/starter.sh
 COPY --from=builder /usr/src/app/target/release/embedding-server /usr/local/bin/embedding-server
 
+RUN chmod +x /usr/src/app/starter.sh
+
 EXPOSE 5556
-CMD ["bash", "starter.sh"]
+CMD /usr/src/app/starter.sh
