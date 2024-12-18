@@ -14,7 +14,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential cmake clang libclang-dev libjemalloc-dev g++-12 gcc-12 \
     pkg-config libgflags-dev openssh-client git curl cmake ninja-build \
-    libssl-dev python3 sse3-support \
+    libssl-dev python3 sse3-support libgtest-dev \
     && update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-12 100 \
     && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 \
     && rm -rf /var/lib/apt/lists/*
@@ -39,17 +39,12 @@ ARG LLAMA_CPP_VERSION=b4153
 
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64:${LLAMA_PATH}/lib
-ENV LIBRARY_PATH=${LIBRARY_PATH}:/usr/local/lib:/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64:${LLAMA_PATH}/lib
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLAMA_PATH}/lib
+ENV LIBRARY_PATH=${LIBRARY_PATH}:${LLAMA_PATH}/lib
 
 
 ENV CUDA_ARCH=${CUDA_DOCKER_ARCH}
 
-
-# Additional dependencies for Llama build
-RUN apt-get update && \
-    apt-get install -y libgtest-dev && \
-    rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /usr/src/llama.cpp && \
     git clone --branch ${LLAMA_CPP_BRANCH} https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
@@ -73,6 +68,7 @@ FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
 
 ARG LLAMA_CPP_VERSION=b4153
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLAMA_PATH}/lib
 
 
 WORKDIR /usr/src/app
