@@ -54,7 +54,7 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN cargo build --release --bin embedding-server --verbose
+RUN cargo build --release --bin embedding-server
 
 # Final Runtime Stage
 FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
