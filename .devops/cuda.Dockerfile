@@ -67,7 +67,7 @@ WORKDIR /usr/src/app
 
 ARG LLAMA_CPP_VERSION=b4153
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 
 COPY . .
 COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
@@ -78,9 +78,10 @@ RUN cargo build --release --bin embedding-server
 # Final Runtime Stage
 FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
 
+
 ARG LLAMA_CPP_VERSION=b4153
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 
 
 WORKDIR /usr/src/app
