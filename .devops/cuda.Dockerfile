@@ -28,8 +28,6 @@ RUN curl -fsSL https://github.com/mozilla/sccache/releases/download/v$SCCACHE/sc
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y && \
     cargo install cargo-chef --locked
 
-# Build Dependencies Stage
-FROM base-builder AS build-deps
 
 COPY gitlab.token /run/secrets/gitlab.token
 COPY gitlab.username /run/secrets/gitlab.username
@@ -39,9 +37,11 @@ RUN git config --global url."https://$(cat /run/secrets/gitlab.username):$(cat /
 ARG CUDA_DOCKER_ARCH=75
 ARG LLAMA_CPP_VERSION=b4153
 
-ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/lib:/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64:${LLAMA_PATH}/lib
+ENV LIBRARY_PATH=${LIBRARY_PATH}:/usr/local/lib:/usr/local/cuda/lib64/stubs:/usr/local/cuda/lib64:${LLAMA_PATH}/lib
+
 
 ENV CUDA_ARCH=${CUDA_DOCKER_ARCH}
 
@@ -54,24 +54,16 @@ RUN apt-get update && \
 RUN mkdir -p /usr/src/llama.cpp && \
     git clone --branch ${LLAMA_CPP_BRANCH} https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
     cd /usr/src/llama.cpp && \
-    cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
-    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . && \
+    cmake -GNinja -B build -DGGML_CUDA=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH} . && \
     cmake --build build --config Release && \
     cmake --install build --prefix ${LLAMA_PATH}
 
 
-FROM build-deps AS builder
-
 WORKDIR /usr/src/app
 
 
-ARG LLAMA_CPP_VERSION=b4153
-ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
-
 COPY . .
-COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
-COPY --from=base-builder /usr/local/ /usr/local/
 
 RUN cargo build --release --bin embedding-server
 
@@ -81,15 +73,14 @@ FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
 
 ARG LLAMA_CPP_VERSION=b4153
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
 
 
 WORKDIR /usr/src/app
 
-COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
+COPY --from=base-builder ${LLAMA_PATH} ${LLAMA_PATH}
 
 COPY ./.devops/starter.sh /usr/src/app/starter.sh
-COPY --from=builder /usr/src/app/target/release/ /usr/src/app/target/release/
+COPY --from=base-builder /usr/src/app/target/release/ /usr/src/app/target/release/
 
 RUN chmod +x /usr/src/app/starter.sh
 
