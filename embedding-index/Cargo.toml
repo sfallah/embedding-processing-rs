@@ -11,17 +11,17 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 indexmap = { workspace = true }
-[target.'cfg(not(target_os = "macos"))'.dependencies]
-usearch = { version = "2.16.6", features = ["simsimd", "fp16lib", "openmp"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-usearch = { version = "2.16.7", default-features = false, features = ["fp16lib"] }
-
 ndarray = "0.16.1"
 rand = "0.8.5"
 rayon = "1.10.0"
 embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }
+
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+usearch = { version = "2.16.6", features = ["simsimd", "fp16lib", "openmp"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+usearch = { version = "2.16.7", default-features = false, features = ["fp16lib"] }
 
 [dev-dependencies]
 tempdir = "0.3.7"
