@@ -6,8 +6,8 @@ ARG BASE_CUDA_DEV_CONTAINER=nvidia/cuda:${CUDA_VERSION}-devel-ubuntu${UBUNTU_VER
 
 FROM ${BASE_CUDA_DEV_CONTAINER} AS base-builder
 
-ENV SCCACHE=0.5.4
-ENV RUSTC_WRAPPER=/usr/local/bin/sccache
+#ENV SCCACHE=0.5.4
+#ENV RUSTC_WRAPPER=/usr/local/bin/sccache
 ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install dependencies
@@ -19,14 +19,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 100 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install and configure sccache
-RUN curl -fsSL https://github.com/mozilla/sccache/releases/download/v$SCCACHE/sccache-v$SCCACHE-x86_64-unknown-linux-musl.tar.gz \
-    | tar -xzv --strip-components=1 -C /usr/local/bin sccache-v$SCCACHE-x86_64-unknown-linux-musl/sccache && \
-    chmod +x /usr/local/bin/sccache
-
 # Install Rust and cargo-chef
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y && \
-    cargo install cargo-chef --locked
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 
 
 COPY gitlab.token /run/secrets/gitlab.token
@@ -39,8 +33,8 @@ ARG LLAMA_CPP_VERSION=b4153
 
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLAMA_PATH}/lib
-ENV LIBRARY_PATH=${LIBRARY_PATH}:${LLAMA_PATH}/lib
+ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda-12.2/lib64/stubs:${LLAMA_PATH}/lib
+ENV LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda-12.2/lib64/stubs/:${LLAMA_PATH}/lib
 
 
 ENV CUDA_ARCH=${CUDA_DOCKER_ARCH}
@@ -49,7 +43,7 @@ ENV CUDA_ARCH=${CUDA_DOCKER_ARCH}
 RUN mkdir -p /usr/src/llama.cpp && \
     git clone --branch ${LLAMA_CPP_BRANCH} https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
     cd /usr/src/llama.cpp && \
-    cmake -GNinja -B build -DGGML_CUDA=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
+    cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
     -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH} . && \
     cmake --build build --config Release && \
     cmake --install build --prefix ${LLAMA_PATH}
@@ -60,15 +54,17 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN cargo build --release --bin embedding-server
+RUN cargo build --release --bin embedding-server --verbose
 
 # Final Runtime Stage
 FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
 
 
 ARG LLAMA_CPP_VERSION=b4153
+ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLAMA_PATH}/lib
+ENV LD_LIBRARY_PATH=/usr/local/cuda-12.2/lib64/stubs:${LLAMA_PATH}/lib
+ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LLAMA_PATH}/lib
 
 
 WORKDIR /usr/src/app
