@@ -41,7 +41,9 @@ ARG LLAMA_CPP_VERSION=b4153
 
 ENV LD_LIBRARY_PATH=/usr/local/lib
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
-ENV LLAMA_CPP_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
+ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
+
+ENV CUDA_ARCH=${CUDA_DOCKER_ARCH}
 
 
 # Additional dependencies for Llama build
@@ -53,17 +55,20 @@ RUN mkdir -p /usr/src/llama.cpp && \
     git clone --branch ${LLAMA_CPP_BRANCH} https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
     cd /usr/src/llama.cpp && \
     cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF \
-    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . && \
+    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH} -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined . && \
     cmake --build build --config Release && \
-    cmake --install build --prefix ${LLAMA_CPP_PATH}
+    cmake --install build --prefix ${LLAMA_PATH}
 
 # Planner Stage
 FROM build-deps AS planner
 
-COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
-
-ENV LLAMA_PATH=${LLAMA_CPP_PATH}
+ARG LLAMA_CPP_VERSION=b4153
+ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
+
+COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
+
+
 
 # Application Build Stage
 WORKDIR /usr/src/app
@@ -80,11 +85,11 @@ ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
 
 COPY --from=planner /usr/src/app/recipe.json recipe.json
-COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
+COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
 
 RUN cargo chef cook --release --no-default-features --recipe-path recipe.json
 
-RUN cargo build --release --bin embedding-server --no-default-features
+RUN cargo build --release --no-default-features
 
 # Final Runtime Stage
 FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
@@ -93,15 +98,13 @@ ARG LLAMA_CPP_VERSION=b4153
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
 
-RUN apt-get update && apt-get install -y --no-install-recommends sse3-support wget libssl-dev libssl3 ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/app
 
-COPY --from=build-deps ${LLAMA_CPP_PATH} ${LLAMA_CPP_PATH}
+COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
 
 COPY ./.devops/starter.sh /usr/src/app/starter.sh
-COPY --from=builder /usr/src/app/target/release/embedding-server /usr/local/bin/embedding-server
+COPY --from=builder /usr/src/app/target/release/embedding-cli /usr/local/bin/embedding-cli
 
 RUN chmod +x /usr/src/app/starter.sh
 
