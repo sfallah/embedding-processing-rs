@@ -16,6 +16,7 @@ use tracing::{error, info};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
+    error!("Starting up");
     // Parse command line arguments
     let args = ServerArgs::parse();
 
