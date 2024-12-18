@@ -59,37 +59,21 @@ RUN mkdir -p /usr/src/llama.cpp && \
     cmake --build build --config Release && \
     cmake --install build --prefix ${LLAMA_PATH}
 
-# Planner Stage
-FROM build-deps AS planner
-
-ARG LLAMA_CPP_VERSION=b4153
-ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
-
-COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
-
-
-
-# Application Build Stage
-WORKDIR /usr/src/app
-
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
 
 FROM build-deps AS builder
 
 WORKDIR /usr/src/app
 
+
 ARG LLAMA_CPP_VERSION=b4153
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
 
-COPY --from=planner /usr/src/app/recipe.json recipe.json
+COPY . .
 COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
+COPY --from=base-builder /usr/local/ /usr/local/
 
-RUN cargo chef cook --release --no-default-features --recipe-path recipe.json
-
-RUN cargo build --release --no-default-features
+RUN cargo build --release --bin embedding-server
 
 # Final Runtime Stage
 FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
@@ -104,7 +88,7 @@ WORKDIR /usr/src/app
 COPY --from=build-deps ${LLAMA_PATH} ${LLAMA_PATH}
 
 COPY ./.devops/starter.sh /usr/src/app/starter.sh
-COPY --from=builder /usr/src/app/target/release/embedding-cli /usr/local/bin/embedding-cli
+COPY --from=builder /usr/src/app/target/release/ /usr/src/app/target/release/
 
 RUN chmod +x /usr/src/app/starter.sh
 
