@@ -1,10 +1,11 @@
 
 fn main() {
 
-    //#[cfg(target_os = "linux")]
-    {
-        println!("cargo:rustc-link-search=/usr/local/cuda/lib64/stubs");
-        println!("cargo:rustc-link-lib=cuda");
-    }
+    let lib_path = "/usr/local/cuda-12.2/lib64/stubs";
+    // Add the library path to the linker search path
+    println!("cargo:rustc-link-search=native={}", lib_path);
+
+    // Add the library to the rpath
+    println!("cargo:rustc-link-arg=-Wl,--allow-shlib-undefined");
     
 }

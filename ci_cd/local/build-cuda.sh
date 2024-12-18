@@ -30,7 +30,7 @@ echo "Using CUDA_DOCKER_ARCH = $CUDA_DOCKER_ARCH"
 GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
 IMAGE_VERSION="$IMAGE_BRANCH"-"$GIT_COMMIT_ID"
 
-docker build \
+docker build --no-cache \
   --build-arg CUDA_VERSION="$CUDA_VERSION" \
   --build-arg CUDA_DOCKER_ARCH="$CUDA_DOCKER_ARCH" \
   -t qimia/qimia-ai-embedding-cuda-"$CUDA_VERSION":"$IMAGE_VERSION" \
