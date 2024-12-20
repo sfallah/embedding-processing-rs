@@ -33,8 +33,7 @@ ARG LLAMA_CPP_VERSION=b4153
 
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda-12.2/lib64/stubs:${LLAMA_PATH}/lib
-ENV LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda-12.2/lib64/stubs/:${LLAMA_PATH}/lib
+ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLAMA_PATH}/lib
 
 
 ENV CUDA_ARCH=${CUDA_DOCKER_ARCH}
@@ -49,30 +48,22 @@ RUN mkdir -p /usr/src/llama.cpp && \
     cmake --install build --prefix ${LLAMA_PATH}
 
 
+# Final Runtime Stage
+FROM base-builder AS runtime
+
 WORKDIR /usr/src/app
 
 
 COPY . .
-
-RUN cargo build --release --bin embedding-server
-
-# Final Runtime Stage
-FROM ${BASE_CUDA_DEV_CONTAINER} AS runtime
-
-
-ARG LLAMA_CPP_VERSION=b4153
-ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
-ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
-ENV LD_LIBRARY_PATH=/usr/local/cuda-12.2/lib64/stubs:${LLAMA_PATH}/lib
-ENV LIBRARY_PATH=/usr/local/cuda/lib64/stubs:${LLAMA_PATH}/lib
 
 
 WORKDIR /usr/src/app
 
 COPY --from=base-builder ${LLAMA_PATH} ${LLAMA_PATH}
 
+RUN cargo build --release --bin embedding-server
+
 COPY ./.devops/starter.sh /usr/src/app/starter.sh
-COPY --from=base-builder /usr/src/app/target/release/ /usr/src/app/target/release/
 
 RUN chmod +x /usr/src/app/starter.sh
 

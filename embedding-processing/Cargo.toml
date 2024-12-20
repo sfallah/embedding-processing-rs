@@ -17,7 +17,7 @@ async-channel = {workspace = true}
 
 fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }
 lexrank-ndarray = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/lexrank-ndarray.git", branch = "main" }
-llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git", branch = "feat/api-abstraction-b4153" }
+llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git", branch = "feat/api-abstraction-b4153_saba3" }
 rayon = "1.10.0"
 
 embedding-common = { path = "../embedding-common" }
