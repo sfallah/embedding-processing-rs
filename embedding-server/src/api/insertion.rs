@@ -5,7 +5,7 @@ use crate::utils::zmq_utils;
 use crate::utils::zmq_utils::send_exception_response;
 use async_channel::Sender;
 use embedding_common::prelude::*;
-use embedding_database::prelude::{save_doc, RocksDB};
+use embedding_database::prelude::{save_doc, check_document_exists, RocksDB};
 use embedding_index::add_to_indices;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
@@ -38,6 +38,19 @@ pub async fn process_document_insertion_request(
     }
 
     debug!("insertion request: {:?}", request);
+
+    if request.override_doc.is_some_and(|val| !val) {
+        let doc_id = processing_context.hasher.hash(&request.doc_url);
+        let exists = check_document_exists(db, doc_id)
+        .await
+        .expect("Failed to check document exists");
+        if exists {
+            let error_message = format!("Document with {:?} id already exists", doc_id);
+            error!("{}", &error_message);
+            send_exception_response(worker_socket, &error_message, message_header).await;
+            return;
+        }
+    }
 
     let document_dto = process_document(
         processing_context,

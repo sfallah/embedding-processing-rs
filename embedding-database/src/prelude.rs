@@ -4,6 +4,7 @@ pub use crate::db::rocksdb_impl::RocksDB;
 pub use crate::services::doc_service::delete_doc_full;
 pub use crate::services::doc_service::get_full_doc;
 pub use crate::services::doc_service::save_doc;
+pub use crate::services::doc_service::check_document_exists;
 pub use crate::services::embedding_service::get_all_embeddings;
 pub use crate::services::embedding_service::get_embedding_full;
 pub use crate::services::embedding_user_service::has_embedding_user;

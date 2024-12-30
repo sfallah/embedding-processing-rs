@@ -144,6 +144,22 @@ impl RocksDB {
         Ok(value)
     }
 
+    pub async fn key_may_exist(&self, cf: ColumnFamilyType, key: &u64) -> Result<bool> {
+        let key_bytes = Self::key_to_bytes(key);
+        let db = self.db.clone();
+        let cf_name = cf.name().to_string();
+        let cf_name_clone = cf_name.clone();
+
+        debug!("Getting key: {} from cf: {}", key, cf_name_clone);
+
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        let value = db.key_may_exist_cf(&cf, &key_bytes);
+        debug!("Key has been found: {} from cf: {}", key, cf_name_clone);
+        Ok(value)
+    }
+
     /// Asynchronously retrieves all values from the specified cf.
     pub async fn get_all(&self, cf: ColumnFamilyType) -> Result<Vec<Vec<u8>>> {
         let db = self.db.clone();
