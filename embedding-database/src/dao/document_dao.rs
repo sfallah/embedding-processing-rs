@@ -1,6 +1,6 @@
 use crate::db::column_families::ColumnFamilyType;
 use crate::db::rocksdb_impl::RocksDB;
-use anyhow::anyhow;
+use anyhow::{anyhow, Ok};
 use embedding_common::prelude::*;
 use std::sync::Arc;
 
@@ -28,6 +28,15 @@ pub async fn get_document(
         }
         None => Ok(None),
     }
+}
+
+/// Retrieves a `Document` by its ID.
+pub async fn document_exists(
+    db: &Arc<RocksDB>,
+    document_id: &u64,
+) -> anyhow::Result<bool> {
+    let doc_exists = db.key_may_exist(ColumnFamilyType::Documents, document_id).await?;
+    Ok(doc_exists)
 }
 
 pub async fn delete_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Result<()> {

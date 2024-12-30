@@ -20,6 +20,7 @@ pub async fn send_exception_response(
     error_message: &str,
     message_header: &mut ZmqMessageHeader,
 ) {
+    message_header.set_error(Some(error_message.to_string()), None);
     let buf = message_header
         .pack()
         .expect("Failed to pack message header");
