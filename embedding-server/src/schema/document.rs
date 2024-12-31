@@ -12,8 +12,8 @@ pub struct DocumentInsertionRequest {
     pub input: String,
     /// model name for generating the embeddings.
     pub model: String,
-    /// optional UUID of the user making the request.
-    pub user: Option<Uuid>,
+    /// UUID of the user making the request.
+    pub user: Uuid,
     /// document url data string to be saved.
     pub doc_url: String,
     /// optional boolean for overriding existing document.

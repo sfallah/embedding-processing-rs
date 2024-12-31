@@ -5,18 +5,20 @@ use crate::services::embeddings::EmbeddingsRequest;
 use embedding_common::dtos::document_dto::DocumentDto;
 use std::sync::Arc;
 use tracing::trace;
+use uuid::Uuid;
 
 #[tracing::instrument(skip(ctx, embed_sender, text))]
 pub async fn process_document(
     ctx: Arc<ProcessingContext>,
     embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
     url: String,
+    workspace: Uuid,
     text: Vec<u8>,
 ) -> anyhow::Result<DocumentDto> {
     let splits = split_text(ctx.splitter.clone(), text).await?;
 
     let mut split_dtos: Vec<_> = Vec::new();
-    let doc_id = ctx.clone().hasher.hash(&url);
+    let doc_id = ctx.clone().hasher.hash(&format!("{}{}", url, workspace.to_string()));
     trace!("Document ID: {}", doc_id);
 
     //let mut handles = Vec::new();

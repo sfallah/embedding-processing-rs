@@ -13,7 +13,6 @@ use embedding_processing::processing::documents::process_document;
 use embedding_processing::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
 use tracing::{debug, error, info};
-use uuid::Uuid;
 use zeromq::RepSocket;
 
 pub async fn process_document_insertion_request(
@@ -56,12 +55,13 @@ pub async fn process_document_insertion_request(
         processing_context,
         embd_req_sender,
         request.doc_url.to_string(),
+        request.user.clone(),
         request.input.clone().into_bytes().to_vec(),
     )
     .await
     .unwrap();
 
-    let user_id = request.user.unwrap_or(Uuid::new_v4());
+    let user_id = request.user;
     debug!("User ID: {}", user_id);
 
     save_doc(db, &document_dto, user_id)

@@ -178,6 +178,7 @@ async fn process_doc(
         ctx.clone(),
         embed.clone(),
         file_path.to_string_lossy().to_string(),
+        user_id,
         doc.into_bytes().to_vec(),
     )
     .await?;
