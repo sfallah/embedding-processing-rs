@@ -11,6 +11,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 ahash = {workspace = true}
+uuid = {workspace = true}
 chrono = "0.4.38"
 async-channel = {workspace = true}
 
