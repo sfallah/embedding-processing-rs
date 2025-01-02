@@ -134,7 +134,6 @@ mod tests {
             ctx,
             embed_sender,
             "test_url".to_string(),
-            uuid::Uuid::new_v4(),
             text_from_file.await.as_bytes().to_vec(),
         )
         .await
