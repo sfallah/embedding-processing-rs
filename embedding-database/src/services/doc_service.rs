@@ -1,4 +1,4 @@
-use crate::dao::document_dao::{delete_document, document_exists, get_document, put_document};
+use crate::dao::document_dao::{delete_document, get_document, put_document};
 use crate::db::rocksdb_impl::RocksDB;
 use crate::services::split_service::{delete_split_full, get_splits_full};
 use crate::services::split_service::{save_split};
@@ -24,16 +24,6 @@ pub async fn save_doc(db: &Arc<RocksDB>, dto: &DocumentDto, user_id: Uuid) -> an
         .collect::<anyhow::Result<()>>()?;
     put_document(db, &document).await?;
     Ok(())
-}
-
-pub async fn check_document_exists(
-    db: &Arc<RocksDB>,
-    document_id: u64,
-) -> anyhow::Result<bool> {
-    match document_exists(db, &document_id).await {
-        Ok(result) => Ok(result),
-        Err(e) => Err(anyhow!("Failed to check if document exists: {}", e)),
-    }
 }
 
 pub async fn get_full_doc(

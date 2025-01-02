@@ -16,8 +16,6 @@ pub struct DocumentInsertionRequest {
     pub user: Uuid,
     /// document url data string to be saved.
     pub doc_url: String,
-    /// optional boolean for overriding existing document.
-    pub override_doc: Option<bool>,
     /// optional boolean for detailed response
     pub verbose: Option<bool>,
 }
