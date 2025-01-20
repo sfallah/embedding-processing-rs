@@ -155,4 +155,39 @@ mod tests {
         futures::future::join_all(handles.into_iter()).await;
         Ok(())
     }
+
+
+    #[rstest]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_document_process_short() -> anyhow::Result<()> {
+        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
+        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
+        let ctx = init_ctx(512, None, 384, model.model_id).await; 
+        let embed_sender = embed_sender.clone();
+        let doc = process_document(
+            ctx,
+            embed_sender,
+            "test_url".to_string(),
+            "a a. a a. a".to_string().as_bytes().to_vec(), // Short text to test error handling
+        )
+        .await
+        .expect("Failed to process document");
+
+        //assert_eq!(doc.splits.len(), 11);
+        debug!("{:?}", doc);
+
+        let _sum_texts = doc
+            .splits
+            .iter()
+            .map(|split| split.text_content.clone())
+            .collect::<Vec<_>>();
+        //println!("{}", sum_texts.join("\n"));
+
+        shutdown
+            .send("shutdown".to_string())
+            .expect("Failed to send shutdown signal");
+        futures::future::join_all(handles.into_iter()).await;
+        Ok(())
+    }
+
 }
