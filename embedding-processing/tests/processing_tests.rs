@@ -162,13 +162,14 @@ mod tests {
     async fn test_document_process_short() -> anyhow::Result<()> {
         let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
         let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await; 
+        let ctx = init_ctx(10, None, 384, model.model_id).await; // low max_tokens to test short text
         let embed_sender = embed_sender.clone();
         let doc = process_document(
             ctx,
             embed_sender,
             "test_url".to_string(),
-            "a a. a a. a".to_string().as_bytes().to_vec(), // Short text to test error handling
+            // Short text to test error -> with filter_splits 4, this will test 0 sentences and 1 sentence for 2 splits
+            "a a. a a. a \n\n a a a. a".to_string().as_bytes().to_vec(), 
         )
         .await
         .expect("Failed to process document");
