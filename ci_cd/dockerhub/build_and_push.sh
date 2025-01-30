@@ -13,7 +13,7 @@ if [ -z "$CUDA_VERSION" ]
   then
 
     echo "Compiling for CPU"
-    REPO_NAME="qimia/qimia-ai-embedding-server"
+    REPO_NAME="qimia/embedding-server-rs"
 
     docker build --no-cache \
       --build-arg LLAMA_AVX512=OFF \
@@ -24,7 +24,7 @@ if [ -z "$CUDA_VERSION" ]
 else
 
     echo "Compiling for CUDA $CUDA_VERSION"
-    REPO_NAME="qimia/qimia-ai-embedding-cuda"
+    REPO_NAME="qimia/embedding-server-rs-cuda"
     docker build --no-cache \
       --build-arg CUDA_VERSION="$CUDA_VERSION" \
       --build-arg CI_JOB_TOKEN="$CI_JOB_TOKEN" \
