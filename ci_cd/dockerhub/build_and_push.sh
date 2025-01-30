@@ -17,6 +17,7 @@ if [ -z "$CUDA_VERSION" ]
 
     docker build --no-cache \
       --build-arg LLAMA_AVX512=OFF \
+      --build-arg CI_JOB_TOKEN="$CI_JOB_TOKEN" \
       --tag $REPO_NAME:$IMAGE_VERSION \
       -f .devops/Dockerfile .
 
@@ -26,6 +27,7 @@ else
     REPO_NAME="qimia/qimia-ai-embedding-cuda"
     docker build --no-cache \
       --build-arg CUDA_VERSION="$CUDA_VERSION" \
+      --build-arg CI_JOB_TOKEN="$CI_JOB_TOKEN" \
       --tag $REPO_NAME:$IMAGE_VERSION \
       -f .devops/cuda.Dockerfile .
 fi
