@@ -22,6 +22,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 # Install Rust and cargo-chef
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 
+ARG GITLAB_TOKEN
 
 #COPY gitlab.token /run/secrets/gitlab.token
 #COPY gitlab.username /run/secrets/gitlab.username
