@@ -1,3 +1,4 @@
+#!/bin/bash
 set -eu;
 
 IMAGE_VERSION=$(git rev-parse --short=8 HEAD)
