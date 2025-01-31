@@ -2,7 +2,7 @@
 dimensions = 384
 scalar_kind = "F16"
 connectivity = 16
-expansion_add = 32
+expansion_add = 200
 expansion_search = 32
 metric_kind = "Cos"
 
