@@ -21,3 +21,5 @@ index_dir/
 *.gguf
 gitlab.token
 gitlab.username
+
+.env
