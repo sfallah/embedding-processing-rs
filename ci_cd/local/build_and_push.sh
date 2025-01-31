@@ -17,6 +17,8 @@ echo "Using DockerHub user: $DOCKERHUB_USER"
 
 docker login -u "$DOCKERHUB_USER" -p "$DOCKERHUB_PAT"
 
+CUDA_DOCKER_ARCH="${CUDA_DOCKER_ARCH:-default}"
+
 # Default to '12.2.2' if CUDA_VERSION is not set
 CUDA_VERSION="${CUDA_VERSION:-12.2.2}"
 echo "Using CUDA version: $CUDA_VERSION"
