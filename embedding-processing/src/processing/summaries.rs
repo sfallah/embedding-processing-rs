@@ -22,6 +22,10 @@ pub async fn process_summaries(
     let sentences: Vec<_> = utils::splits_texts(&splits);
     trace!("Number of sentences: {}", sentences.len());
 
+    if sentences.len() == 0 {
+        return Ok(Vec::new());
+    }
+
     let embeddings = async_get_embeddings(embed_sender.clone(), &sentences, ctx.n_embd).await?;
 
     let lx_ranks =
