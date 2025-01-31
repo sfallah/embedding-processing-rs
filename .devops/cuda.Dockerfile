@@ -29,7 +29,7 @@ ARG CI_JOB_TOKEN
 
 RUN git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
 
-ARG CUDA_DOCKER_ARCH=75
+ARG CUDA_DOCKER_ARCH=89
 ARG LLAMA_CPP_VERSION=b4153
 
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
