@@ -27,7 +27,7 @@ ARG GITLAB_TOKEN
 
 RUN git config --global url."https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
 
-ARG CUDA_DOCKER_ARCH=89
+ARG CUDA_DOCKER_ARCH=default
 ARG LLAMA_CPP_VERSION=b4153
 
 ENV LLAMA_CPP_BRANCH=Release_${LLAMA_CPP_VERSION}
@@ -35,11 +35,13 @@ ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLAMA_PATH}/lib
 
 
-RUN mkdir -p /usr/src/llama.cpp && \
+RUN if [ "${CUDA_DOCKER_ARCH}" != "default" ]; then \
+            export CMAKE_ARGS="-DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH}"; \
+            fi && \
+    mkdir -p /usr/src/llama.cpp && \
     git clone --branch ${LLAMA_CPP_BRANCH} https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
     cd /usr/src/llama.cpp && \
     cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
-    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} . && \
     cmake --build build --config Release && \
     cmake --install build --prefix ${LLAMA_PATH}
 

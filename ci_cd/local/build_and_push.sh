@@ -17,8 +17,6 @@ echo "Using DockerHub user: $DOCKERHUB_USER"
 
 docker login -u "$DOCKERHUB_USER" -p "$DOCKERHUB_PAT"
 
-CUDA_DOCKER_ARCH="${CUDA_DOCKER_ARCH:-default}"
-
 # Default to '12.2.2' if CUDA_VERSION is not set
 CUDA_VERSION="${CUDA_VERSION:-12.2.2}"
 echo "Using CUDA version: $CUDA_VERSION"
@@ -45,12 +43,12 @@ else
 
     echo "Compiling for CUDA $CUDA_VERSION"
     REPO_NAME="qimia/embedding-server-rs-cuda"
-    docker build --no-cache \
+    docker build \
       --build-arg CUDA_VERSION="$CUDA_VERSION" \
       --build-arg GITLAB_USER="$GITLAB_USER" \
       --build-arg GITLAB_TOKEN="$GITLAB_TOKEN" \
       --build-arg CUDA_DOCKER_ARCH="$CUDA_DOCKER_ARCH" \
-      --tag $REPO_NAME:"$IMAGE_VERSION" \
+      --tag $REPO_NAME:"$CUDA_VERSION-$IMAGE_VERSION" \
       -f .devops/cuda.Dockerfile .
 fi
 
