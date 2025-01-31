@@ -22,12 +22,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 # Install Rust and cargo-chef
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 
-ARG CI_JOB_TOKEN
+ARG GITLAB_USER
+ARG GITLAB_TOKEN
 
-#COPY gitlab.token /run/secrets/gitlab.token
-#COPY gitlab.username /run/secrets/gitlab.username
-
-RUN git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
+RUN git config --global url."https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/".insteadOf "https://gitlab.com/"
 
 ARG CUDA_DOCKER_ARCH=89
 ARG LLAMA_CPP_VERSION=b4153
@@ -37,14 +35,11 @@ ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 ENV LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${LLAMA_PATH}/lib
 
 
-ENV CUDA_ARCH=${CUDA_DOCKER_ARCH}
-
-
 RUN mkdir -p /usr/src/llama.cpp && \
     git clone --branch ${LLAMA_CPP_BRANCH} https://gitlab.com/qimiaio/qimia-ai-dev/llama.cpp.git /usr/src/llama.cpp && \
     cd /usr/src/llama.cpp && \
     cmake -GNinja -B build -DGGML_CUDA=ON -DBUILD_SHARED_LIBS=ON -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
-    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCH} . && \
+    -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} . && \
     cmake --build build --config Release && \
     cmake --install build --prefix ${LLAMA_PATH}
 

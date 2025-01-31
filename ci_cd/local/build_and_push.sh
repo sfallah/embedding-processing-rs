@@ -1,34 +1,58 @@
-#!/bin/bash
-set -e
+set -eu;
 
-docker login
+IMAGE_VERSION=$(git rev-parse --short=8 HEAD)
+echo "Image version  $IMAGE_VERSION"
 
-if [ -z "$1" ]; then
-  IMAGE_BRANCH="dev"
-  echo "Using default branch dev"
-else
-  IMAGE_BRANCH="$1"
-  echo "Using branch $IMAGE_BRANCH"
+# Load environment variables from .env file (if exists)
+if [ -f .env ]; then
+  set -a  # Auto-export variables
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+  echo "Loaded environment variables from .env file"
 fi
 
-GIT_COMMIT_ID=$(git rev-parse --short=8 HEAD)
-IMAGE_VERSION="$IMAGE_BRANCH"-"$GIT_COMMIT_ID"
+echo "Using DockerHub user: $DOCKERHUB_USER"
 
-docker build \
-  -t qimia/llama-zmq-server-base:"$IMAGE_VERSION" \
-  -t qimia/llama-zmq-server-base:"$IMAGE_BRANCH"-latest \
-  -f .devops/zmq-server-base.Dockerfile .
+docker login -u "$DOCKERHUB_USER" -p "$DOCKERHUB_PAT"
 
-docker push qimia/llama-zmq-server-base:"$IMAGE_VERSION"
-docker push qimia/llama-zmq-server-base:"$IMAGE_BRANCH"-latest
+CUDA_DOCKER_ARCH="${CUDA_DOCKER_ARCH:-default}"
 
-docker build \
-  --build-arg LLAMA_BASE_VERSION="$IMAGE_VERSION" \
-  --build-arg LLAMA_AVX512=OFF \
-  -t qimia/llama-zmq-server:"$IMAGE_VERSION" \
-  -t qimia/llama-zmq-server:"$IMAGE_BRANCH"-latest \
-  -f .devops/llama-zmq-server.Dockerfile .
+# Default to '12.2.2' if CUDA_VERSION is not set
+CUDA_VERSION="${CUDA_VERSION:-12.2.2}"
+echo "Using CUDA version: $CUDA_VERSION"
 
-docker push qimia/llama-zmq-server:"$IMAGE_VERSION"
-docker push qimia/llama-zmq-server:"$IMAGE_BRANCH"-latest
+GITLAB_USER="${GITLAB_USER:-gitlab-ci-token}"
+echo "Using Gitlab user: $GITLAB_USER"
 
+GITLAB_TOKEN="${GITLAB_TOKEN:-$CI_JOB_TOKEN}"
+
+if [ -z "$CUDA_VERSION" ]
+  then
+
+    echo "Compiling for CPU"
+    REPO_NAME="qimia/embedding-server-rs"
+
+    docker build --no-cache \
+      --build-arg LLAMA_AVX512=OFF \
+      --build-arg GITLAB_USER="$GITLAB_USER" \
+      --build-arg GITLAB_TOKEN="$GITLAB_TOKEN" \
+      --tag $REPO_NAME:"$IMAGE_VERSION" \
+      -f .devops/Dockerfile .
+
+else
+
+    echo "Compiling for CUDA $CUDA_VERSION"
+    REPO_NAME="qimia/embedding-server-rs-cuda"
+    docker build --no-cache \
+      --build-arg CUDA_VERSION="$CUDA_VERSION" \
+      --build-arg GITLAB_USER="$GITLAB_USER" \
+      --build-arg GITLAB_TOKEN="$GITLAB_TOKEN" \
+      --build-arg CUDA_DOCKER_ARCH="$CUDA_DOCKER_ARCH" \
+      --tag $REPO_NAME:"$IMAGE_VERSION" \
+      -f .devops/cuda.Dockerfile .
+fi
+
+IMAGE_URI="$REPO_NAME:$IMAGE_VERSION"
+echo "Pushing to $IMAGE_URI"
+docker push "$IMAGE_URI"
