@@ -54,6 +54,6 @@ else
       -f .devops/cuda.Dockerfile .
 fi
 
-IMAGE_URI="$REPO_NAME:$IMAGE_VERSION"
+IMAGE_URI=$REPO_NAME:"$CUDA_VERSION-$IMAGE_VERSION"
 echo "Pushing to $IMAGE_URI"
 docker push "$IMAGE_URI"
