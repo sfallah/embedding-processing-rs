@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use llama_cxx_rs::LlamaContext;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::Sender;
@@ -57,7 +57,7 @@ unsafe impl Send for EmbeddingsResponse {}
 
 #[tracing::instrument(skip(ctx, receiver, shutdown))]
 pub async fn async_embeddings_routine(
-    ctx: Arc<LlamaContext>,
+    ctx: Arc<Mutex<LlamaContext>>,
     receiver: async_channel::Receiver<EmbeddingsRequest>,
     mut shutdown: Receiver<String>,
 ) {
@@ -74,7 +74,7 @@ pub async fn async_embeddings_routine(
                     Ok(EmbeddingsRequest {seq_id,n_embd, texts, sender}) => {
                         debug!("Received embeddings request");
                         let ctx = Arc::clone(&ctx);
-                        let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings(&texts,false)).await {
+                        let embeddings = match tokio::task::spawn_blocking(move || ctx.lock().unwrap().get_embeddings(&texts,false)).await {
                             Ok(embedding) => {
                                 match embedding {
                                     Ok(embedding) => embedding,

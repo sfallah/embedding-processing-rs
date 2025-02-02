@@ -4,7 +4,7 @@ use embedding_common::prelude::Model;
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use llama_cxx_rs::LlamaContext;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
@@ -31,15 +31,16 @@ pub async fn init(
 
     let mut embed_handles = Vec::new();
     for _ in 0..model_config.instances {
-        let model_instance = Arc::new(LlamaContext::new(model_config.gguf_file.as_str(), 512, 1000, 4, model_config.verbose)?);
+        let llama = LlamaContext::new(model_config.gguf_file.as_str(), 512, 1000, 4, model_config.verbose)?;
 
         if n_ctx.is_none() {
-            n_ctx = Some(model_instance.get_n_ctx());
-            n_embd = Some(model_instance.get_n_embd());
+            n_ctx = Some(llama.get_n_ctx());
+            n_embd = Some(llama.get_n_embd());
         }
 
         let embedding_receiver = embedding_receiver.clone();
         let shutdown_receiver = shutdown_receiver.clone();
+        let model_instance = Arc::new(Mutex::new(llama));
         let embed_handle = tokio::spawn(async move {
             async_embeddings_routine(
                 model_instance,
