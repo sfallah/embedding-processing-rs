@@ -10,15 +10,13 @@ futures = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-ahash = {workspace = true}
-chrono = "0.4.38"
 async-channel = {workspace = true}
 
 
 fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }
 lexrank-ndarray = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/lexrank-ndarray.git", branch = "main" }
-llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git", branch = "feat/release_b4570" }
-rayon = "1.10.0"
+llama-cpp-sys = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git", package = "llama-cpp-sys", branch = "llama.cpp_b4574_2025-01-28" }
+llama-cpp = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git", package = "llama-cpp", branch = "llama.cpp_b4574_2025-01-28" }
 
 embedding-common = { path = "../embedding-common" }
 
@@ -33,8 +31,8 @@ harness = false
 
 [features]
 default = []
-cuda = ["llama-cxx-rs/cuda"]
-metal = ["llama-cxx-rs/metal"]
+cuda = [ "llama-cpp/cuda", "llama-cpp-sys/cuda"]
+metal = ["llama-cpp/metal", "llama-cpp-sys/metal"]
 accelerate = ["lexrank-ndarray/accelerate"]
 blas = ["lexrank-ndarray/blas"]
 mkl = ["lexrank-ndarray/mkl"]
