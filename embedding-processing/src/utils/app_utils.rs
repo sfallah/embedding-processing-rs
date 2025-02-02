@@ -1,16 +1,22 @@
 use crate::processing::context::ProcessingContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
+use anyhow::Context;
+use embedding_common::config::ModelConfig;
 use embedding_common::prelude::Model;
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
-use std::ops::Deref;
-use std::sync::Arc;
+use llama_cpp::context::params::LlamaContextParams;
+use llama_cpp::llama_backend::LlamaBackend;
+use llama_cpp::model::params::LlamaModelParams;
+use llama_cpp::model::LlamaModel;
 use llama_cxx_rs::LlamaContext;
+use std::ops::Deref;
+use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use embedding_common::config::ModelConfig;
 
 pub async fn init(
     model_config: ModelConfig,
@@ -26,23 +32,30 @@ pub async fn init(
     let shutdown_receiver = Arc::new(shutdown_receiver);
     let shutdown_sender = Arc::new(shutdown_sender);
 
-    let mut n_ctx = None;
-    let mut n_embd = None;
-
     let mut embed_handles = Vec::new();
     for _ in 0..model_config.instances {
-        let model_instance = Arc::new(LlamaContext::new(model_config.gguf_file.as_str(), 512, 1000, 4, model_config.verbose)?);
+        let backend = LlamaBackend::init()?;
+        // offload all layers to the gpu
+        #[cfg(any(feature = "cuda", feature = "vulkan"))]
+        let model_params = LlamaModelParams::default().with_n_gpu_layers(1000);
+        #[cfg(not(any(feature = "cuda", feature = "vulkan")))]
+        let model_params = LlamaModelParams::default();
 
-        if n_ctx.is_none() {
-            n_ctx = Some(model_instance.get_n_ctx());
-            n_embd = Some(model_instance.get_n_embd());
-        }
+        let model_path: PathBuf = model_config.gguf_file.clone().into();
+
+        let model = LlamaModel::load_from_file(&backend, model_path, &model_params)
+            .with_context(|| "unable to load model")?;
+
+        let n_ctx = model.n_ctx_train() as usize;
+        let n_embd = Some(model.n_embd());
 
         let embedding_receiver = embedding_receiver.clone();
         let shutdown_receiver = shutdown_receiver.clone();
         let embed_handle = tokio::spawn(async move {
             async_embeddings_routine(
-                model_instance,
+                Arc::new(backend),
+                Arc::new(model),
+                model_config.clone(),
                 embedding_receiver,
                 shutdown_receiver.deref().resubscribe(),
             )
@@ -55,7 +68,7 @@ pub async fn init(
     let model = Model::new(
         &hasher,
         model_config.gguf_file.clone(),
-        n_ctx.unwrap(),
+        n_ctx ,
         n_embd.unwrap(),
     );
     let model = Arc::new(model);

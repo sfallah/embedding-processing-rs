@@ -1,8 +1,16 @@
-use std::sync::Arc;
-use llama_cxx_rs::LlamaContext;
+use std::ops::Deref;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use anyhow::Context;
+use llama_cpp::context::params::LlamaContextParams;
+use llama_cpp::llama_backend::LlamaBackend;
+use llama_cpp::llama_batch::LlamaBatch;
+use llama_cpp::model::{AddBos, LlamaModel};
+use llama_cpp::model::params::LlamaModelParams;
 use tokio::sync::broadcast::Receiver;
 use tokio::sync::oneshot::Sender;
 use tracing::{debug, error, info, trace};
+use embedding_common::config::ModelConfig;
 
 #[derive(Debug)]
 pub struct EmbeddingsRequest {
@@ -57,11 +65,34 @@ unsafe impl Send for EmbeddingsResponse {}
 
 #[tracing::instrument(skip(ctx, receiver, shutdown))]
 pub async fn async_embeddings_routine(
-    ctx: Arc<LlamaContext>,
+    backend: Arc<LlamaBackend>,
+    model: Arc<LlamaModel>,
+    model_config: ModelConfig,
     receiver: async_channel::Receiver<EmbeddingsRequest>,
     mut shutdown: Receiver<String>,
 ) {
     info!("Starting routine");
+
+
+    // initialize the context
+    let ctx_params = LlamaContextParams::default()
+        .with_n_threads_batch(std::thread::available_parallelism()?.get().try_into()?)
+        .with_n_batch(512)
+        .with_n_ubatch(512)
+        .with_n_ctx(Some(512.into()))
+        .with_embeddings(true);
+
+    let mut ctx = model
+        .new_context(&backend, ctx_params)
+        .with_context(|| "unable to create the llama_context")?;
+
+    let n_ctx = ctx.n_ctx() as usize;
+    let n_ctx_train = model.n_ctx_train();
+    let mut batch = LlamaBatch::new(n_ctx, 1);
+
+    let ctx = Arc::new(Mutex::new(ctx));
+    let batch = Arc::new(batch);
+
     loop {
         debug!("Waiting for requests.....");
         tokio::select! {
@@ -74,7 +105,41 @@ pub async fn async_embeddings_routine(
                     Ok(EmbeddingsRequest {seq_id,n_embd, texts, sender}) => {
                         debug!("Received embeddings request");
                         let ctx = Arc::clone(&ctx);
-                        let embeddings = match tokio::task::spawn_blocking(move || ctx.get_embeddings(&texts,false)).await {
+                        let embeddings = match tokio::task::spawn_blocking(move || {
+                            let prompt_lines = texts.iter();
+                            let tokens_lines_list = prompt_lines
+                                .map(|line| model.str_to_token(line, AddBos::Always))
+                                .collect::<Result<Vec<_>, _>>()
+                                .with_context(|| format!("failed to tokenize {prompt}"))?;
+                            if tokens_lines_list.iter().any(|tok| n_ctx < tok.len()) {
+                                error!("Token length exceeds n_ctx")
+                            }
+                                let mut max_seq_id_batch = 0;
+                                let mut output = Vec::with_capacity(tokens_lines_list.len());
+                                for tokens in &tokens_lines_list {
+                                    if batch.n_tokens() as usize + tokens.len() > n_ctx {
+                                        ctx.clear_kv_cache();
+    ctx.decode(batch).with_context(|| "llama_decode() failed")?;
+
+    for i in 0..s_batch {
+        let embedding = ctx
+            .embeddings_seq_ith(i)
+            .with_context(|| "Failed to get embeddings")?;
+        let output_embeddings = if normalise {
+            normalize(embedding)
+        } else {
+            embedding.to_vec()
+        };
+
+        output.push(output_embeddings);
+    }
+
+    batch.clear();
+                                    }
+                                }
+
+
+                        }).await {
                             Ok(embedding) => {
                                 match embedding {
                                     Ok(embedding) => embedding,
