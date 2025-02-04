@@ -1,0 +1,21 @@
+[package]
+name = "embedding-model"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+llama-cpp = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git", package = "llama-cpp", branch = "llama.cpp_b4574_2025-01-28" }
+anyhow = "1.0.95"
+clap = { version = "4.5.28", features = ["derive"] }
+tracing = "0.1.41"
+tokio = "1.43.0"
+zeromq = {workspace = true}
+serde = {workspace = true}
+serde_json = {workspace = true}
+embedding-common = { path = "../embedding-common" }
+
+
+[features]
+default = []
+cuda = [ "llama-cpp/cuda"]
+metal = ["llama-cpp/metal"]

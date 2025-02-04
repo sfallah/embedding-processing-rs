@@ -10,7 +10,6 @@ use embedding_index::add_to_indices;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::documents::process_document;
-use embedding_processing::services::embeddings::EmbeddingsRequest;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 use zeromq::RepSocket;
@@ -21,7 +20,7 @@ pub async fn process_document_insertion_request(
     processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
-    embd_req_sender: Arc<Sender<EmbeddingsRequest>>,
+    embedding_addr: String,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
 ) {
@@ -40,7 +39,7 @@ pub async fn process_document_insertion_request(
 
     let document_dto = process_document(
         processing_context,
-        embd_req_sender,
+        embedding_addr.clone(),
         request.doc_url.to_string(),
         request.input.clone().into_bytes().to_vec(),
     )

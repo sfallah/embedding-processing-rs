@@ -11,7 +11,6 @@ use embedding_database::prelude::{
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::query::process_query;
-use embedding_processing::services::embeddings::EmbeddingsRequest;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use tracing::{debug, error, info};
@@ -24,7 +23,7 @@ pub async fn process_document_query_request(
     processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
-    embd_req_sender: Arc<Sender<EmbeddingsRequest>>,
+    embedding_addr: String,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
 ) {
@@ -48,7 +47,7 @@ pub async fn process_document_query_request(
 
     let query_embeddings = process_query(
         processing_context.clone(),
-        embd_req_sender.clone(),
+        embedding_addr.clone(),
         request.input.clone(),
     )
     .await

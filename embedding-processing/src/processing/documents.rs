@@ -1,15 +1,14 @@
 use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
-use crate::services::embeddings::EmbeddingsRequest;
 use embedding_common::dtos::document_dto::DocumentDto;
 use std::sync::Arc;
 use tracing::trace;
 
-#[tracing::instrument(skip(ctx, embed_sender, text))]
+#[tracing::instrument(skip(ctx, embedding_addr, text))]
 pub async fn process_document(
     ctx: Arc<ProcessingContext>,
-    embed_sender: Arc<async_channel::Sender<EmbeddingsRequest>>,
+    embedding_addr: String,
     url: String,
     text: Vec<u8>,
 ) -> anyhow::Result<DocumentDto> {
@@ -26,7 +25,7 @@ pub async fn process_document(
         process_split(
             ctx.clone(),
             split,
-            embed_sender.clone(),
+            embedding_addr.clone(),
             doc_id,
             seq_id as i32,
         )
