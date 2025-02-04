@@ -12,10 +12,9 @@ use async_channel::Sender;
 use tokio::sync::broadcast::Receiver;
 use tokio::{select};
 use tracing::info;
-use zeromq::{RepSocket, Socket, SocketRecv};
+use zeromq::{RepSocket, ReqSocket, Socket, SocketRecv};
 use embedding_common::config::ZmqConfig;
 use embedding_common::prelude::{DeterministicAHasher, Serde};
-use embedding_processing::services::embeddings::EmbeddingsRequest;
 use crate::api::health::process_health_check;
 
 pub struct ServerWorker {
@@ -45,7 +44,7 @@ pub async fn worker_routine(
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     db: &Arc<RocksDB>,
-    embedding_sender: Arc<Sender<EmbeddingsRequest>>,
+    model_addr: String,
 ) {
     loop {
         select! {
@@ -101,7 +100,7 @@ pub async fn worker_routine(
                     processing_context.clone(),
                     split_index,
                     summary_index,
-                    embedding_sender.clone(),
+                    model_addr.clone(),
                     &mut message_header,
                     &messages.get(1).unwrap().to_vec(),
                 )
@@ -114,7 +113,7 @@ pub async fn worker_routine(
                     processing_context.clone(),
                     split_index,
                     summary_index,
-                    embedding_sender.clone(),
+                    model_addr.clone(),
                     &mut message_header,
                     &messages.get(1).unwrap().to_vec(),
                 )

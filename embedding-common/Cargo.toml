@@ -13,8 +13,9 @@ serde_json = { workspace = true }
 ahash = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-config = "0.14.1"
+config = "0.15.7"
+clap = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-rand = "0.8.5"
+rand = "0.9.0"
 indexmap = "2.6.0"

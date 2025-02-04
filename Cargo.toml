@@ -5,8 +5,9 @@ members = [
     "embedding-processing",
     "embedding-database",
     "embedding-index",
-    "embedding-cli",
+    #"embedding-cli",
     "embedding-server",
+    "embedding-model",
 ]
 
 [workspace.dependencies]
@@ -27,3 +28,5 @@ num_cpus = "1.16.0"
 async-channel = "2.3.1"
 chrono = "0.4.38"
 indexmap = "2.6.0"
+zeromq = "0.4.1"
+

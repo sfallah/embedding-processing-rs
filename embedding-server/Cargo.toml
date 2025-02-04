@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-zeromq = "0.4.1"
 async-channel = "2.3.1"
 anyhow = { workspace = true }
 futures = { workspace = true }
@@ -17,6 +16,7 @@ serde = { workspace = true }
 serde_repr = { workspace = true }
 chrono = { workspace = true }
 indexmap = { workspace = true }
+zeromq = {workspace = true}
 
 embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }
