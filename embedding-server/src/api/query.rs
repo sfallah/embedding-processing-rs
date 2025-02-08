@@ -23,7 +23,6 @@ pub async fn process_document_query_request(
     processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
-    embedding_addr: String,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
 ) {
@@ -47,7 +46,6 @@ pub async fn process_document_query_request(
 
     let query_embeddings = process_query(
         processing_context.clone(),
-        embedding_addr.clone(),
         request.input.clone(),
     )
     .await

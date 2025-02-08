@@ -20,7 +20,6 @@ pub async fn process_document_insertion_request(
     processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
-    embedding_addr: String,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
 ) {
@@ -39,7 +38,6 @@ pub async fn process_document_insertion_request(
 
     let document_dto = process_document(
         processing_context,
-        embedding_addr.clone(),
         request.doc_url.to_string(),
         request.input.clone().into_bytes().to_vec(),
     )

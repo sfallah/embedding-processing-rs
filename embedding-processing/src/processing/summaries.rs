@@ -1,18 +1,16 @@
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
-use crate::services::embeddings::{async_get_embeddings};
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::summary_dto::SummaryDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;
-use zeromq::ReqSocket;
 use crate::processing::utils;
+use crate::processing::utils::async_get_embeddings;
 
-#[tracing::instrument(skip(ctx, embedding_addr, text))]
+#[tracing::instrument(skip(ctx, text))]
 pub async fn process_summaries(
     ctx: Arc<ProcessingContext>,
-    embedding_addr: String,
     text: String,
     doc_id: u64,
     split_id: u64,
@@ -27,7 +25,7 @@ pub async fn process_summaries(
         return Ok(Vec::new());
     }
 
-    let embeddings = async_get_embeddings(embedding_addr.clone(), &sentences, ctx.n_embd).await?;
+    let embeddings = async_get_embeddings(ctx.zmq_context.clone(),ctx.model_endpoint.clone(), ctx.n_embd, sentences.clone()).await?;
 
     let lx_ranks =
         lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None).await?;
@@ -61,6 +59,8 @@ pub async fn process_summaries(
         .collect();
     Ok(summaries)
 }
+
+
 
 fn tokens_num(splits: Vec<SplitResultLite>) -> Vec<usize> {
     splits

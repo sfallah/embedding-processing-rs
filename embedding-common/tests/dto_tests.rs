@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexSet;
     use embedding_common::prelude::*;
+    use indexmap::IndexSet;
 
     #[test]
     fn test_split_dto_set() {
@@ -12,5 +12,4 @@ mod tests {
         index_set.insert(split2);
         assert_eq!(index_set.len(), 2);
     }
-
 }

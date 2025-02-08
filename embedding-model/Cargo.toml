@@ -8,14 +8,30 @@ llama-cpp = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git", 
 anyhow = "1.0.95"
 clap = { version = "4.5.28", features = ["derive"] }
 tracing = "0.1.41"
-tokio = "1.43.0"
-zeromq = {workspace = true}
 serde = {workspace = true}
 serde_json = {workspace = true}
 embedding-common = { path = "../embedding-common" }
-
+config = { version = "0.15.7", features = ["toml", "async"], default-features = false }
+zmq = {workspace = true}
+uuid = {workspace = true}
 
 [features]
 default = []
 cuda = [ "llama-cpp/cuda"]
 metal = ["llama-cpp/metal"]
+
+[[bin]]
+name = "model_cli"
+path = "src/model_cli.rs"
+
+[[bin]]
+name = "model_broker"
+path = "src/model_broker.rs"
+
+[[bin]]
+name = "model_worker"
+path = "src/model_worker.rs"
+
+[[bin]]
+name = "model_client"
+path = "src/model_client.rs"

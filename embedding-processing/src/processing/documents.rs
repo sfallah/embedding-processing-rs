@@ -5,10 +5,9 @@ use embedding_common::dtos::document_dto::DocumentDto;
 use std::sync::Arc;
 use tracing::trace;
 
-#[tracing::instrument(skip(ctx, embedding_addr, text))]
+#[tracing::instrument(skip(ctx, text))]
 pub async fn process_document(
     ctx: Arc<ProcessingContext>,
-    embedding_addr: String,
     url: String,
     text: Vec<u8>,
 ) -> anyhow::Result<DocumentDto> {
@@ -25,7 +24,6 @@ pub async fn process_document(
         process_split(
             ctx.clone(),
             split,
-            embedding_addr.clone(),
             doc_id,
             seq_id as i32,
         )

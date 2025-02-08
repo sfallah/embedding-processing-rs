@@ -2,7 +2,10 @@ use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
-use rocksdb::{ColumnFamilyDescriptor, DBCompressionType, IteratorMode, MultiThreaded, OptimisticTransactionDB, Options, WriteBatchWithTransaction};
+use rocksdb::{
+    ColumnFamilyDescriptor, DBCompressionType, IteratorMode, MultiThreaded,
+    OptimisticTransactionDB, Options, WriteBatchWithTransaction,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::task;
@@ -37,15 +40,21 @@ impl RocksDB {
         key_bytes
     }
 
-    fn open_column_families(path: &str, cfs: Vec<&str>) -> Result<OptimisticTransactionDB<MultiThreaded>> {
+    fn open_column_families(
+        path: &str,
+        cfs: Vec<&str>,
+    ) -> Result<OptimisticTransactionDB<MultiThreaded>> {
         let opts = Self::configure_options();
         let cf_descriptors: Vec<_> = cfs
             .into_iter()
             .map(|name| ColumnFamilyDescriptor::new(name, Options::default()))
             .collect();
 
-        let db =
-            OptimisticTransactionDB::<MultiThreaded>::open_cf_descriptors(&opts, path, cf_descriptors)?;
+        let db = OptimisticTransactionDB::<MultiThreaded>::open_cf_descriptors(
+            &opts,
+            path,
+            cf_descriptors,
+        )?;
         Ok(db)
     }
 
@@ -286,9 +295,9 @@ impl RocksDB {
             let mut batch = WriteBatchWithTransaction::default();
             for record in records.iter() {
                 let cf = if !cf_map.contains_key(&record.cf_type) {
-                    let cf = db
-                        .cf_handle(&record.cf_type.name())
-                        .ok_or_else(|| anyhow!("Column family '{}' not found", record.cf_type.name()))?;
+                    let cf = db.cf_handle(&record.cf_type.name()).ok_or_else(|| {
+                        anyhow!("Column family '{}' not found", record.cf_type.name())
+                    })?;
                     cf_map.insert(record.cf_type, cf.clone());
                     cf
                 } else {
@@ -313,9 +322,9 @@ impl RocksDB {
             let mut batch = WriteBatchWithTransaction::default();
             for record in records.iter() {
                 let cf = if !cf_map.contains_key(&record.cf_type) {
-                    let cf = db
-                        .cf_handle(&record.cf_type.name())
-                        .ok_or_else(|| anyhow!("Column family '{}' not found", record.cf_type.name()))?;
+                    let cf = db.cf_handle(&record.cf_type.name()).ok_or_else(|| {
+                        anyhow!("Column family '{}' not found", record.cf_type.name())
+                    })?;
                     cf_map.insert(record.cf_type, cf.clone());
                     cf
                 } else {
@@ -327,7 +336,7 @@ impl RocksDB {
             db.write(batch)?;
             Ok(())
         })
-            .await??;
+        .await??;
 
         Ok(())
     }

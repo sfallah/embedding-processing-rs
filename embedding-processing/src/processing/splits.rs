@@ -5,13 +5,11 @@ use embedding_common::dtos::split_dto::SplitDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;
-use zeromq::ReqSocket;
 
-#[tracing::instrument(skip(ctx, split_res, embedding_addr))]
+#[tracing::instrument(skip(ctx, split_res))]
 pub async fn process_split(
     ctx: Arc<ProcessingContext>,
     split_res: Arc<SplitResultLite>,
-    embedding_addr: String,
     doc_id: u64,
     seq_id: i32,
 ) -> anyhow::Result<SplitDto> {
@@ -19,7 +17,7 @@ pub async fn process_split(
     trace!("Processing split: {}", split_id);
 
     let embedding = process_embedding(
-        embedding_addr.clone(),
+        ctx.clone(),
         split_id,
         vec![split_res.split_string.clone()],
         ctx.model_id,
@@ -28,7 +26,6 @@ pub async fn process_split(
     .await?;
     let summaries = process_summaries(
         ctx.clone(),
-        embedding_addr,
         split_res.split_string.clone(),
         doc_id,
         split_id,

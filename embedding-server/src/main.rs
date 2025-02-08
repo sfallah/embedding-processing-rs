@@ -1,5 +1,5 @@
 use clap::Parser;
-use embedding_common::config::{AppConfig, ServerArgs};
+use embedding_common::config::AppConfig;
 use embedding_common::utils::helpers::{create_directory, get_db_dir};
 use embedding_database::prelude::{put_model, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
@@ -8,12 +8,12 @@ use embedding_index::initialize_index_from_db;
 use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_server::zmq::server_task::ServerTask;
-use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
+use embedding_server::ServerArgs;
 use std::sync::Arc;
 use tokio::select;
-use tokio::sync::broadcast;
 use tracing::{error, info};
-use embedding_common::prelude::{DeterministicAHasher, Model};
+use embedding_common::config::config_file::ConfigFromFile;
+use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -21,7 +21,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Parse command line arguments
     let args = ServerArgs::parse();
 
-    let app_config = AppConfig::from_file_async(args.config_file).await?;
+    let app_config = AppConfig::from_file(args.config_file)?;
 
     let model_config = app_config.model_config;
     let splitter_config = app_config.splitter_config;
@@ -45,16 +45,12 @@ async fn main() -> Result<(), anyhow::Error> {
     let rocksdb = RocksDB::open(&db_path).await?;
     let db = Arc::new(rocksdb);
 
-    let n_ctx = 512;
-    let n_embd = 384;
-
-    let hasher = DeterministicAHasher::new(None, None);
-    let model = Model::new(
-        &hasher,
-        model_config.gguf_file.clone(),
-        n_ctx ,
-        n_embd,
+    let model_config = embedding_model::config::ModelConfig::new(
+        model_config.gguf_file,
+        model_config.verbose,
     );
+
+    let (shutdown_sender, shutdown_receiver) = async_channel::unbounded::<String>();
 
     put_model(&db, &model).await?;
 
@@ -87,8 +83,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Set up signal handling
 
-    let (shutdown_sender, shutdown_receiver) = broadcast::channel::<String>(1);
-
     let shutdown_clone = shutdown_sender.clone();
     let shutdown_handle = tokio::spawn(async move {
         if let Err(e) = tokio::signal::ctrl_c().await {
@@ -117,8 +111,6 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let mut worker_handles = Vec::new();
 
-    let model_addr = format!("tcp://{}:{}", zmq_config.zmq_host, "5560");
-
     // Initialize separate workers for each thread
     for _ in 0..parallel_workers {
         let mut worker = ServerWorker::init(zmq_config.clone()).await;
@@ -126,8 +118,8 @@ async fn main() -> Result<(), anyhow::Error> {
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);
         let db_clone = Arc::clone(&db);
+        let sender_clone = Arc::clone(&embed);
         let shutdown_receiver = shutdown_sender.subscribe();
-        let model_addr = model_addr.clone();
         let handle = tokio::task::spawn(async move {
             worker_routine(
                 shutdown_receiver,
@@ -136,7 +128,7 @@ async fn main() -> Result<(), anyhow::Error> {
                 &split_index_clone,
                 &summary_index_clone,
                 &db_clone,
-                model_addr,
+                sender_clone,
             )
             .await;
         });
@@ -157,6 +149,7 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // Shut down
+    futures::future::join_all(handles).await;
     info!("embedding routines handles joined");
     futures::future::join_all(worker_handles).await;
     info!("worker handles joined");
