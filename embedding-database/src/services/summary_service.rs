@@ -1,4 +1,4 @@
-use crate::dao::summary_dao::{get_all_summaries};
+use crate::dao::summary_dao::get_all_summaries;
 use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use crate::db::rocksdb_impl::RocksDB;
@@ -10,7 +10,6 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-
 pub(crate) async fn save_summary_aux(
     dtos: &Vec<SummaryDto>,
     user_id: Uuid,
@@ -18,7 +17,7 @@ pub(crate) async fn save_summary_aux(
 ) -> Result<()> {
     for dto in dtos {
         let summary = dto.to_model();
-        let embedding = dto.to_embedding_model();
+        let embedding = dto.to_embedding_backend();
         let embedding_user = dto.to_embedding_user_model(user_id);
         if let Some(embedding) = embedding {
             let embedding_record = to_embedding_record(&embedding).await?;
@@ -38,7 +37,7 @@ pub(crate) async fn save_summary_aux(
     Ok(())
 }
 
-pub(crate) async  fn delete_summaries_aux(
+pub(crate) async fn delete_summaries_aux(
     summary_ids: &Vec<u64>,
     db_records: &mut Vec<DbRecordKey>,
 ) -> Result<()> {

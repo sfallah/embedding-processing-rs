@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use embedding_common::config::config_file::ConfigFromFile;
     use embedding_common::config::{AppConfig, MetricKind, ScalarKind};
 
     #[test]
@@ -47,21 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn test_model_config() -> anyhow::Result<()> {
-        let conf_file = "tests/test_config.toml".to_string();
-        let app_config = AppConfig::from_file(conf_file)?;
-        let model_config = app_config.model_config;
-        println!("model config: {:?}", model_config);
-        assert_eq!(
-            model_config.gguf_file,
-            "models/all-minilm-l6-v2-q2_k.gguf".to_string()
-        );
-        assert_eq!(model_config.instances, 2);
-        assert_eq!(model_config.ngl, 1000);
-        Ok(())
-    }
-
-    #[test]
     fn test_database_config() -> anyhow::Result<()> {
         let conf_file = "tests/test_config.toml".to_string();
         let app_config = AppConfig::from_file(conf_file)?;
@@ -76,7 +62,7 @@ mod tests {
         let conf_file = "tests/test_config.toml".to_string();
         let app_config = AppConfig::from_file(conf_file)?;
         let zmq_config = app_config.zmq_config;
-        println!("zmq config: {:?}", zmq_config);
+        println!("zmq_server config: {:?}", zmq_config);
         assert_eq!(zmq_config.zmq_host, "127.0.0.1".to_string());
         assert_eq!(zmq_config.zmq_frontend_port, 5556);
         assert_eq!(zmq_config.zmq_backend_port, 5560);

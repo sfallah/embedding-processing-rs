@@ -11,10 +11,10 @@ serde_repr = { workspace = true }
 rmp-serde = { workspace = true }
 serde_json = { workspace = true }
 ahash = { workspace = true }
-tokio = { workspace = true }
 tracing = { workspace = true }
-config = "0.15.7"
+tracing-subscriber = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
+config = { workspace = true }
 
 [dev-dependencies]
 rand = "0.9.0"

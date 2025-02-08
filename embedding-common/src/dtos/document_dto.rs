@@ -26,7 +26,10 @@ impl DocumentDto {
     pub fn to_model(&self) -> Document {
         let split_ids = self.splits.iter().map(|s| s.split_id).collect();
 
-        let summary_ids = self.summaries.clone().map(|summary_dto| summary_dto.iter().map(|s| s.summary_id).collect());
+        let summary_ids = self
+            .summaries
+            .clone()
+            .map(|summary_dto| summary_dto.iter().map(|s| s.summary_id).collect());
         Document {
             document_id: self.document_id,
             document_url: self.document_url.clone(),

@@ -1,13 +1,11 @@
 use crate::processing::context::ProcessingContext;
-use anyhow::Context;
-use embedding_common::config::ModelConfig;
-use embedding_common::prelude::Model;
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
 use std::sync::Arc;
-use tokio::sync::broadcast;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
+
+
 pub async fn init_ctx(
     max_tokens: usize,
     merge_level: Option<usize>,
@@ -41,7 +39,10 @@ pub async fn init_ctx(
     );
 
     let hasher = DeterministicAHasher::new(None, None);
+    let zmq_context = zmq::Context::new();
     Arc::new(ProcessingContext {
+        zmq_context: Arc::new(zmq_context),
+        model_endpoint: "tcp://localhost:5555".to_string(),
         splitter: Arc::new(nw_splitter),
         sentence_splitter: Arc::new(sentence_splitter),
         hasher: Arc::new(hasher),

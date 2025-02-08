@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
+    use embedding_common::prelude::*;
     use rand::Rng;
     use uuid::Uuid;
-    use embedding_common::prelude::*;
 
     #[test]
     fn embedding_user_serde() -> anyhow::Result<()> {

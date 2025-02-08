@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ProcessingContext {
+    pub model_endpoint: String,
+    pub zmq_context: Arc<zmq::Context>,
     pub splitter: Arc<SplitterLiteConfig<HFTokenizer>>,
     pub sentence_splitter: Arc<SplitterLiteConfig<HFTokenizer>>,
     pub hasher: Arc<DeterministicAHasher>,

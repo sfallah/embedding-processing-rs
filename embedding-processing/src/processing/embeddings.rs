@@ -1,21 +1,17 @@
-use crate::services::embeddings::{async_get_embeddings};
-use async_channel::Sender;
+use crate::processing::utils::async_get_embeddings;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use std::sync::Arc;
-use tracing::trace;
-use zeromq::ReqSocket;
+use crate::processing::context::ProcessingContext;
 
-#[tracing::instrument(skip(embedding_addr, sentences))]
+#[tracing::instrument(skip(ctx, sentences))]
 pub async fn process_embedding(
-    embedding_addr: String,
+    ctx: Arc<ProcessingContext>,
     embed_id: u64,
     sentences: Vec<String>,
     model_id: u64,
     n_embd: usize,
 ) -> anyhow::Result<EmbeddingDto> {
-    trace!("Processing embedding...");
-    //FIXME: n_embd is hardcoded to 384
-    let embedding = async_get_embeddings(embedding_addr, &sentences, n_embd).await?;
-    trace!("Embedding processed");
-    Ok(EmbeddingDto::new(embed_id, embedding, model_id))
+    let embeddings =
+        async_get_embeddings(ctx.zmq_context.clone(), ctx.model_endpoint.clone(), n_embd, sentences.clone()).await?;
+    Ok(EmbeddingDto::new(embed_id, embeddings, model_id))
 }

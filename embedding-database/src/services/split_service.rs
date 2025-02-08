@@ -4,13 +4,13 @@ use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use crate::db::rocksdb_impl::RocksDB;
 use crate::prelude::*;
 use crate::services::embedding_service::{get_embeddings_map, to_embedding_record};
+use crate::services::embedding_user_service::to_embedding_user_record;
+use crate::services::summary_service::{delete_summaries_aux, save_summary_aux};
 use anyhow::Result;
 use embedding_common::prelude::*;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
-use crate::services::embedding_user_service::to_embedding_user_record;
-use crate::services::summary_service::{delete_summaries_aux, save_summary_aux};
 
 pub(crate) async fn save_split(
     db: &Arc<RocksDB>,
@@ -19,7 +19,7 @@ pub(crate) async fn save_split(
 ) -> Result<()> {
     let mut db_records = Vec::new();
     let split = split_dto.to_model();
-    let embedding = split_dto.to_embedding_model();
+    let embedding = split_dto.to_embedding_backend();
     let embedding_user = split_dto.to_embedding_user_model(user_id);
     if let Some(embedding) = embedding {
         let embedding_record = to_embedding_record(&embedding).await?;
@@ -45,10 +45,7 @@ pub async fn delete_split_full(db: &Arc<RocksDB>, split_id: &u64) -> anyhow::Res
         None => Ok(None),
         Some(split) => {
             let mut key_records = Vec::new();
-            key_records.push(DbRecordKey::new(
-                ColumnFamilyType::Splits,
-                *split_id,
-            ));
+            key_records.push(DbRecordKey::new(ColumnFamilyType::Splits, *split_id));
             let summary_ids = split.summary_ids.clone().unwrap_or_default();
             delete_summaries_aux(&summary_ids, &mut key_records).await?;
             delete_split_aux(*split_id, &mut key_records).await?;

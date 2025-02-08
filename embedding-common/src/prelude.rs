@@ -14,5 +14,4 @@ pub use crate::models::summary::Summary;
 
 pub use crate::utils::hashing::DeterministicAHasher;
 
-
 pub use crate::types::common::Serde;

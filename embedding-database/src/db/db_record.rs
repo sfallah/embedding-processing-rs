@@ -25,9 +25,6 @@ pub struct DbRecordKey {
 
 impl DbRecordKey {
     pub fn new(cf_type: ColumnFamilyType, key: u64) -> Self {
-        Self {
-            cf_type,
-            key,
-        }
+        Self { cf_type, key }
     }
 }

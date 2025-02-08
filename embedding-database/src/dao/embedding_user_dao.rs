@@ -5,7 +5,6 @@ use embedding_common::prelude::*;
 use std::sync::Arc;
 use uuid::Uuid;
 
-
 pub fn get_embedding_user(
     db: &Arc<RocksDB>,
     embed_id: u64,

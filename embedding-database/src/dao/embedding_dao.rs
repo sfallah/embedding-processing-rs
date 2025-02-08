@@ -5,7 +5,6 @@ use embedding_common::prelude::*;
 use futures::future::try_join_all;
 use std::sync::Arc;
 
-
 pub async fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embedding>> {
     let embedding_data_bytes_vec = db
         .get_all(ColumnFamilyType::Embeddings)

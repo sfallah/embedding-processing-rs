@@ -1,10 +1,10 @@
 use crate::dao::embedding_dao::{get_embedding, get_embeddings};
+use crate::db::column_families::ColumnFamilyType;
+use crate::db::db_record::DbRecordValue;
 use crate::db::rocksdb_impl::RocksDB;
 use embedding_common::prelude::{Embedding, EmbeddingDto, Serde};
 use indexmap::IndexMap;
 use std::sync::Arc;
-use crate::db::column_families::ColumnFamilyType;
-use crate::db::db_record::DbRecordValue;
 
 pub async fn get_embeddings_map(
     db: &Arc<RocksDB>,
