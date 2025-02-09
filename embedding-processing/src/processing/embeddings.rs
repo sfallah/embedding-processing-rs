@@ -25,11 +25,10 @@ pub async fn async_get_embeddings(
     n_embd: usize,
     texts: Vec<String>,
 ) -> anyhow::Result<Vec<f32>> {
-    tokio::task::spawn_blocking(move || {
+    tokio::task::block_in_place(move || {
         let embeddings = get_embeddings(zmq_ctx, model_endpoint, n_embd, texts.clone())?;
         Ok(embeddings)
     })
-    .await?
 }
 
 pub fn get_embeddings(
