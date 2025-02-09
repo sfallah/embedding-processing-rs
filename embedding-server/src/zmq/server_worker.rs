@@ -8,7 +8,6 @@ use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use std::sync::Arc;
-use async_channel::Sender;
 use tokio::sync::broadcast::Receiver;
 use tokio::{select};
 use tracing::info;

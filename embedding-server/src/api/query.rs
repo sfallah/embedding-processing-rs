@@ -3,7 +3,6 @@ use crate::schema::document::DocumentQueryResponse;
 use crate::schema::search_mode::SearchModeType;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
-use async_channel::Sender;
 use embedding_common::prelude::*;
 use embedding_database::prelude::{
     get_doc_splits_map, get_full_doc, get_split_summaries_map, RocksDB,
