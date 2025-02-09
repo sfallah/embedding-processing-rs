@@ -27,4 +27,7 @@ test: build
 test_processing: build
 	cargo test -p embedding-processing -- --test-threads=1
 
+bench_processing: release
+	cargo bench -p embedding-processing
+
 
