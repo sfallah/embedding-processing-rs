@@ -1,15 +1,16 @@
 #[cfg(test)]
 mod tests {
+    use embedding_common::config::ModelConfig;
+    use embedding_common::utils::tracting::setup_tracing;
     use embedding_processing::processing::documents::process_document;
+    use embedding_processing::processing::embeddings::async_get_embeddings;
     use embedding_processing::processing::splits::process_split;
     use embedding_processing::processing::splitter::split_text;
     use embedding_processing::processing::summaries::process_summaries;
-    use embedding_processing::services::embeddings::async_get_embeddings;
-    use embedding_processing::utils::app_utils::{init, init_ctx, setup_tracing};
+    use embedding_processing::utils::app_utils::init_ctx;
     use rstest::{fixture, rstest};
     use std::sync::Arc;
     use tracing::{debug, Level};
-    use embedding_common::config::ModelConfig;
 
     const MODEL_PATH: &str = "../models/all-minilm-l6-v2-q2_k.gguf";
 
@@ -44,15 +45,17 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_embeddings() -> anyhow::Result<()> {
         let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
-        let (embed, shutdown, handles, _model) = init(model_config).await?;
-
+        let ctx = init_ctx(510, Some(3), 384, 500).await;
         let text = "This is a test text".to_string();
-        let embeddings = async_get_embeddings(embed.clone(), &vec![text], 512).await?;
+        let embeddings = async_get_embeddings(
+            ctx.zmq_context.clone(),
+            ctx.model_endpoint.clone(),
+            ctx.n_embd,
+            vec![text],
+        )
+        .await?;
         println!("{:?}", embeddings);
-        shutdown
-            .send("shutdown".to_string())
-            .expect("Failed to send shutdown signal");
-        futures::future::join_all(handles.into_iter()).await;
+
         Ok(())
     }
 
@@ -72,12 +75,9 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_summaries_process(text: String) -> anyhow::Result<()> {
-        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
-        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await;
+        let ctx = init_ctx(512, None, 384, 10).await;
         let text = text.clone();
-        let embed_sender = embed_sender.clone();
-        let summaries = process_summaries(ctx, embed_sender, text, 0, 0)
+        let summaries = process_summaries(ctx, text, 0, 0)
             .await
             .expect("Failed to process summaries");
         println!("{:?}", summaries);
@@ -87,11 +87,6 @@ mod tests {
             .map(|sum| sum.text_content.clone())
             .collect::<Vec<_>>();
         println!("{}", sum_texts.join("\n"));
-        shutdown
-            .send("shutdown".to_string())
-            .expect("Failed to send shutdown signal");
-
-        futures::future::join_all(handles.into_iter()).await;
 
         Ok(())
     }
@@ -99,11 +94,8 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_split_process(text: String) -> anyhow::Result<()> {
-        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
-        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await;
+        let ctx = init_ctx(512, None, 384, 3000).await;
         let text = text.clone();
-        let embed_sender = embed_sender.clone();
         let splitter = ctx.clone().splitter.clone();
         let splits = split_text(splitter, text.as_bytes().to_vec())
             .await
@@ -111,13 +103,9 @@ mod tests {
         assert_eq!(splits.len(), 1);
         println!("{:?}", splits);
 
-        let split = process_split(ctx, Arc::new(splits[0].clone()), embed_sender, 0, 0)
+        let split = process_split(ctx, Arc::new(splits[0].clone()), 0, 0)
             .await
             .expect("Failed to process split");
-        shutdown
-            .send("shutdown".to_string())
-            .expect("Failed to send shutdown signal");
-        futures::future::join_all(handles.into_iter()).await;
         println!("{:?}", split);
         Ok(())
     }
@@ -126,13 +114,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_document_process(#[future] text_from_file: String) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
-        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
-        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await;
-        let embed_sender = embed_sender.clone();
+        let ctx = init_ctx(512, None, 384, 100).await;
         let doc = process_document(
             ctx,
-            embed_sender,
             "test_url".to_string(),
             text_from_file.await.as_bytes().to_vec(),
         )
@@ -148,28 +132,18 @@ mod tests {
             .map(|split| split.text_content.clone())
             .collect::<Vec<_>>();
         //println!("{}", sum_texts.join("\n"));
-
-        shutdown
-            .send("shutdown".to_string())
-            .expect("Failed to send shutdown signal");
-        futures::future::join_all(handles.into_iter()).await;
         Ok(())
     }
-
 
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_document_process_short() -> anyhow::Result<()> {
-        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
-        let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(10, None, 384, model.model_id).await; // low max_tokens to test short text
-        let embed_sender = embed_sender.clone();
+        let ctx = init_ctx(10, None, 384, 3000).await; // low max_tokens to test short text
         let doc = process_document(
             ctx,
-            embed_sender,
             "test_url".to_string(),
             // Short text to test error -> with filter_splits 4, this will test 0 sentences and 1 sentence for 2 splits
-            "a a. a a. a \n\n a a a. a".to_string().as_bytes().to_vec(), 
+            "a a. a a. a \n\n a a a. a".to_string().as_bytes().to_vec(),
         )
         .await
         .expect("Failed to process document");
@@ -183,12 +157,6 @@ mod tests {
             .map(|split| split.text_content.clone())
             .collect::<Vec<_>>();
         //println!("{}", sum_texts.join("\n"));
-
-        shutdown
-            .send("shutdown".to_string())
-            .expect("Failed to send shutdown signal");
-        futures::future::join_all(handles.into_iter()).await;
         Ok(())
     }
-
 }

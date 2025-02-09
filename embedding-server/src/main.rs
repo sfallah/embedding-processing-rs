@@ -1,19 +1,18 @@
 use clap::Parser;
+use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::AppConfig;
+use embedding_common::prelude::{DeterministicAHasher, Model};
 use embedding_common::utils::helpers::{create_directory, get_db_dir};
 use embedding_database::prelude::{put_model, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_index::initialize_index_from_db;
-//use embedding_index::save_index;
-use embedding_processing::utils::app_utils;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_server::zmq::server_task::ServerTask;
+use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
 use embedding_server::ServerArgs;
 use std::sync::Arc;
 use tokio::select;
 use tracing::{error, info};
-use embedding_common::config::config_file::ConfigFromFile;
-use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -50,7 +49,9 @@ async fn main() -> Result<(), anyhow::Error> {
         model_config.verbose,
     );
 
-    let (shutdown_sender, shutdown_receiver) = async_channel::unbounded::<String>();
+    let (shutdown_sender, mut shutdown_receiver) = tokio::sync::broadcast::channel(1);
+
+    let model = Model::new(&DeterministicAHasher::new(None, None), model_config.gguf_file, 512, 384);
 
     put_model(&db, &model).await?;
 
@@ -118,7 +119,6 @@ async fn main() -> Result<(), anyhow::Error> {
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);
         let db_clone = Arc::clone(&db);
-        let sender_clone = Arc::clone(&embed);
         let shutdown_receiver = shutdown_sender.subscribe();
         let handle = tokio::task::spawn(async move {
             worker_routine(
@@ -128,7 +128,6 @@ async fn main() -> Result<(), anyhow::Error> {
                 &split_index_clone,
                 &summary_index_clone,
                 &db_clone,
-                sender_clone,
             )
             .await;
         });
@@ -137,9 +136,8 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // Start the ZMQ proxy
-    let mut shutdown = shutdown_sender.subscribe();
     select! {
-        _ =  shutdown.recv() => {
+        _ =  shutdown_receiver.recv() => {
             //save_index(split_index, summary_index).await?;
             info!("Shutting down");
         }
@@ -149,7 +147,6 @@ async fn main() -> Result<(), anyhow::Error> {
     }
 
     // Shut down
-    futures::future::join_all(handles).await;
     info!("embedding routines handles joined");
     futures::future::join_all(worker_handles).await;
     info!("worker handles joined");

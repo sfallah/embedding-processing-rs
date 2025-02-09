@@ -3,7 +3,7 @@ use tracing::trace;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
 use crate::processing::utils;
-use crate::processing::utils::async_get_embeddings;
+use crate::processing::embeddings::async_get_embeddings;
 
 pub async fn process_query(
     ctx: Arc<ProcessingContext>,

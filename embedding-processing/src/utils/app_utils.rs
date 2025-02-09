@@ -42,7 +42,7 @@ pub async fn init_ctx(
     let zmq_context = zmq::Context::new();
     Arc::new(ProcessingContext {
         zmq_context: Arc::new(zmq_context),
-        model_endpoint: "tcp://localhost:5555".to_string(),
+        model_endpoint: "tcp://localhost:5559".to_string(),
         splitter: Arc::new(nw_splitter),
         sentence_splitter: Arc::new(sentence_splitter),
         hasher: Arc::new(hasher),

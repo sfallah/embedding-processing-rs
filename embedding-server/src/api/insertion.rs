@@ -3,7 +3,6 @@ use crate::schema::document_status::DocumentInsertionStatus;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils;
 use crate::utils::zmq_utils::send_exception_response;
-use async_channel::Sender;
 use embedding_common::prelude::*;
 use embedding_database::prelude::{save_doc, RocksDB};
 use embedding_index::add_to_indices;

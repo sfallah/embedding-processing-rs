@@ -6,7 +6,7 @@ use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;
 use crate::processing::utils;
-use crate::processing::utils::async_get_embeddings;
+use crate::processing::embeddings::async_get_embeddings;
 
 #[tracing::instrument(skip(ctx, text))]
 pub async fn process_summaries(

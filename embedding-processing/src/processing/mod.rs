@@ -1,8 +1,8 @@
 pub mod context;
 pub mod documents;
-mod embeddings;
+pub mod embeddings;
 pub mod splits;
 pub mod splitter;
 pub mod summaries;
 pub mod query;
-mod utils;
+pub mod utils;
