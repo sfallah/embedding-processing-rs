@@ -90,7 +90,7 @@ fn main() -> anyhow::Result<()> {
                 break;
             }
         };
-        info!("Worker {} received {} messages", worker_id, messages.len());
+        debug!("Worker {} received messages", worker_id);
         let identity = messages[0].clone();
         let request = match EmbeddingsRequest::unpack::<EmbeddingsRequest>(&messages[1]) {
             Ok(request) => request,
