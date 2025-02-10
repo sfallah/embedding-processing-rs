@@ -3,7 +3,7 @@ use embedding_processing::processing::documents::process_document;
 use embedding_processing::processing::embeddings::get_embeddings;
 use embedding_processing::utils::app_utils::init_ctx;
 use fast_text_splitter::config::SplitterLiteConfig;
-//use rayon::prelude::*;
+use rayon::prelude::*;
 use std::fs;
 use std::sync::Arc;
 
@@ -44,7 +44,7 @@ pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
         let zmq_ctx = Arc::new(zmq::Context::new());
         b.iter(|| {
             black_box(splits.clone())
-                .iter()
+                .par_iter()
                 .enumerate()
                 .for_each(|(idx, split)| {
                     let embedding = get_embeddings(
@@ -106,7 +106,7 @@ pub fn benches() {
     let file_path = "tests/test_data/superlinear.txt".to_string();
     // read the file
     let doc = fs::read_to_string(file_path).unwrap();
-    //process_doc(&mut criterion, doc.clone());
+    process_doc(&mut criterion, doc.clone());
     embedding_benchmark(&mut criterion, doc.clone());
     embedding_benchmark_batch(&mut criterion, doc);
 }
