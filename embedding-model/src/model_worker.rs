@@ -18,6 +18,8 @@ use tracing::{debug, error, info, warn};
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
+    let uuid = uuid::Uuid::new_v4();
+    let worker_id = uuid.to_string();
 
     setup_tracing(args.log_level.to_tracing_level());
 
@@ -88,6 +90,7 @@ fn main() -> anyhow::Result<()> {
                 break;
             }
         };
+        info!("Worker {} received {} messages", worker_id, messages.len());
         let identity = messages[0].clone();
         let request = match EmbeddingsRequest::unpack::<EmbeddingsRequest>(&messages[1]) {
             Ok(request) => request,

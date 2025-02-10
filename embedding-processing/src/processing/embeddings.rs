@@ -47,9 +47,9 @@ pub fn get_embeddings(
         .set_rcvtimeo(30000)
         .expect("Failed to set receive timeout");
     // identity random uuid
-    let identity = uuid::Uuid::new_v4();
+    //let identity = uuid::Uuid::new_v4();
     socket
-        .set_identity(identity.as_bytes())
+        .set_identity("embedding_client".as_bytes())
         .expect("Failed to set identity");
     trace!("Processing embedding...");
     //FIXME: n_embd is hardcoded to 384
