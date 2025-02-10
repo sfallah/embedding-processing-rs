@@ -1,11 +1,11 @@
 use anyhow::Context;
 use clap::Parser;
-use embedding_model::config::ModelAppConfig;
-use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::prelude::Serde;
 use embedding_common::utils::tracting::setup_tracing;
+use embedding_model::config::ModelAppConfig;
+use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 use llama_cpp::context::params::LlamaContextParams;
 use llama_cpp::context::LlamaContext;
 use llama_cpp::ggml_time_us;
@@ -38,7 +38,11 @@ fn main() -> anyhow::Result<()> {
     }
 
     // offload all layers to the gpu
-    let model_params = LlamaModelParams::default();
+    let mut model_params = if cfg!(feature = "cuda") || cfg!(feature = "vulkan") {
+        LlamaModelParams::default().with_n_gpu_layers(16)
+    } else {
+        LlamaModelParams::default()
+    };
 
     let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
 
