@@ -1,8 +1,11 @@
-use criterion::{criterion_main, Criterion};
+use criterion::{black_box, criterion_main, Criterion};
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::utils::app_utils::{init_ctx};
 use std::fs;
-use embedding_common::config::ModelConfig;
+use std::sync::Arc;
+use fast_text_splitter::config::SplitterLiteConfig;
+use rayon::prelude::*;
+use embedding_processing::processing::embeddings::get_embeddings;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
     c.bench_function("embeddings_splits_batch", |b| {
@@ -18,6 +21,39 @@ pub fn process_doc(c: &mut Criterion, doc: String) {
     });
 }
 
+pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
+    let splitter_patterns = vec![
+        vec!["\n\n".to_string()],
+        vec!["\n".to_string()],
+        vec![
+            ".".to_string(),
+            "!".to_string(),
+            "?".to_string(),
+            ". ".to_string(),
+        ],
+    ];
+    let splitter = SplitterLiteConfig::new_hf(
+        splitter_patterns.clone(),
+        Some(512),
+        None,
+        true,
+        None,
+    );
+    let splitter = Arc::new(splitter);
+    let splits = splitter.hf_splits(&doc.into_bytes());
+    let splits = splits.into_iter().map(|split| split.split_string).collect::<Vec<String>>();
+    c.bench_function("embeddings_splits", |b| {
+        let zmq_ctx = Arc::new(zmq::Context::new());
+        b.iter(|| {
+            black_box(splits.clone()).par_iter().for_each(|split| {
+                let embedding = get_embeddings(zmq_ctx.clone(), "tcp://localhost:5559".to_string(), 384, vec![split.clone()]).expect("Failed to get embeddings");
+                black_box(embedding);
+            });
+
+        });
+    });
+}
+
 pub fn benches() {
     let mut criterion: Criterion<_> = Criterion::default()
         .sample_size(10)
@@ -27,6 +63,7 @@ pub fn benches() {
     let file_path = "tests/test_data/superlinear.txt".to_string();
     // read the file
     let doc = fs::read_to_string(file_path).unwrap();
-    process_doc(&mut criterion, doc);
+    //process_doc(&mut criterion, doc.clone());
+    embedding_benchmark(&mut criterion, doc);
 }
 criterion_main!(benches);
