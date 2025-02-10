@@ -35,6 +35,8 @@ harness = false
 
 [features]
 default = []
+cuda = [ "embedding-model/cuda"]
+metal = ["embedding-model/metal"]
 accelerate = ["lexrank-ndarray/accelerate"]
 blas = ["lexrank-ndarray/blas"]
 mkl = ["lexrank-ndarray/mkl"]
