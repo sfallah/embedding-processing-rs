@@ -44,7 +44,7 @@ pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
         let zmq_ctx = Arc::new(zmq::Context::new());
         b.iter(|| {
             black_box(splits.clone())
-                .par_iter()
+                .iter()
                 .enumerate()
                 .for_each(|(idx, split)| {
                     let embedding = get_embeddings(
