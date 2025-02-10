@@ -4,7 +4,7 @@ use embedding_processing::utils::app_utils::init_ctx;
 use fast_text_splitter::config::SplitterLiteConfig;
 use std::fs;
 use std::sync::Arc;
-//use rayon::prelude::*;
+use rayon::prelude::*;
 use embedding_processing::processing::embeddings::get_embeddings;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
@@ -44,7 +44,7 @@ pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
         let zmq_ctx = Arc::new(zmq::Context::new());
         b.iter(|| {
             black_box(splits.clone())
-                .iter()
+                .par_iter()
                 .enumerate()
                 .for_each(|(idx, split)| {
                     let embedding = get_embeddings(
