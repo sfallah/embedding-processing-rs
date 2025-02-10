@@ -4,7 +4,6 @@ use tracing::trace;
 use embedding_common::prelude::Serde;
 use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 use crate::processing::context::ProcessingContext;
-use crate::processing::utils;
 
 #[tracing::instrument(skip(ctx, sentences))]
 pub async fn process_embedding(

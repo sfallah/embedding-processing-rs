@@ -1,4 +1,3 @@
-use anyhow::Context;
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
@@ -6,17 +5,9 @@ use embedding_common::prelude::Serde;
 use embedding_common::utils::tracting::setup_tracing;
 use embedding_model::config::ModelAppConfig;
 use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
-use llama_cpp::context::params::LlamaContextParams;
-use llama_cpp::context::LlamaContext;
-use llama_cpp::ggml_time_us;
-use llama_cpp::llama_backend::LlamaBackend;
-use llama_cpp::llama_batch::LlamaBatch;
-use llama_cpp::model::params::LlamaModelParams;
-use llama_cpp::model::{AddBos, LlamaModel};
-use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
@@ -34,12 +25,6 @@ fn main() -> anyhow::Result<()> {
         }
     };
     debug!("Config loaded: {:?}", config);
-
-    let mut backend = LlamaBackend::init()?;
-    if !config.model_config.verbose {
-        backend.void_logs();
-    }
-
 
     //  Prepare our context and socket
     let context = zmq::Context::new();
