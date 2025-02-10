@@ -8,7 +8,7 @@ use std::fs;
 use std::sync::Arc;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
-    c.bench_function("embeddings_splits_batch", |b| {
+    c.bench_function("process_doc", |b| {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let proc_ctx = rt.block_on(init_ctx(512, None, 384, 30600));
         b.to_async(rt).iter(|| {
