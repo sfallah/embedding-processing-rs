@@ -15,7 +15,7 @@ pub async fn process_embedding(
     n_embd: usize,
 ) -> anyhow::Result<EmbeddingDto> {
     let embeddings =
-        async_get_embeddings(ctx.zmq_context.clone(), ctx.model_endpoint.clone(), n_embd, sentences.clone()).await?;
+        async_get_embeddings(ctx.zmq_context.clone(), ctx.model_endpoint.clone(), n_embd, sentences.clone(), embed_id).await?;
     Ok(EmbeddingDto::new(embed_id, embeddings, model_id))
 }
 
@@ -24,9 +24,10 @@ pub async fn async_get_embeddings(
     model_endpoint: String,
     n_embd: usize,
     texts: Vec<String>,
+    embed_id: u64,
 ) -> anyhow::Result<Vec<f32>> {
     tokio::task::block_in_place(move || {
-        let embeddings = get_embeddings(zmq_ctx, model_endpoint, n_embd, texts.clone())?;
+        let embeddings = get_embeddings(zmq_ctx, model_endpoint, n_embd, texts.clone(), embed_id)?;
         Ok(embeddings)
     })
 }
@@ -36,6 +37,7 @@ pub fn get_embeddings(
     model_endpoint: String,
     n_embd: usize,
     texts: Vec<String>,
+    embed_id: u64,
 ) -> anyhow::Result<Vec<f32>> {
     let socket = zmq_ctx.socket(zmq::DEALER)?;
     socket.connect(&model_endpoint).expect("Failed to connect");
@@ -49,7 +51,7 @@ pub fn get_embeddings(
     // identity random uuid
     //let identity = uuid::Uuid::new_v4();
     socket
-        .set_identity("embedding_client".as_bytes())
+        .set_identity(embed_id.to_string().as_bytes())
         .expect("Failed to set identity");
     trace!("Processing embedding...");
     //FIXME: n_embd is hardcoded to 384

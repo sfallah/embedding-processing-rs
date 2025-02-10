@@ -25,7 +25,7 @@ pub async fn process_summaries(
         return Ok(Vec::new());
     }
 
-    let embeddings = async_get_embeddings(ctx.zmq_context.clone(),ctx.model_endpoint.clone(), ctx.n_embd, sentences.clone()).await?;
+    let embeddings = async_get_embeddings(ctx.zmq_context.clone(),ctx.model_endpoint.clone(), ctx.n_embd, sentences.clone(), split_id).await?;
 
     let lx_ranks =
         lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None).await?;
