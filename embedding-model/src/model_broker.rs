@@ -1,8 +1,8 @@
 use clap::Parser;
-use embedding_model::config::ModelAppConfig;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::utils::tracting::setup_tracing;
+use embedding_model::config::ModelAppConfig;
 use tracing::{debug, error, info};
 
 fn main() -> anyhow::Result<()> {
@@ -18,6 +18,12 @@ fn main() -> anyhow::Result<()> {
     debug!("Config loaded: {:?}", config);
 
     let context = zmq::Context::new();
+    if let Err(e) = context.set_io_threads(config.zmq_config.num_workers as i32) {
+        error!("Failed to set IO threads: {:?}", e);
+        return Err(e.into());
+    }
+    let io_threads = context.get_io_threads()?;
+    info!("ZMQ IO threads: {}", io_threads);
     let frontend = match context.socket(zmq::ROUTER) {
         Ok(socket) => socket,
         Err(e) => {

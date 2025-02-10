@@ -33,5 +33,9 @@ name = "model_worker"
 path = "src/model_worker.rs"
 
 [[bin]]
+name = "model_fake_worker"
+path = "src/model_fake_worker.rs"
+
+[[bin]]
 name = "model_client"
 path = "src/model_client.rs"

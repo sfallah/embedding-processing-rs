@@ -12,7 +12,8 @@ pub async fn process_query(
     trace!("Processing embedding...");
     let query_splits = split_text(ctx.splitter.clone(), query.clone().into_bytes()).await?;
     let query_split_texts = utils::splits_texts(&query_splits);
-    let embedding = async_get_embeddings(ctx.zmq_context.clone(),ctx.model_endpoint.clone(), ctx.n_embd, vec![query.clone()]).await?;
+    let query_id = ctx.hasher.hash(&query);
+    let embedding = async_get_embeddings(ctx.zmq_context.clone(),ctx.model_endpoint.clone(), ctx.n_embd, vec![query.clone()], query_id).await?;
     let mut embeddings = Vec::new();
     for i in 0..query_split_texts.len() {
         let i = i * ctx.n_embd;
