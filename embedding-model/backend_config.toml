@@ -4,11 +4,11 @@
 gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
 #cpu = false
 ngl = 16
-#verbose = true
+verbose = true
 
 
 [zmq]
 host = "127.0.0.1"
 frontend_port = 5559
 backend_port = 5560
-num_workers = 8
+num_workers = 2
