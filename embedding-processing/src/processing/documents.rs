@@ -17,23 +17,24 @@ pub async fn process_document(
     let doc_id = ctx.clone().hasher.hash(&url);
     trace!("Document ID: {}", doc_id);
 
-    //let mut handles = Vec::new();
+    let mut splits_futures = Vec::new();
 
-    let splits_futures = splits.iter().enumerate().map(|(seq_id, split)| {
+    for (seq_id, split) in splits.iter().enumerate() {
         let split = Arc::new(split.clone());
         let ctx = ctx.clone();
-        tokio::spawn(async move {
-            process_split(ctx.clone(), split, doc_id, seq_id as i32)
-                .await
-                .expect("Failed to process split")
-        })
-    });
+        splits_futures.push(tokio::spawn(process_split(
+            ctx.clone(),
+            split,
+            doc_id,
+            seq_id as i32,
+        )));
+    }
 
     futures::future::join_all(splits_futures)
         .await
         .into_iter()
         .for_each(|res| {
-            split_dtos.push(res.expect("Failed to process split"));
+            split_dtos.push(res.expect("whatever").expect("Failed to process split"));
         });
 
     let summaries: Vec<_> = split_dtos

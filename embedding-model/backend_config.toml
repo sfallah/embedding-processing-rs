@@ -4,7 +4,7 @@
 gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
 #cpu = false
 ngl = 16
-verbose = true
+verbose = false
 
 
 [zmq]
