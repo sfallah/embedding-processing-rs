@@ -21,12 +21,12 @@ pub async fn process_document(
 
     let splits_futures = splits.iter().enumerate().map(|(seq_id, split)| {
         let split = Arc::new(split.clone());
-        process_split(
-            ctx.clone(),
-            split,
-            doc_id,
-            seq_id as i32,
-        )
+        let ctx = ctx.clone();
+        tokio::spawn(async move {
+            process_split(ctx.clone(), split, doc_id, seq_id as i32)
+                .await
+                .expect("Failed to process split")
+        })
     });
 
     futures::future::join_all(splits_futures)
