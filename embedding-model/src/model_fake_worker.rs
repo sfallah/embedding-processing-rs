@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
             }
         };
 
-        thread::sleep(Duration::from_millis(30));
+        //thread::sleep(Duration::from_millis(30));
         let n_texts = request.texts.len();
 
         let mut output = Vec::new();
