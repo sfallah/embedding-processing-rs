@@ -43,12 +43,12 @@ pub async fn process_document_query_request(
         .search_mode
         .unwrap_or(SearchModeType::SplitAndSummary);
 
-    let query_embeddings = process_query(
-        processing_context.clone(),
-        request.input.clone(),
-    )
-    .await
-    .unwrap();
+    let query_embeddings = tokio::task::spawn_blocking(move || {
+        process_query(
+            processing_context.clone(),
+            request.input.clone(),
+        ).expect("Failed to process query")
+    }).await.unwrap();
     let query_embeddings = &query_embeddings[0];
 
     // 1. Search for the query in the indexes

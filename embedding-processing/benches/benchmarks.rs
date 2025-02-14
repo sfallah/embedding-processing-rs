@@ -9,9 +9,8 @@ use std::sync::Arc;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
     c.bench_function("process_doc", |b| {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let proc_ctx = rt.block_on(init_ctx(512, None, 384, 30600));
-        b.to_async(rt).iter(|| {
+        let proc_ctx = init_ctx(512, None, 384, 30600);
+        b.iter(|| {
             process_document(
                 proc_ctx.clone(),
                 "url".to_string(),

@@ -1,22 +1,22 @@
 use crate::processing::context::ProcessingContext;
+use crate::processing::embeddings::async_get_embeddings;
 use crate::processing::splitter::split_text;
+use crate::processing::utils;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::summary_dto::SummaryDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;
-use crate::processing::utils;
-use crate::processing::embeddings::async_get_embeddings;
 
 #[tracing::instrument(skip(ctx, text))]
-pub async fn process_summaries(
+pub fn process_summaries(
     ctx: Arc<ProcessingContext>,
     text: String,
     doc_id: u64,
     split_id: u64,
 ) -> anyhow::Result<Vec<SummaryDto>> {
     trace!("Processing summaries...");
-    let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes()).await?;
+    let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes())?;
     let splits: Vec<_> = filter_splits(&splits, 4);
     let sentences: Vec<_> = utils::splits_texts(&splits);
     trace!("Number of sentences: {}", sentences.len());
@@ -25,10 +25,15 @@ pub async fn process_summaries(
         return Ok(Vec::new());
     }
 
-    let embeddings = async_get_embeddings(ctx.zmq_context.clone(),ctx.model_endpoint.clone(), ctx.n_embd, sentences.clone(), split_id).await?;
+    let embeddings = async_get_embeddings(
+        ctx.zmq_context.clone(),
+        ctx.model_endpoint.clone(),
+        ctx.n_embd,
+        sentences.clone(),
+        split_id,
+    )?;
 
-    let lx_ranks =
-        lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None).await?;
+    let lx_ranks = lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None)?;
     let no_tokens = tokens_num(splits);
 
     let summaries: Vec<_> = lx_ranks
@@ -60,8 +65,6 @@ pub async fn process_summaries(
     Ok(summaries)
 }
 
-
-
 fn tokens_num(splits: Vec<SplitResultLite>) -> Vec<usize> {
     splits
         .iter()
@@ -83,21 +86,18 @@ fn filter_splits(splits: &Vec<SplitResultLite>, ln: usize) -> Vec<SplitResultLit
 }
 
 #[tracing::instrument]
-async fn lexrank_sentences(
+fn lexrank_sentences(
     embeddings: Vec<f32>,
     len: usize,
     n_embd: usize,
     threshold: Option<f32>,
     max_iter: Option<usize>,
 ) -> anyhow::Result<Vec<(usize, f32)>> {
-    tokio::spawn(async move {
-        lexrank_ndarray::lexrank_array(
-            &embeddings,
-            len,
-            n_embd,
-            threshold,
-            max_iter.unwrap_or(10000),
-        )
-    })
-    .await?
+    lexrank_ndarray::lexrank_array(
+        &embeddings,
+        len,
+        n_embd,
+        threshold,
+        max_iter.unwrap_or(10000),
+    )
 }

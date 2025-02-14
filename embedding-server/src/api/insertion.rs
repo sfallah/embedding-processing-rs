@@ -35,11 +35,14 @@ pub async fn process_document_insertion_request(
 
     debug!("insertion request: {:?}", request);
 
-    let document_dto = process_document(
+    let document_dto = tokio::task::spawn_blocking(move || {
+
+        process_document(
         processing_context,
         request.doc_url.to_string(),
         request.input.clone().into_bytes().to_vec(),
-    )
+    ).expect("Failed to process document")
+    })
     .await
     .unwrap();
 

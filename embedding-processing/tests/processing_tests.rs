@@ -36,24 +36,21 @@ mod tests {
     }
 
     #[fixture]
-    async fn text_from_file(#[default("tests/test_data/superlinear.txt")] file: String) -> String {
-        tokio::fs::read_to_string(file)
-            .await
-            .expect("Failed to read test text file")
+    fn text_from_file(#[default("tests/test_data/superlinear.txt")] file: String) -> String {
+        std::fs::read_to_string(file).expect("Failed to read test text file")
     }
 
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_embeddings() -> anyhow::Result<()> {
+    fn test_embeddings() -> anyhow::Result<()> {
         let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
-        let ctx = init_ctx(510, Some(3), 384, 500).await;
+        let ctx = init_ctx(510, Some(3), 384, 500);
         let text = "This is a test text".to_string();
         let embeddings = async_get_embeddings(
             ctx.zmq_context.clone(),
             ctx.model_endpoint.clone(),
             ctx.n_embd,
             vec![text],
-        )
-        .await?;
+            0,
+        );
         println!("{:?}", embeddings);
 
         Ok(())
@@ -62,24 +59,18 @@ mod tests {
     #[tokio::test]
     async fn test_splitter() -> anyhow::Result<()> {
         let text = "This is a test text".to_string();
-        let ctx = init_ctx(512, None, 384, 0).await;
+        let ctx = init_ctx(512, None, 384, 0);
         let splitter = ctx.splitter.clone();
-        let splits = split_text(splitter, text.as_bytes().to_vec())
-            .await
-            .expect("Failed to split text");
+        let splits = split_text(splitter, text.as_bytes().to_vec()).expect("Failed to split text");
         assert_eq!(splits.len(), 1);
         println!("{:?}", splits);
         Ok(())
     }
 
-    #[rstest]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_summaries_process(text: String) -> anyhow::Result<()> {
-        let ctx = init_ctx(512, None, 384, 10).await;
+    fn test_summaries_process(text: String) -> anyhow::Result<()> {
+        let ctx = init_ctx(512, None, 384, 10);
         let text = text.clone();
-        let summaries = process_summaries(ctx, text, 0, 0)
-            .await
-            .expect("Failed to process summaries");
+        let summaries = process_summaries(ctx, text, 0, 0).expect("Failed to process summaries");
         println!("{:?}", summaries);
         assert_eq!(summaries.len(), 2);
         let sum_texts = summaries
@@ -91,36 +82,28 @@ mod tests {
         Ok(())
     }
 
-    #[rstest]
-    #[tokio::test(flavor = "multi_thread")]
     async fn test_split_process(text: String) -> anyhow::Result<()> {
-        let ctx = init_ctx(512, None, 384, 3000).await;
+        let ctx = init_ctx(512, None, 384, 3000);
         let text = text.clone();
         let splitter = ctx.clone().splitter.clone();
-        let splits = split_text(splitter, text.as_bytes().to_vec())
-            .await
-            .expect("Failed to split text");
+        let splits = split_text(splitter, text.as_bytes().to_vec()).expect("Failed to split text");
         assert_eq!(splits.len(), 1);
         println!("{:?}", splits);
 
-        let split = process_split(ctx, Arc::new(splits[0].clone()), 0, 0)
-            .await
-            .expect("Failed to process split");
+        let split =
+            process_split(ctx, Arc::new(splits[0].clone()), 0, 0).expect("Failed to process split");
         println!("{:?}", split);
         Ok(())
     }
 
-    #[rstest]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_document_process(#[future] text_from_file: String) -> anyhow::Result<()> {
+    fn test_document_process(text_from_file: String) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
-        let ctx = init_ctx(512, None, 384, 100).await;
+        let ctx = init_ctx(512, None, 384, 100);
         let doc = process_document(
             ctx,
             "test_url".to_string(),
-            text_from_file.await.as_bytes().to_vec(),
+            text_from_file.as_bytes().to_vec(),
         )
-        .await
         .expect("Failed to process document");
 
         assert_eq!(doc.splits.len(), 11);
@@ -138,14 +121,13 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_document_process_short() -> anyhow::Result<()> {
-        let ctx = init_ctx(10, None, 384, 3000).await; // low max_tokens to test short text
+        let ctx = init_ctx(10, None, 384, 3000); // low max_tokens to test short text
         let doc = process_document(
             ctx,
             "test_url".to_string(),
             // Short text to test error -> with filter_splits 4, this will test 0 sentences and 1 sentence for 2 splits
             "a a. a a. a \n\n a a a. a".to_string().as_bytes().to_vec(),
         )
-        .await
         .expect("Failed to process document");
 
         //assert_eq!(doc.splits.len(), 11);
