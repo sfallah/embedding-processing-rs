@@ -6,7 +6,7 @@ use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 
-pub async fn init_ctx(
+pub fn init_ctx(
     max_tokens: usize,
     merge_level: Option<usize>,
     n_embd: usize,

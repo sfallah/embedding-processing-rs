@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tracing::trace;
 
 #[tracing::instrument(skip(ctx, split_res))]
-pub async fn process_split(
+pub fn process_split(
     ctx: Arc<ProcessingContext>,
     split_res: Arc<SplitResultLite>,
     doc_id: u64,
@@ -22,15 +22,13 @@ pub async fn process_split(
         vec![split_res.split_string.clone()],
         ctx.model_id,
         ctx.n_embd,
-    )
-    .await?;
+    )?;
     let summaries = process_summaries(
         ctx.clone(),
         split_res.split_string.clone(),
         doc_id,
         split_id,
-    )
-    .await?;
+    )?;
     Ok(SplitDto::new(
         split_id,
         seq_id,

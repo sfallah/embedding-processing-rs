@@ -68,13 +68,14 @@ async fn main() -> Result<(), anyhow::Error> {
         splitter_config.max_tokens
     };
 
-    let processing_ctx = init_ctx(
+    let processing_ctx =  tokio::task::spawn_blocking(move || {
+        init_ctx(
         splitter_max_tokens,
         splitter_config.merge_level,
         model.n_embd as usize,
         model.model_id,
     )
-    .await;
+    }).await?;
     let clients = ServerTask::init(
         &zmq_config.zmq_host,
         zmq_config.zmq_frontend_port,

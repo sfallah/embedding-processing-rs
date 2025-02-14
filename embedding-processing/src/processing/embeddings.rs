@@ -6,7 +6,7 @@ use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 use crate::processing::context::ProcessingContext;
 
 #[tracing::instrument(skip(ctx, sentences))]
-pub async fn process_embedding(
+pub fn process_embedding(
     ctx: Arc<ProcessingContext>,
     embed_id: u64,
     sentences: Vec<String>,
@@ -14,11 +14,11 @@ pub async fn process_embedding(
     n_embd: usize,
 ) -> anyhow::Result<EmbeddingDto> {
     let embeddings =
-        async_get_embeddings(ctx.zmq_context.clone(), ctx.model_endpoint.clone(), n_embd, sentences.clone(), embed_id).await?;
+        async_get_embeddings(ctx.zmq_context.clone(), ctx.model_endpoint.clone(), n_embd, sentences.clone(), embed_id)?;
     Ok(EmbeddingDto::new(embed_id, embeddings, model_id))
 }
 
-pub async fn async_get_embeddings(
+pub fn async_get_embeddings(
     zmq_ctx: Arc<zmq::Context>,
     model_endpoint: String,
     n_embd: usize,
