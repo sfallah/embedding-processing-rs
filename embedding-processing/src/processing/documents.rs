@@ -2,7 +2,7 @@ use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use embedding_common::dtos::document_dto::DocumentDto;
-use rayon::prelude::*;
+//use rayon::prelude::*;
 use std::sync::Arc;
 use tracing::{error, trace};
 
@@ -19,10 +19,9 @@ pub fn process_document(
 
 
     let split_dtos: Vec<_> = splits
-        .par_iter()
+        .iter()
         .enumerate()
         .filter_map(|(seq_id, split)| {
-            let split = Arc::new(split.clone());
             let ctx = ctx.clone();
             let res = process_split(ctx.clone(), split, doc_id, seq_id as i32);
             match res {

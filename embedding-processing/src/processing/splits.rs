@@ -9,7 +9,7 @@ use tracing::trace;
 #[tracing::instrument(skip(ctx, split_res))]
 pub fn process_split(
     ctx: Arc<ProcessingContext>,
-    split_res: Arc<SplitResultLite>,
+    split_res: &SplitResultLite,
     doc_id: u64,
     seq_id: i32,
 ) -> anyhow::Result<SplitDto> {

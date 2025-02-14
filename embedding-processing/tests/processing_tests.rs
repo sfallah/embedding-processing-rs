@@ -91,7 +91,7 @@ mod tests {
         println!("{:?}", splits);
 
         let split =
-            process_split(ctx, Arc::new(splits[0].clone()), 0, 0).expect("Failed to process split");
+            process_split(ctx, &splits[0], 0, 0).expect("Failed to process split");
         println!("{:?}", split);
         Ok(())
     }
