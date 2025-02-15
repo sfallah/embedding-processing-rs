@@ -2,13 +2,13 @@ use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use embedding_common::dtos::document_dto::DocumentDto;
-//use rayon::prelude::*;
-use std::sync::Arc;
+use rayon::prelude::*;
+use std::rc::Rc;
 use tracing::{error, trace};
 
 #[tracing::instrument(skip(ctx, text))]
 pub fn process_document(
-    ctx: Arc<ProcessingContext>,
+    ctx: Rc<ProcessingContext>,
     url: String,
     text: Vec<u8>,
 ) -> anyhow::Result<DocumentDto> {

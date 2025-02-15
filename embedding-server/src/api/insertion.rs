@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::schema::document::{DocumentInsertionRequest, DocumentInsertionResponse};
 use crate::schema::document_status::DocumentInsertionStatus;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
@@ -16,7 +17,7 @@ use zeromq::RepSocket;
 pub async fn process_document_insertion_request(
     worker_socket: &mut RepSocket,
     db: &Arc<RocksDB>,
-    processing_context: Arc<ProcessingContext>,
+    processing_context: Rc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     message_header: &mut ZmqMessageHeader,

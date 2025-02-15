@@ -3,9 +3,8 @@ use embedding_processing::processing::documents::process_document;
 use embedding_processing::processing::embeddings::get_embeddings;
 use embedding_processing::utils::app_utils::init_ctx;
 use fast_text_splitter::config::SplitterLiteConfig;
-use rayon::prelude::*;
 use std::fs;
-use std::sync::Arc;
+use std::rc::Rc;
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
     c.bench_function("process_doc", |b| {
@@ -33,17 +32,17 @@ pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
     ];
     let splitter =
         SplitterLiteConfig::new_hf(splitter_patterns.clone(), Some(512), None, true, None);
-    let splitter = Arc::new(splitter);
+    let splitter = Rc::new(splitter);
     let splits = splitter.hf_splits(&doc.into_bytes());
     let splits = splits
         .into_iter()
         .map(|split| split.split_string)
         .collect::<Vec<String>>();
     c.bench_function("embeddings_splits", |b| {
-        let zmq_ctx = Arc::new(zmq::Context::new());
+        let zmq_ctx = Rc::new(zmq::Context::new());
         b.iter(|| {
             black_box(splits.clone())
-                .par_iter()
+                .iter()
                 .enumerate()
                 .for_each(|(idx, split)| {
                     let embedding = get_embeddings(
@@ -73,14 +72,14 @@ pub fn embedding_benchmark_batch(c: &mut Criterion, doc: String) {
     ];
     let splitter =
         SplitterLiteConfig::new_hf(splitter_patterns.clone(), Some(512), None, true, None);
-    let splitter = Arc::new(splitter);
+    let splitter = Rc::new(splitter);
     let splits = splitter.hf_splits(&doc.into_bytes());
     let splits = splits
         .into_iter()
         .map(|split| split.split_string)
         .collect::<Vec<String>>();
     c.bench_function("embeddings_splits_batch", |b| {
-        let zmq_ctx = Arc::new(zmq::Context::new());
+        let zmq_ctx = Rc::new(zmq::Context::new());
         b.iter(|| {
             let id_rnd = rand::random::<u64>();
             let embeddings = get_embeddings(

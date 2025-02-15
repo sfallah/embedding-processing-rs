@@ -3,7 +3,7 @@ mod tests {
     use embedding_common::config::ModelConfig;
     use embedding_common::utils::tracting::setup_tracing;
     use embedding_processing::processing::documents::process_document;
-    use embedding_processing::processing::embeddings::async_get_embeddings;
+    use embedding_processing::processing::embeddings::get_embeddings;
     use embedding_processing::processing::splits::process_split;
     use embedding_processing::processing::splitter::split_text;
     use embedding_processing::processing::summaries::process_summaries;
@@ -11,8 +11,6 @@ mod tests {
     use rstest::{fixture, rstest};
     use std::sync::Arc;
     use tracing::{debug, Level};
-
-    const MODEL_PATH: &str = "../models/all-minilm-l6-v2-q2_k.gguf";
 
     #[fixture]
     fn text() -> String {
@@ -40,24 +38,28 @@ mod tests {
         std::fs::read_to_string(file).expect("Failed to read test text file")
     }
 
+    #[test]
     fn test_embeddings() -> anyhow::Result<()> {
-        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
         let ctx = init_ctx(510, Some(3), 384, 500);
         let text = "This is a test text".to_string();
-        let embeddings = async_get_embeddings(
+        let text2 = "This is another test text".to_string();
+        let embeddings = get_embeddings(
             ctx.zmq_context.clone(),
             ctx.model_endpoint.clone(),
             ctx.n_embd,
-            vec![text],
+            vec![text, text2],
             0,
         );
+        assert!(embeddings.is_ok());
+        let embeddings = embeddings?;
+        assert_eq!(embeddings.clone().len(), 2);
         println!("{:?}", embeddings);
 
         Ok(())
     }
 
-    #[tokio::test]
-    async fn test_splitter() -> anyhow::Result<()> {
+    #[test]
+    fn test_splitter() -> anyhow::Result<()> {
         let text = "This is a test text".to_string();
         let ctx = init_ctx(512, None, 384, 0);
         let splitter = ctx.splitter.clone();
@@ -67,6 +69,7 @@ mod tests {
         Ok(())
     }
 
+    #[rstest]
     fn test_summaries_process(text: String) -> anyhow::Result<()> {
         let ctx = init_ctx(512, None, 384, 10);
         let text = text.clone();
@@ -82,7 +85,8 @@ mod tests {
         Ok(())
     }
 
-    async fn test_split_process(text: String) -> anyhow::Result<()> {
+   #[rstest]
+    fn test_split_process(text: String) -> anyhow::Result<()> {
         let ctx = init_ctx(512, None, 384, 3000);
         let text = text.clone();
         let splitter = ctx.clone().splitter.clone();
@@ -96,6 +100,7 @@ mod tests {
         Ok(())
     }
 
+    #[rstest]
     fn test_document_process(text_from_file: String) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
         let ctx = init_ctx(512, None, 384, 100);
