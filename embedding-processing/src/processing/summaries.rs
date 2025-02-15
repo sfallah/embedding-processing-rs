@@ -27,9 +27,9 @@ pub fn process_summaries(
 
     let embeddings = get_embeddings(
         ctx.zmq_context.clone(),
-        ctx.model_endpoint.clone(),
+        &ctx.model_endpoint,
         ctx.n_embd,
-        sentences.clone(),
+        &sentences,
         split_id,
     )?;
 

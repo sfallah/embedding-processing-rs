@@ -918,6 +918,7 @@ dependencies = [
  "config",
  "embedding-common",
  "llama-cpp",
+ "rand 0.9.0",
  "serde",
  "serde_json",
  "tracing",
