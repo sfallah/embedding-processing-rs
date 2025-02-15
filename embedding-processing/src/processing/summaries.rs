@@ -1,3 +1,4 @@
+use std::error::Error;
 use crate::processing::context::ProcessingContext;
 use crate::processing::embeddings::get_embeddings;
 use crate::processing::splitter::split_text;
@@ -8,41 +9,29 @@ use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::rc::Rc;
 use tracing::trace;
 
-#[tracing::instrument(skip(ctx, text))]
 pub fn process_summaries(
     ctx: Rc<ProcessingContext>,
-    text: String,
+    sentences: &[String],
+    sentences_no_tokens: &[usize],
+    embeddings: &[f32],
     doc_id: u64,
     split_id: u64,
 ) -> anyhow::Result<Vec<SummaryDto>> {
     trace!("Processing summaries...");
-    let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes())?;
-    let splits: Vec<_> = filter_splits(&splits, 4);
-    let sentences: Vec<_> = utils::splits_texts(&splits);
     trace!("Number of sentences: {}", sentences.len());
 
     if sentences.len() == 0 {
         return Ok(Vec::new());
     }
 
-    let embeddings = get_embeddings(
-        ctx.zmq_context.clone(),
-        &ctx.model_endpoint,
-        ctx.n_embd,
-        &sentences,
-        split_id,
-    )?;
-
-    let embeddings: Vec<_> = embeddings.into_iter().flatten().collect();
-    let lx_ranks = lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None)?;
-    let no_tokens = tokens_num(splits);
+    let lx_ranks = lexrank_sentences(embeddings.to_vec(), sentences.len(), ctx.n_embd, None, None)?;
 
     let summaries: Vec<_> = lx_ranks
         .into_iter()
         .take(2)
         .map(|(seq_id, score)| {
             let sentence = sentences.get(seq_id).unwrap().clone();
-            let no_tokens = *no_tokens.get(seq_id).unwrap();
+            let no_tokens = sentences_no_tokens[seq_id];
             let i = seq_id * ctx.n_embd;
             let j = (seq_id + 1) * ctx.n_embd;
             let embeddings: Vec<f32> = embeddings[i..j].to_vec();
@@ -64,6 +53,14 @@ pub fn process_summaries(
         })
         .collect();
     Ok(summaries)
+}
+
+pub fn get_sentences(ctx: &Rc<ProcessingContext>, text: String) -> anyhow::Result<(Vec<String>, Vec<usize>)> {
+    let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes())?;
+    let splits: Vec<_> = filter_splits(&splits, 4);
+    let splits_no_tokens: Vec<_> = splits.iter().map(|res| res.tokens.len()).collect();
+    let sentences: Vec<_> = utils::splits_texts(&splits);
+    Ok((sentences, splits_no_tokens))
 }
 
 fn tokens_num(splits: Vec<SplitResultLite>) -> Vec<usize> {

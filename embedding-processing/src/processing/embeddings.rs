@@ -5,19 +5,6 @@ use embedding_common::prelude::Serde;
 use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 use crate::processing::context::ProcessingContext;
 
-#[tracing::instrument(skip(ctx, sentences))]
-pub fn process_embedding(
-    ctx: Rc<ProcessingContext>,
-    embed_id: u64,
-    sentences: &[String],
-    model_id: u64,
-    n_embd: usize,
-) -> anyhow::Result<EmbeddingDto> {
-    let embeddings =
-        get_embeddings(ctx.zmq_context.clone(), &ctx.model_endpoint, n_embd, sentences, embed_id)?;
-    Ok(EmbeddingDto::new(embed_id, embeddings[0].clone(), model_id))
-}
-
 pub fn get_embeddings(
     zmq_ctx: Rc<zmq::Context>,
     model_endpoint: &str,
