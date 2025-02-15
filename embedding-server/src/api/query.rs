@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use crate::schema::document::DocumentQueryRequest;
 use crate::schema::document::DocumentQueryResponse;
 use crate::schema::search_mode::SearchModeType;
@@ -19,7 +20,7 @@ use zeromq::RepSocket;
 pub async fn process_document_query_request(
     worker_socket: &mut RepSocket,
     db: &Arc<RocksDB>,
-    processing_context: Arc<ProcessingContext>,
+    processing_context: Rc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     message_header: &mut ZmqMessageHeader,

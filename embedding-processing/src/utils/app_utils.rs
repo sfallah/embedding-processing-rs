@@ -1,7 +1,7 @@
+use std::rc::Rc;
 use crate::processing::context::ProcessingContext;
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
-use std::sync::Arc;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
@@ -11,7 +11,7 @@ pub fn init_ctx(
     merge_level: Option<usize>,
     n_embd: usize,
     model_id: u64,
-) -> Arc<ProcessingContext> {
+) -> Rc<ProcessingContext> {
     let splitter_patterns = vec![
         vec!["\n\n".to_string()],
         vec!["\n".to_string()],
@@ -40,12 +40,12 @@ pub fn init_ctx(
 
     let hasher = DeterministicAHasher::new(None, None);
     let zmq_context = zmq::Context::new();
-    Arc::new(ProcessingContext {
-        zmq_context: Arc::new(zmq_context),
+    Rc::new(ProcessingContext {
+        zmq_context: Rc::new(zmq_context),
         model_endpoint: "tcp://localhost:5559".to_string(),
-        splitter: Arc::new(nw_splitter),
-        sentence_splitter: Arc::new(sentence_splitter),
-        hasher: Arc::new(hasher),
+        splitter: Rc::new(nw_splitter),
+        sentence_splitter: Rc::new(sentence_splitter),
+        hasher: Rc::new(hasher),
         n_embd,
         model_id,
     })

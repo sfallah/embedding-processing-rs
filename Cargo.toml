@@ -5,7 +5,7 @@ members = [
     "embedding-processing",
     "embedding-database",
     "embedding-index",
-    "embedding-server",
+    #"embedding-server",
     "embedding-model",
 ]
 

@@ -1,16 +1,16 @@
 use crate::processing::context::ProcessingContext;
-use crate::processing::embeddings::async_get_embeddings;
+use crate::processing::embeddings::get_embeddings;
 use crate::processing::splitter::split_text;
 use crate::processing::utils;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::summary_dto::SummaryDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
-use std::sync::Arc;
+use std::rc::Rc;
 use tracing::trace;
 
 #[tracing::instrument(skip(ctx, text))]
 pub fn process_summaries(
-    ctx: Arc<ProcessingContext>,
+    ctx: Rc<ProcessingContext>,
     text: String,
     doc_id: u64,
     split_id: u64,
@@ -25,7 +25,7 @@ pub fn process_summaries(
         return Ok(Vec::new());
     }
 
-    let embeddings = async_get_embeddings(
+    let embeddings = get_embeddings(
         ctx.zmq_context.clone(),
         ctx.model_endpoint.clone(),
         ctx.n_embd,
@@ -33,6 +33,7 @@ pub fn process_summaries(
         split_id,
     )?;
 
+    let embeddings: Vec<_> = embeddings.into_iter().flatten().collect();
     let lx_ranks = lexrank_sentences(embeddings.clone(), sentences.len(), ctx.n_embd, None, None)?;
     let no_tokens = tokens_num(splits);
 

@@ -3,12 +3,12 @@ use crate::processing::embeddings::process_embedding;
 use crate::processing::summaries::process_summaries;
 use embedding_common::dtos::split_dto::SplitDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
-use std::sync::Arc;
+use std::rc::Rc;
 use tracing::trace;
 
 #[tracing::instrument(skip(ctx, split_res))]
 pub fn process_split(
-    ctx: Arc<ProcessingContext>,
+    ctx: Rc<ProcessingContext>,
     split_res: &SplitResultLite,
     doc_id: u64,
     seq_id: i32,
