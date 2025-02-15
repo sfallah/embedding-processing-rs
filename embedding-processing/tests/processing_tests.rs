@@ -6,7 +6,7 @@ mod tests {
     use embedding_processing::processing::embeddings::get_embeddings;
     use embedding_processing::processing::splits::process_split;
     use embedding_processing::processing::splitter::split_text;
-    use embedding_processing::processing::summaries::process_summaries;
+    use embedding_processing::processing::summaries::{get_sentences, process_summaries};
     use embedding_processing::utils::app_utils::init_ctx;
     use rstest::{fixture, rstest};
     use std::sync::Arc;
@@ -45,9 +45,9 @@ mod tests {
         let text2 = "This is another test text".to_string();
         let embeddings = get_embeddings(
             ctx.zmq_context.clone(),
-            ctx.model_endpoint.clone(),
+            &ctx.model_endpoint,
             ctx.n_embd,
-            vec![text, text2],
+            &vec![text, text2],
             0,
         );
         assert!(embeddings.is_ok());
@@ -73,7 +73,23 @@ mod tests {
     fn test_summaries_process(text: String) -> anyhow::Result<()> {
         let ctx = init_ctx(512, None, 384, 10);
         let text = text.clone();
-        let summaries = process_summaries(ctx, text, 0, 0).expect("Failed to process summaries");
+        let (sentences, no_tokens) = get_sentences(&ctx, text.clone()).expect("Failed to get sentences");
+        let embeddings = get_embeddings(
+            ctx.zmq_context.clone(),
+            &ctx.model_endpoint,
+            ctx.n_embd,
+            &sentences,
+            0,
+        ).expect("Failed to get embeddings");
+        let embeddings = embeddings.into_iter().flatten().collect::<Vec<f32>>();
+        let summaries = process_summaries(
+            ctx,
+            &sentences,
+            &no_tokens,
+            &embeddings,
+            0,
+            0,
+        ).expect("Failed to process summaries");
         println!("{:?}", summaries);
         assert_eq!(summaries.len(), 2);
         let sum_texts = summaries
