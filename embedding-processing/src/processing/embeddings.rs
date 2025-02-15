@@ -9,20 +9,20 @@ use crate::processing::context::ProcessingContext;
 pub fn process_embedding(
     ctx: Rc<ProcessingContext>,
     embed_id: u64,
-    sentences: Vec<String>,
+    sentences: &[String],
     model_id: u64,
     n_embd: usize,
 ) -> anyhow::Result<EmbeddingDto> {
     let embeddings =
-        get_embeddings(ctx.zmq_context.clone(), ctx.model_endpoint.clone(), n_embd, sentences.clone(), embed_id)?;
+        get_embeddings(ctx.zmq_context.clone(), &ctx.model_endpoint, n_embd, sentences, embed_id)?;
     Ok(EmbeddingDto::new(embed_id, embeddings[0].clone(), model_id))
 }
 
 pub fn get_embeddings(
     zmq_ctx: Rc<zmq::Context>,
-    model_endpoint: String,
+    model_endpoint: &str,
     n_embd: usize,
-    texts: Vec<String>,
+    texts: &[String],
     embed_id: u64,
 ) -> anyhow::Result<Vec<Vec<f32>>> {
     let socket = zmq_ctx.socket(zmq::DEALER)?;
@@ -41,7 +41,7 @@ pub fn get_embeddings(
         .expect("Failed to set identity");
     trace!("Processing embedding...");
     //FIXME: n_embd is hardcoded to 384
-    let request = EmbeddingsRequest::new(0, 0, n_embd, texts);
+    let request = EmbeddingsRequest::new(0, 0, n_embd, texts.to_vec());
     let msg = request.pack().expect("Failed to pack");
     socket.send(msg, 0).expect("Failed to send");
     let rsp = socket.recv_bytes(0).expect("Failed to receive");

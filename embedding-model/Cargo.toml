@@ -14,6 +14,7 @@ embedding-common = { path = "../embedding-common" }
 config = { version = "0.15.7", features = ["toml", "async"], default-features = false }
 zmq = {workspace = true}
 uuid = {workspace = true}
+rand = "0.9.0"
 
 [features]
 default = []

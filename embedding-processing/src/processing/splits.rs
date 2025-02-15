@@ -19,7 +19,7 @@ pub fn process_split(
     let embedding = process_embedding(
         ctx.clone(),
         split_id,
-        vec![split_res.split_string.clone()],
+        &[split_res.split_string.clone()],
         ctx.model_id,
         ctx.n_embd,
     )?;

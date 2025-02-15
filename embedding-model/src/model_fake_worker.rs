@@ -5,9 +5,27 @@ use embedding_common::prelude::Serde;
 use embedding_common::utils::tracting::setup_tracing;
 use embedding_model::config::ModelAppConfig;
 use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
-use std::thread;
-use std::time::Duration;
+use rand::distr::Uniform;
+use rand::Rng;
 use tracing::{debug, error, info};
+
+fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
+    // Create a uniform distribution for f32 values between 0.0 and 1.0
+    let distribution = Uniform::new(0.0, 1.0).expect("Failed to create distribution");
+
+    // Initialize the matrix with random values
+    let mut matrix = vec![vec![0.0; cols]; rows];
+
+    // Fill the matrix with random values
+    let mut rng = rand::rng();
+    for i in 0..rows {
+        for j in 0..cols {
+            matrix[i][j] = rng.sample(distribution);
+        }
+    }
+
+    matrix
+}
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
@@ -68,20 +86,11 @@ fn main() -> anyhow::Result<()> {
             }
         };
 
-        //thread::sleep(Duration::from_millis(30));
-        let n_texts = request.texts.len();
-
-        let mut output = Vec::new();
-        for _ in  0..n_texts {
-            let embeddings = vec![0.0; request.n_embd];
-            output.push(embeddings);
-        }
-
         let response = EmbeddingsResponse::new(
             request.req_id,
             request.seq_id,
             request.n_embd,
-            output.to_vec(),
+            generate_random_matrix(request.texts.len(), request.n_embd),
         );
         let response_bytes = response.pack()?;
         if let Err(e) = socket.send_multipart(vec![identity, response_bytes.into()], 0) {

@@ -2,7 +2,6 @@ use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use embedding_common::dtos::document_dto::DocumentDto;
-use rayon::prelude::*;
 use std::rc::Rc;
 use tracing::{error, trace};
 
