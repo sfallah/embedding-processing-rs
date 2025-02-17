@@ -102,12 +102,12 @@ pub fn benches() {
         .measurement_time(std::time::Duration::from_secs(20))
         .configure_from_args();
 
-    //let file_path = "tests/test_data/superlinear.txt".to_string();
-    let file_path = "tests/test_data/United_States.txt".to_string();
+    let file_path = "tests/test_data/superlinear.txt".to_string();
+    //let file_path = "tests/test_data/United_States.txt".to_string();
     // read the file
     let doc = fs::read_to_string(file_path).unwrap();
     process_doc(&mut criterion, doc.clone());
     embedding_benchmark(&mut criterion, doc.clone());
-    embedding_benchmark_batch(&mut criterion, doc);
+    //embedding_benchmark_batch(&mut criterion, doc);
 }
 criterion_main!(benches);
