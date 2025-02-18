@@ -1,13 +1,11 @@
-use embedding_common::dtos::embedding_dto::EmbeddingDto;
-use std::rc::Rc;
 use std::sync::Arc;
 use tracing::trace;
+use zmq::Context;
 use embedding_common::prelude::Serde;
 use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
-use crate::processing::context::ProcessingContext;
 
 pub fn get_embeddings(
-    zmq_ctx: Rc<zmq::Context>,
+    zmq_ctx: Arc<Context>,
     model_endpoint: &str,
     n_embd: usize,
     texts: &[String],

@@ -12,4 +12,4 @@ verbose = true
 host = "127.0.0.1"
 frontend_port = 5559
 backend_port = 5560
-num_workers = 4
+num_workers = 1
