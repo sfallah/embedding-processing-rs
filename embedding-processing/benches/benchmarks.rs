@@ -10,6 +10,7 @@ use rand::distr::Uniform;
 use rand::Rng;
 use embedding_common::prelude::Serde;
 use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
+use rayon::prelude::*;
 
 fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
     // Create a uniform distribution for f32 values between 0.0 and 1.0
@@ -65,7 +66,7 @@ pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
         let zmq_ctx = Arc::new(zmq::Context::new());
         b.iter(|| {
             black_box(splits.clone())
-                .iter()
+                .par_iter()
                 .enumerate()
                 .for_each(|(idx, split)| {
                     let embedding = get_embeddings_2(
@@ -171,9 +172,9 @@ pub fn benches() {
     let file_path = "tests/test_data/superlinear.txt".to_string();
     // read the file
     let doc = fs::read_to_string(file_path).unwrap();
-    process_doc(&mut criterion, doc.clone());
+    //process_doc(&mut criterion, doc.clone());
     //embedding_msgpack_benchmark(&mut criterion, doc.clone());
-    embedding_benchmark_batch(&mut criterion, doc.clone());
+    //embedding_benchmark_batch(&mut criterion, doc.clone());
     embedding_benchmark(&mut criterion, doc.clone());
 }
 criterion_main!(benches);
