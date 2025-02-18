@@ -1,10 +1,11 @@
 
 
 [model]
-gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
+#gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
+gguf_file = "models/bge-m3-q4_k_m.gguf"
 #cpu = false
-ngl = 16
-verbose = false
+ngl = 1000
+verbose = true
 
 
 [zmq]

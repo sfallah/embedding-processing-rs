@@ -1,3 +1,4 @@
+use std::num::NonZero;
 use anyhow::Context;
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
@@ -38,20 +39,28 @@ fn main() -> anyhow::Result<()> {
     }
 
     // offload all layers to the gpu
-    let model_params = if cfg!(feature = "cuda") {
+    let mut model_params = if cfg!(feature = "cuda") {
         LlamaModelParams::default().with_n_gpu_layers(config.model_config.ngl as u32)
     } else {
         LlamaModelParams::default()
     };
+
 
     let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
 
     let model = LlamaModel::load_from_file(&backend, model_path, &model_params)
         .with_context(|| "unable to load model")?;
 
+    let n_ctx = model.n_ctx_train();
+
+    error!("model n_ctx_train: {}", n_ctx);
+
     // initialize the context
     let ctx_params = LlamaContextParams::default()
         .with_n_threads_batch(std::thread::available_parallelism()?.get().try_into()?)
+        .with_n_ctx(Some(NonZero::new(n_ctx).unwrap()))
+        .with_n_batch(n_ctx)
+        .with_n_ubatch(n_ctx)
         .with_embeddings(true);
 
     let mut ctx = model
