@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
     }
 
     // offload all layers to the gpu
-    let mut model_params = if cfg!(feature = "cuda") {
+    let model_params = if cfg!(feature = "cuda") {
         LlamaModelParams::default().with_n_gpu_layers(config.model_config.ngl as u32)
     } else {
         LlamaModelParams::default()

@@ -4,12 +4,12 @@ use crate::processing::summaries::{get_sentences, process_summaries};
 use embedding_common::dtos::split_dto::SplitDto;
 use embedding_common::dtos::EmbeddingDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
-use std::rc::Rc;
+use std::sync::Arc;
 use tracing::trace;
 
 #[tracing::instrument(skip(ctx, split_res))]
 pub fn process_split(
-    ctx: Rc<ProcessingContext>,
+    ctx: Arc<ProcessingContext>,
     split_res: &SplitResultLite,
     doc_id: u64,
     seq_id: i32,
@@ -17,7 +17,7 @@ pub fn process_split(
     let split_id = ctx.hasher.hash(&format!("{}{}", doc_id, seq_id));
     trace!("Processing split: {}", split_id);
 
-    let (sentences, sentences_no_tokens) = get_sentences(&ctx, split_res.split_string.clone())?;
+    let (sentences, sentences_no_tokens) = get_sentences(ctx.clone(), split_res.split_string.clone())?;
 
     let mut text_vec = Vec::new();
     text_vec.push(split_res.split_string.clone());
