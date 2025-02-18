@@ -20,6 +20,8 @@ fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
 
     // Fill the matrix with random values
     let mut rng = rand::rng();
+    // parallelize this loop
+
     for i in 0..rows {
         for j in 0..cols {
             matrix[i][j] = rng.sample(distribution);
@@ -31,8 +33,8 @@ fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
-    //let uuid = uuid::Uuid::new_v4();
-    //let worker_id = uuid.to_string();
+    let uuid = uuid::Uuid::new_v4();
+    let worker_id = uuid.to_string();
 
 
     setup_tracing(args.log_level.to_tracing_level());
@@ -78,7 +80,7 @@ fn main() -> anyhow::Result<()> {
                 break;
             }
         };
-        //debug!("Worker {} received messages", worker_id);
+        //info!("Worker {} received messages", worker_id);
         let identity = messages[0].clone();
         let request = match EmbeddingsRequest::unpack::<EmbeddingsRequest>(&messages[1]) {
             Ok(request) => request,
@@ -88,7 +90,9 @@ fn main() -> anyhow::Result<()> {
             }
         };
 
-        //thread::sleep(Duration::from_millis(30));
+        let rnd_sleep = rand::rng().random_range(0..20);
+
+        thread::sleep(Duration::from_millis(rnd_sleep));
 
         let response = EmbeddingsResponse::new(
             request.req_id,

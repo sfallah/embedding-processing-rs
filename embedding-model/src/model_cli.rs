@@ -53,7 +53,7 @@ fn main() -> anyhow::Result<()> {
     };
     children.push(broker);
     for _ in 0..config.zmq_config.num_workers {
-        let worker = match spawn_process("model_fake_worker",args.config_file.as_str()) {
+        let worker = match spawn_process("model_worker",args.config_file.as_str()) {
             Ok(worker) => worker,
             Err(e) => {
                 error!("Failed to spawn model_worker: {:?}", e);
