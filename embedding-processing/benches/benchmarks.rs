@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_main, Criterion};
 use embedding_processing::processing::documents::process_document;
-use embedding_processing::processing::embeddings::{get_embeddings, get_embeddings_2};
+use embedding_processing::processing::embeddings::{get_embeddings};
 use embedding_processing::utils::app_utils::init_ctx;
 use fast_text_splitter::config::SplitterLiteConfig;
 use std::fs;
@@ -68,7 +68,7 @@ pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
                 .par_iter()
                 .enumerate()
                 .for_each(|(idx, split)| {
-                    let embedding = get_embeddings_2(
+                    let embedding = get_embeddings(
                         zmq_ctx.clone(),
                         "tcp://127.0.0.1:5559",
                         384,
@@ -170,9 +170,9 @@ pub fn benches() {
     let file_path = "tests/test_data/superlinear.txt".to_string();
     // read the file
     let doc = fs::read_to_string(file_path).unwrap();
-    //process_doc(&mut criterion, doc.clone());
+    process_doc(&mut criterion, doc.clone());
     //embedding_msgpack_benchmark(&mut criterion, doc.clone());
-    //embedding_benchmark_batch(&mut criterion, doc.clone());
+    embedding_benchmark_batch(&mut criterion, doc.clone());
     embedding_benchmark(&mut criterion, doc.clone());
 }
 criterion_main!(benches);
