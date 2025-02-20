@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub(crate) async fn save_summary_aux(
+pub(crate) fn save_summary_aux(
     dtos: &Vec<SummaryDto>,
     user_id: Uuid,
     db_records: &mut Vec<DbRecordValue>,
@@ -20,11 +20,11 @@ pub(crate) async fn save_summary_aux(
         let embedding = dto.to_embedding_backend();
         let embedding_user = dto.to_embedding_user_model(user_id);
         if let Some(embedding) = embedding {
-            let embedding_record = to_embedding_record(&embedding).await?;
+            let embedding_record = to_embedding_record(&embedding)?;
             db_records.push(embedding_record);
         }
         if let Some(embedding_user) = embedding_user {
-            let embedding_user_record = to_embedding_user_record(&embedding_user).await?;
+            let embedding_user_record = to_embedding_user_record(&embedding_user)?;
             db_records.push(embedding_user_record);
         }
         let summary_record = DbRecordValue::new(
@@ -37,7 +37,7 @@ pub(crate) async fn save_summary_aux(
     Ok(())
 }
 
-pub(crate) async fn delete_summaries_aux(
+pub(crate) fn delete_summaries_aux(
     summary_ids: &Vec<u64>,
     db_records: &mut Vec<DbRecordKey>,
 ) -> Result<()> {
@@ -52,16 +52,16 @@ pub(crate) async fn delete_summaries_aux(
     Ok(())
 }
 
-pub async fn get_summaries_full(
+pub fn get_summaries_full(
     db: &Arc<RocksDB>,
     summary_ids: &[u64],
     summaries_query_res: Option<&IndexMap<u64, f32>>,
     with_embeddings: bool,
 ) -> Result<Vec<SummaryDto>> {
-    let summaries = get_all_summaries(db, summary_ids).await?;
+    let summaries = get_all_summaries(db, summary_ids)?;
     let summary_ids: Vec<_> = summaries.iter().map(|s| s.summary_id).collect();
     let embeddings_map = if with_embeddings {
-        get_embeddings_map(db, summary_ids.as_slice()).await?
+        get_embeddings_map(db, summary_ids.as_slice())?
     } else {
         IndexMap::new()
     };
@@ -80,13 +80,13 @@ pub async fn get_summaries_full(
     Ok(summary_dtos)
 }
 
-pub async fn get_split_summaries_map(
+pub fn get_split_summaries_map(
     db: &Arc<RocksDB>,
     summary_ids: &[u64],
     query_res: Option<&IndexMap<u64, f32>>,
     with_embeddings: bool,
 ) -> Result<IndexMap<u64, Vec<SummaryDto>>> {
-    let summary_dtos = get_summaries_full(db, summary_ids, query_res, with_embeddings).await?;
+    let summary_dtos = get_summaries_full(db, summary_ids, query_res, with_embeddings)?;
     let mut summary_map: IndexMap<u64, Vec<SummaryDto>> = IndexMap::new();
     for summary_dto in summary_dtos {
         let split_id = summary_dto.split_id;

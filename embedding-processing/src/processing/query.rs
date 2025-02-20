@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::Arc;
 use tracing::trace;
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
@@ -6,7 +6,7 @@ use crate::processing::utils;
 use crate::processing::embeddings::get_embeddings;
 
 pub fn process_query(
-    ctx: Rc<ProcessingContext>,
+    ctx: Arc<ProcessingContext>,
     query: String,
 ) -> anyhow::Result<Vec<Vec<f32>>> {
     trace!("Processing embedding...");

@@ -13,7 +13,7 @@ pub fn has_embedding_user(
     crate::dao::embedding_user_dao::has_embedding_user(db, embed_id, user_uuids)
 }
 
-pub async fn to_embedding_user_record(
+pub fn to_embedding_user_record(
     embedding_user: &EmbeddingUser,
 ) -> anyhow::Result<DbRecordValue> {
     Ok(DbRecordValue::new(

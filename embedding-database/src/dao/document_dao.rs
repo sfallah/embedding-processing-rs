@@ -5,22 +5,22 @@ use embedding_common::prelude::*;
 use std::sync::Arc;
 
 /// Stores a `Document` in the database.
-pub async fn put_document(db: &Arc<RocksDB>, document: &Document) -> anyhow::Result<()> {
+pub fn put_document(db: &Arc<RocksDB>, document: &Document) -> anyhow::Result<()> {
     let document_id = &document.document_id;
     let data = document
         .pack()
         .map_err(|e| anyhow!("Failed to pack document: {}", e))?;
     db.put(ColumnFamilyType::Documents, document_id, &data)
-        .await?;
+        ?;
     Ok(())
 }
 
 /// Retrieves a `Document` by its ID.
-pub async fn get_document(
+pub fn get_document(
     db: &Arc<RocksDB>,
     document_id: &u64,
 ) -> anyhow::Result<Option<Document>> {
-    match db.get(ColumnFamilyType::Documents, document_id).await? {
+    match db.get(ColumnFamilyType::Documents, document_id)? {
         Some(data) => {
             let document =
                 Document::unpack(&data).map_err(|e| anyhow!("Failed to unpack document: {}", e))?;
@@ -30,6 +30,6 @@ pub async fn get_document(
     }
 }
 
-pub async fn delete_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Result<()> {
-    db.delete(ColumnFamilyType::Documents, document_id).await
+pub fn delete_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Result<()> {
+    db.delete(ColumnFamilyType::Documents, document_id)
 }

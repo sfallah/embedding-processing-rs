@@ -1,7 +1,6 @@
 use crate::hnsw_index::HnswIndex;
 use embedding_common::prelude::{DocumentDto, EmbeddingDataType};
 use embedding_database::prelude::{get_all_embeddings, RocksDB};
-use futures::future::join_all;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -12,7 +11,7 @@ pub mod utils;
 use index_record::IndexRecord;
 
 #[tracing::instrument(skip(splits_index, summaries_index, doc_dto))]
-pub async fn add_to_indices(
+pub fn add_to_indices(
     splits_index: Arc<HnswIndex>,
     summaries_index: Arc<HnswIndex>,
     doc_dto: &DocumentDto,
@@ -43,31 +42,29 @@ pub async fn add_to_indices(
 
     splits_index
         .upsert_batch_records(Arc::new(split_entries))
-        .await?;
+        ?;
     summaries_index
         .upsert_batch_records(Arc::new(summary_entries))
-        .await?;
+        ?;
     Ok(())
 }
 
 #[tracing::instrument(skip(splits_index, summaries_index))]
-pub async fn save_index(
+pub fn save_index(
     splits_index: Arc<HnswIndex>,
     summaries_index: Arc<HnswIndex>,
 ) -> anyhow::Result<()> {
-    join_all(vec![splits_index.save(), summaries_index.save()])
-        .await
-        .into_iter()
-        .collect::<anyhow::Result<()>>()?;
+    splits_index.save()?;
+    summaries_index.save()?;
     Ok(())
 }
 
-pub async fn initialize_index_from_db(
+pub fn initialize_index_from_db(
     db: &Arc<RocksDB>,
     split_index: &HnswIndex,
     summary_index: &HnswIndex,
 ) -> anyhow::Result<()> {
-    let embedding_data = match get_all_embeddings(db).await {
+    let embedding_data = match get_all_embeddings(db) {
         Ok(embedding_data) => embedding_data,
         Err(e) => {
             let error_message = format!("Failed to get all embedding data: {}", e);
@@ -101,7 +98,7 @@ pub async fn initialize_index_from_db(
     }
     if let Err(e) = split_index
         .upsert_batch(&split_embeddings, &split_labels)
-        .await
+
     {
         error!("Failed to add split embeddings: {}", e);
     } else {
@@ -110,7 +107,7 @@ pub async fn initialize_index_from_db(
 
     if let Err(e) = summary_index
         .upsert_batch(&summary_embeddings, &summary_labels)
-        .await
+
     {
         error!("Failed to add summary embeddings: {}", e);
     } else {

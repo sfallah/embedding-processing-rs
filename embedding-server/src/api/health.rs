@@ -1,12 +1,13 @@
 use std::sync::Arc;
-use zeromq::RepSocket;
 use embedding_common::config::ZmqConfig;
 use crate::schema::health_check::HealthCheckResponse;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::send_success_response;
 
-pub async fn process_health_check(
-    socket: &mut RepSocket,
+pub fn process_health_check(
+    socket: Arc<zmq::Socket>,
+    identity: &Vec<u8>,
+
     message_header: &mut ZmqMessageHeader,
     zmq_config: Arc<ZmqConfig>,
 ) {
@@ -16,5 +17,5 @@ pub async fn process_health_check(
         worker_count: zmq_config.zmq_num_workers,
     };
 
-    send_success_response(socket, response, message_header).await;
+    send_success_response(socket.clone(),identity, response, message_header);
 }

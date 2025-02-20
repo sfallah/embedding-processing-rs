@@ -951,6 +951,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedding-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "embedding-common",
+ "embedding-database",
+ "embedding-index",
+ "embedding-model",
+ "embedding-processing",
+ "indexmap",
+ "num_cpus",
+ "serde",
+ "serde_repr",
+ "tracing",
+ "uuid",
+ "zmq",
+]
+
+[[package]]
 name = "encode_unicode"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"

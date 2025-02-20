@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use crate::schema::document::DocumentQueryRequest;
 use crate::schema::document::DocumentQueryResponse;
 use crate::schema::search_mode::SearchModeType;
@@ -14,16 +13,16 @@ use embedding_processing::processing::query::process_query;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use tracing::{debug, error, info};
-use zeromq::RepSocket;
 
 // Requests calling embedding model
-pub async fn process_document_query_request(
-    worker_socket: &mut RepSocket,
+pub fn process_document_query_request(
+    worker_socket: Arc<zmq::Socket>,
     db: &Arc<RocksDB>,
-    processing_context: Rc<ProcessingContext>,
+    processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     message_header: &mut ZmqMessageHeader,
+    identity: &Vec<u8>,
     body_message: &Vec<u8>,
 ) {
     let request: DocumentQueryRequest;
@@ -32,7 +31,7 @@ pub async fn process_document_query_request(
         Err(e) => {
             let error_message = format!("Error unpacking DocumentQueryRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket, &error_message, message_header).await;
+            send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
             return;
         }
     }
@@ -44,12 +43,11 @@ pub async fn process_document_query_request(
         .search_mode
         .unwrap_or(SearchModeType::SplitAndSummary);
 
-    let query_embeddings = tokio::task::spawn_blocking(move || {
+    let query_embeddings =
         process_query(
             processing_context.clone(),
             request.input.clone(),
-        ).expect("Failed to process query")
-    }).await.unwrap();
+        ).expect("Failed to process query");
     let query_embeddings = &query_embeddings[0];
 
     // 1. Search for the query in the indexes
@@ -66,7 +64,7 @@ pub async fn process_document_query_request(
                 &query_embeddings,
                 top_k,
             )
-            .await
+
             .unwrap();
         debug!("Summary query results: {:?}", summaries_query_res);
 
@@ -77,7 +75,7 @@ pub async fn process_document_query_request(
             Some(&summaries_query_res),
             with_embeddings,
         )
-        .await
+
         .unwrap();
     }
 
@@ -91,7 +89,7 @@ pub async fn process_document_query_request(
                 &query_embeddings,
                 top_k,
             )
-            .await
+
             .unwrap();
         debug!("Split query results: {:?}", split_query_res);
     }
@@ -118,19 +116,19 @@ pub async fn process_document_query_request(
         Some(&split_summary_map),
         with_embeddings,
     )
-    .await
+
     .unwrap();
 
     // Load documents from rocks db
     let mut docs: Vec<DocumentDto> = Vec::new();
     for (doc_id, doc_splits) in doc_split_map.into_iter() {
-        let doc_dto = get_full_doc(db, doc_id, with_embeddings, Some(doc_splits)).await;
+        let doc_dto = get_full_doc(db, doc_id, with_embeddings, Some(doc_splits));
         match doc_dto {
             Ok(Some(doc)) => docs.push(doc),
             Ok(None) => {
                 let error_message = format!("Document not found for id: {}", doc_id);
                 error!("{}", error_message);
-                send_exception_response(worker_socket, &error_message, message_header).await;
+                send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
             }
             Err(e) => {
                 let error_message = format!(
@@ -138,7 +136,7 @@ pub async fn process_document_query_request(
                     doc_id, e
                 );
                 error!("{}", error_message);
-                send_exception_response(worker_socket, &error_message, message_header).await;
+                send_exception_response(worker_socket.clone(), identity, &error_message, message_header);
             }
         }
     }
@@ -147,17 +145,19 @@ pub async fn process_document_query_request(
     send_document_query_response(
         worker_socket,
         &request.model,
+        identity,
         message_header,
         &docs,
         &query_embeddings,
         with_embeddings,
     )
-    .await;
+    ;
 }
 
-async fn send_document_query_response(
-    socket: &mut RepSocket,
+fn send_document_query_response(
+    socket: Arc<zmq::Socket>,
     model: &str,
+    identity: &Vec<u8>,
     message_header: &mut ZmqMessageHeader,
     documents: &Vec<DocumentDto>,
     query_embeddings: &Vec<f32>,
@@ -172,5 +172,5 @@ async fn send_document_query_response(
             None
         },
     };
-    send_success_response(socket, response, message_header).await
+    send_success_response(socket.clone(),identity, response, message_header)
 }

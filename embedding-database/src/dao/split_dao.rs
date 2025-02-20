@@ -5,8 +5,8 @@ use embedding_common::prelude::*;
 use std::sync::Arc;
 use tracing::error;
 
-pub async fn get_all_splits(db: &Arc<RocksDB>, split_ids: &[u64]) -> anyhow::Result<Vec<Split>> {
-    let split_bytes = db.multi_get(ColumnFamilyType::Splits, split_ids).await?;
+pub fn get_all_splits(db: &Arc<RocksDB>, split_ids: &[u64]) -> anyhow::Result<Vec<Split>> {
+    let split_bytes = db.multi_get(ColumnFamilyType::Splits, split_ids)?;
     let mut splits = Vec::new();
     for option_bytes in split_bytes {
         if let Some(bytes) = option_bytes {
@@ -18,8 +18,8 @@ pub async fn get_all_splits(db: &Arc<RocksDB>, split_ids: &[u64]) -> anyhow::Res
     Ok(splits)
 }
 
-pub async fn get_split(db: &Arc<RocksDB>, split_id: u64) -> anyhow::Result<Option<Split>> {
-    let split_bytes = db.get(ColumnFamilyType::Splits, &split_id).await?;
+pub fn get_split(db: &Arc<RocksDB>, split_id: u64) -> anyhow::Result<Option<Split>> {
+    let split_bytes = db.get(ColumnFamilyType::Splits, &split_id)?;
     match split_bytes {
         None => Ok(None),
         Some(bytes) => match Split::unpack(&bytes) {

@@ -2,33 +2,31 @@ use crate::db::column_families::ColumnFamilyType;
 use crate::db::rocksdb_impl::RocksDB;
 use anyhow::{anyhow, Context};
 use embedding_common::prelude::*;
-use futures::future::try_join_all;
 use std::sync::Arc;
 
-pub async fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embedding>> {
+pub fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embedding>> {
     let embedding_data_bytes_vec = db
         .get_all(ColumnFamilyType::Embeddings)
-        .await
+
         .context("Failed to get all embeddings")?;
 
-    let futures = embedding_data_bytes_vec
+    let embeddings_data =  embedding_data_bytes_vec
         .into_iter()
-        .map(|embedding_data_bytes| async move {
-            Embedding::unpack(&embedding_data_bytes).context("Failed to unpack embedding")
-        });
+        .map(|embedding_data_bytes| {
+            Embedding::unpack(&embedding_data_bytes).expect("Failed to unpack embedding")
+        }).collect::<Vec<_>>();
 
-    let embeddings_data = try_join_all(futures).await?;
 
     Ok(embeddings_data)
 }
 
-pub async fn get_embeddings(
+pub fn get_embeddings(
     db: &Arc<RocksDB>,
     embedding_ids: &[u64],
 ) -> anyhow::Result<Vec<Embedding>> {
     let embedding_data_bytes_vec = db
         .multi_get(ColumnFamilyType::Embeddings, embedding_ids)
-        .await
+
         .context("Failed to get all embeddings")?;
     let mut embeddings = Vec::new();
     for option_bytes in embedding_data_bytes_vec {
@@ -42,11 +40,11 @@ pub async fn get_embeddings(
 }
 
 /// Retrieves an `Embedding` by its ID.
-pub async fn get_embedding(
+pub fn get_embedding(
     db: &Arc<RocksDB>,
     embedding_id: &u64,
 ) -> anyhow::Result<Option<Embedding>> {
-    match db.get(ColumnFamilyType::Embeddings, embedding_id).await? {
+    match db.get(ColumnFamilyType::Embeddings, embedding_id)? {
         Some(data) => {
             let embedding = Embedding::unpack(&data)
                 .map_err(|e| anyhow!("Failed to unpack embedding: {}", e))?;

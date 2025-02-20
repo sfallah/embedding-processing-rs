@@ -8,7 +8,6 @@ use rocksdb::{
 };
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::task;
 use tracing::instrument;
 use tracing::{debug, info, trace};
 
@@ -60,7 +59,7 @@ impl RocksDB {
 
     /// Opens the RocksDB database asynchronously.
     #[instrument]
-    pub async fn open(path: &str) -> Result<Self> {
+    pub fn open(path: &str) -> Result<Self> {
         let cfs = vec![
             "default",
             "documents",
@@ -75,10 +74,7 @@ impl RocksDB {
 
         info!("Opening RocksDB at path: {}", path);
 
-        let db = task::spawn_blocking(move || -> Result<OptimisticTransactionDB<MultiThreaded>> {
-            Self::open_column_families(&path, cfs)
-        })
-        .await??;
+        let db = Self::open_column_families(&path, cfs)?;
 
         info!("Successfully opened RocksDB at path: {}", path_clone);
 
@@ -86,7 +82,7 @@ impl RocksDB {
     }
 
     /// Asynchronously puts a key-value pair into the specified cf.
-    pub async fn put(&self, cf: ColumnFamilyType, key: &u64, value: &[u8]) -> Result<()> {
+    pub fn put(&self, cf: ColumnFamilyType, key: &u64, value: &[u8]) -> Result<()> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
         let value = value.to_vec();
@@ -95,20 +91,15 @@ impl RocksDB {
 
         trace!("Putting key: {} into cf: {}", key, cf_name_clone);
 
-        task::spawn_blocking(move || -> Result<()> {
-            let cf = db
-                .cf_handle(&cf_name)
-                .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
-            db.put_cf(&cf, &key_bytes, &value)?;
-            Ok(())
-        })
-        .await??;
-
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        db.put_cf(&cf, &key_bytes, &value)?;
         Ok(())
     }
 
     /// Asynchronously gets the value associated with a key from the specified cf.
-    pub async fn get(&self, cf: ColumnFamilyType, key: &u64) -> Result<Option<Vec<u8>>> {
+    pub fn get(&self, cf: ColumnFamilyType, key: &u64) -> Result<Option<Vec<u8>>> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
@@ -116,16 +107,12 @@ impl RocksDB {
 
         trace!("Getting key: {} from cf: {}", key, cf_name_clone);
 
-        let result = task::spawn_blocking(move || -> Result<Option<Vec<u8>>> {
             let cf = db
                 .cf_handle(&cf_name)
                 .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
             let value = db.get_cf(&cf, &key_bytes)?;
-            Ok(value)
-        })
-        .await??;
 
-        match &result {
+        match &value {
             Some(value) => debug!(
                 "Successfully got key: {} ({} bytes) from cf: {}",
                 key,
@@ -135,7 +122,7 @@ impl RocksDB {
             None => debug!("Key: {} not found in cf: {}", key, cf_name_clone),
         }
 
-        Ok(result)
+        Ok(value)
     }
 
     pub fn get_sync(&self, cf: ColumnFamilyType, key: &u64) -> Result<Option<Vec<u8>>> {
@@ -154,29 +141,24 @@ impl RocksDB {
     }
 
     /// Asynchronously retrieves all values from the specified cf.
-    pub async fn get_all(&self, cf: ColumnFamilyType) -> Result<Vec<Vec<u8>>> {
+    pub fn get_all(&self, cf: ColumnFamilyType) -> Result<Vec<Vec<u8>>> {
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
         debug!("Getting all values from cf: {}", cf_name_clone);
 
-        let values = task::spawn_blocking(move || -> Result<Vec<Vec<u8>>> {
-            let cf = db
-                .cf_handle(&cf_name)
-                .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
 
-            let iter = db.iterator_cf(&cf, IteratorMode::Start);
-            let mut values = Vec::new();
+        let iter = db.iterator_cf(&cf, IteratorMode::Start);
+        let mut values = Vec::new();
 
-            for item in iter {
-                let (_key, value) = item?;
-                values.push(value.to_vec());
-            }
-
-            Ok(values)
-        })
-        .await??;
+        for item in iter {
+            let (_key, value) = item?;
+            values.push(value.to_vec());
+        }
 
         debug!(
             "Successfully retrieved {} values from cf: {}",
@@ -188,11 +170,7 @@ impl RocksDB {
     }
 
     /// Asynchronously gets multiple values associated with the provided keys from the specified cf.
-    pub async fn multi_get(
-        &self,
-        cf: ColumnFamilyType,
-        keys: &[u64],
-    ) -> Result<Vec<Option<Vec<u8>>>> {
+    pub fn multi_get(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<Vec<Option<Vec<u8>>>> {
         let db = self.db.clone();
         let keys = keys.to_vec();
         let keys_len = keys.len();
@@ -204,20 +182,16 @@ impl RocksDB {
             keys_len, cf_name_clone
         );
 
-        let results = task::spawn_blocking(move || -> Result<Vec<Option<Vec<u8>>>> {
-            let cf = db
-                .cf_handle(&cf_name)
-                .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
 
-            let mut results = Vec::with_capacity(keys.len());
-            for key in keys {
-                let key_bytes = Self::key_to_bytes(&key);
-                let value = db.get_cf(&cf, &key_bytes)?;
-                results.push(value);
-            }
-            Ok(results)
-        })
-        .await??;
+        let mut results = Vec::with_capacity(keys.len());
+        for key in keys {
+            let key_bytes = Self::key_to_bytes(&key);
+            let value = db.get_cf(&cf, &key_bytes)?;
+            results.push(value);
+        }
 
         debug!(
             "multi_get completed for {} keys in column family: {}",
@@ -228,7 +202,7 @@ impl RocksDB {
     }
 
     /// Asynchronously deletes a key-value pair from the specified cf.
-    pub async fn delete(&self, cf: ColumnFamilyType, key: &u64) -> Result<()> {
+    pub fn delete(&self, cf: ColumnFamilyType, key: &u64) -> Result<()> {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
@@ -236,14 +210,10 @@ impl RocksDB {
 
         debug!("Deleting key: {} from cf: {}", key, cf_name_clone);
 
-        task::spawn_blocking(move || -> Result<()> {
-            let cf = db
-                .cf_handle(&cf_name)
-                .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
-            db.delete_cf(&cf, &key_bytes)?;
-            Ok(())
-        })
-        .await??;
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        db.delete_cf(&cf, &key_bytes)?;
 
         debug!(
             "Successfully deleted key: {} from cf: {}",
@@ -254,7 +224,7 @@ impl RocksDB {
     }
 
     /// Asynchronously deletes multiple key-value pairs from the specified cf.
-    pub async fn multi_delete(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<()> {
+    pub fn multi_delete(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<()> {
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
@@ -262,22 +232,18 @@ impl RocksDB {
         let keys_len = keys.len();
         debug!("Deleting {} keys from cf: {}", keys_len, cf_name_clone);
 
-        task::spawn_blocking(move || -> Result<()> {
-            let cf = db
-                .cf_handle(&cf_name)
-                .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
 
-            let mut batch = WriteBatchWithTransaction::default();
+        let mut batch = WriteBatchWithTransaction::default();
 
-            for key in keys {
-                let key_bytes = Self::key_to_bytes(&key);
-                batch.delete_cf(&cf, &key_bytes);
-            }
+        for key in keys {
+            let key_bytes = Self::key_to_bytes(&key);
+            batch.delete_cf(&cf, &key_bytes);
+        }
 
-            db.write(batch)?;
-            Ok(())
-        })
-        .await??;
+        db.write(batch)?;
 
         debug!(
             "Successfully deleted {} keys from cf: {}",
@@ -287,57 +253,48 @@ impl RocksDB {
         Ok(())
     }
 
-    pub async fn save_records(&self, records: Arc<Vec<DbRecordValue>>) -> Result<()> {
+    pub fn save_records(&self, records: Arc<Vec<DbRecordValue>>) -> Result<()> {
         let db = self.db.clone();
         let records = records.clone();
-        task::spawn_blocking(move || -> Result<()> {
-            let mut cf_map = HashMap::new();
-            let mut batch = WriteBatchWithTransaction::default();
-            for record in records.iter() {
-                let cf = if !cf_map.contains_key(&record.cf_type) {
-                    let cf = db.cf_handle(&record.cf_type.name()).ok_or_else(|| {
-                        anyhow!("Column family '{}' not found", record.cf_type.name())
-                    })?;
-                    cf_map.insert(record.cf_type, cf.clone());
-                    cf
-                } else {
-                    cf_map.get(&record.cf_type).unwrap().clone()
-                };
-                let key_bytes = Self::key_to_bytes(&record.key);
-                batch.put_cf(&cf, key_bytes, &record.value);
-            }
-            db.write(batch)?;
-            Ok(())
-        })
-        .await??;
+        let mut cf_map = HashMap::new();
+        let mut batch = WriteBatchWithTransaction::default();
+        for record in records.iter() {
+            let cf = if !cf_map.contains_key(&record.cf_type) {
+                let cf = db.cf_handle(&record.cf_type.name()).ok_or_else(|| {
+                    anyhow!("Column family '{}' not found", record.cf_type.name())
+                })?;
+                cf_map.insert(record.cf_type, cf.clone());
+                cf
+            } else {
+                cf_map.get(&record.cf_type).unwrap().clone()
+            };
+            let key_bytes = Self::key_to_bytes(&record.key);
+            batch.put_cf(&cf, key_bytes, &record.value);
+        }
+        db.write(batch)?;
 
         Ok(())
     }
 
-    pub(crate) async fn delete_records(&self, records: Arc<Vec<DbRecordKey>>) -> Result<()> {
+    pub(crate) fn delete_records(&self, records: Arc<Vec<DbRecordKey>>) -> Result<()> {
         let db = self.db.clone();
         let records = records.clone();
-        task::spawn_blocking(move || -> Result<()> {
-            let mut cf_map = HashMap::new();
-            let mut batch = WriteBatchWithTransaction::default();
-            for record in records.iter() {
-                let cf = if !cf_map.contains_key(&record.cf_type) {
-                    let cf = db.cf_handle(&record.cf_type.name()).ok_or_else(|| {
-                        anyhow!("Column family '{}' not found", record.cf_type.name())
-                    })?;
-                    cf_map.insert(record.cf_type, cf.clone());
-                    cf
-                } else {
-                    cf_map.get(&record.cf_type).unwrap().clone()
-                };
-                let key_bytes = Self::key_to_bytes(&record.key);
-                batch.delete_cf(&cf, key_bytes);
-            }
-            db.write(batch)?;
-            Ok(())
-        })
-        .await??;
-
+        let mut cf_map = HashMap::new();
+        let mut batch = WriteBatchWithTransaction::default();
+        for record in records.iter() {
+            let cf = if !cf_map.contains_key(&record.cf_type) {
+                let cf = db.cf_handle(&record.cf_type.name()).ok_or_else(|| {
+                    anyhow!("Column family '{}' not found", record.cf_type.name())
+                })?;
+                cf_map.insert(record.cf_type, cf.clone());
+                cf
+            } else {
+                cf_map.get(&record.cf_type).unwrap().clone()
+            };
+            let key_bytes = Self::key_to_bytes(&record.key);
+            batch.delete_cf(&cf, key_bytes);
+        }
+        db.write(batch)?;
         Ok(())
     }
 }
