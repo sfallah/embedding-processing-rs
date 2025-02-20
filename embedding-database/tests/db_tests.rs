@@ -5,9 +5,8 @@ mod tests {
     use fake::faker::lorem::en::*;
     use fake::{Fake, Faker};
     use tempdir::TempDir;
-    use tokio;
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[test]
     fn test_put() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_put")?;
@@ -17,9 +16,7 @@ mod tests {
         let value: String = Sentence(1..3).fake();
 
         // Act
-        rocksdb
-            .put(ColumnFamilyType::Default, &key, value.as_bytes())
-            ?;
+        rocksdb.put(ColumnFamilyType::Default, &key, value.as_bytes())?;
 
         // Assert
         let retrieved_value = rocksdb.get(ColumnFamilyType::Default, &key)?;
@@ -27,8 +24,7 @@ mod tests {
 
         Ok(())
     }
-
-    #[tokio::test(flavor = "multi_thread")]
+    #[test]
     fn test_get() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_get")?;
@@ -37,9 +33,7 @@ mod tests {
         let key: u64 = Faker.fake();
         let value: String = Sentence(1..3).fake();
 
-        rocksdb
-            .put(ColumnFamilyType::Default, &key, value.as_bytes())
-            ?;
+        rocksdb.put(ColumnFamilyType::Default, &key, value.as_bytes())?;
 
         // Act
         let retrieved_value = rocksdb.get(ColumnFamilyType::Default, &key)?;
@@ -49,8 +43,7 @@ mod tests {
 
         Ok(())
     }
-
-    #[tokio::test(flavor = "multi_thread")]
+    #[test]
     fn test_multi_put() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_multi_put")?;
@@ -61,9 +54,7 @@ mod tests {
 
         // Act
         for (key, value) in keys.iter().zip(values.iter()) {
-            rocksdb
-                .put(ColumnFamilyType::Default, key, value.as_bytes())
-                ?;
+            rocksdb.put(ColumnFamilyType::Default, key, value.as_bytes())?;
         }
 
         // Assert
@@ -74,8 +65,8 @@ mod tests {
 
         Ok(())
     }
+    #[test]
 
-    #[tokio::test(flavor = "multi_thread")]
     fn test_multi_get() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_multi_get")?;
@@ -85,9 +76,7 @@ mod tests {
         let values: Vec<String> = (0..10).map(|_| Sentence(5..10).fake()).collect();
 
         for (key, value) in keys.iter().zip(values.iter()) {
-            rocksdb
-                .put(ColumnFamilyType::Default, key, value.as_bytes())
-                ?;
+            rocksdb.put(ColumnFamilyType::Default, key, value.as_bytes())?;
         }
 
         // Act
@@ -103,8 +92,7 @@ mod tests {
 
         Ok(())
     }
-
-    #[tokio::test(flavor = "multi_thread")]
+    #[test]
     fn test_delete() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_delete")?;
@@ -113,9 +101,7 @@ mod tests {
         let key: u64 = Faker.fake();
         let value: String = Sentence(3..5).fake();
 
-        rocksdb
-            .put(ColumnFamilyType::Default, &key, value.as_bytes())
-            ?;
+        rocksdb.put(ColumnFamilyType::Default, &key, value.as_bytes())?;
 
         // Act
         rocksdb.delete(ColumnFamilyType::Default, &key)?;
@@ -126,8 +112,7 @@ mod tests {
 
         Ok(())
     }
-
-    #[tokio::test(flavor = "multi_thread")]
+    #[test]
     fn test_delete_many() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_delete_many")?;
@@ -137,15 +122,11 @@ mod tests {
 
         for key in &keys {
             let value: String = Sentence(3..6).fake();
-            rocksdb
-                .put(ColumnFamilyType::Default, key, value.as_bytes())
-                ?;
+            rocksdb.put(ColumnFamilyType::Default, key, value.as_bytes())?;
         }
 
         // Act
-        rocksdb
-            .multi_delete(ColumnFamilyType::Default, &keys)
-            ?;
+        rocksdb.multi_delete(ColumnFamilyType::Default, &keys)?;
 
         // Assert
         for key in &keys {
@@ -155,8 +136,7 @@ mod tests {
 
         Ok(())
     }
-
-    #[tokio::test(flavor = "multi_thread")]
+    #[test]
     fn test_get_all() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_get_all")?;
@@ -166,9 +146,7 @@ mod tests {
         for _ in 0..10 {
             let key: u64 = Faker.fake();
             let value: String = Sentence(3..6).fake();
-            rocksdb
-                .put(ColumnFamilyType::Default, &key, value.as_bytes())
-                ?;
+            rocksdb.put(ColumnFamilyType::Default, &key, value.as_bytes())?;
         }
 
         // Act

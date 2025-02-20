@@ -12,9 +12,9 @@ use uuid::Uuid;
 pub fn save_doc(db: &Arc<RocksDB>, dto: &DocumentDto, user_id: Uuid) -> anyhow::Result<()> {
     let document = dto.to_model();
     for split in dto.splits.iter() {
-            if let Err(e) = save_split(db, split, user_id) {
-                error!("Failed to save split: {}", e);
-            }
+        if let Err(e) = save_split(db, split, user_id) {
+            error!("Failed to save split: {}", e);
+        }
     }
     put_document(db, &document)?;
     Ok(())

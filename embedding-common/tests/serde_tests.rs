@@ -2,13 +2,12 @@
 mod tests {
     use anyhow::anyhow;
     use embedding_common::prelude::*;
-    use rand::Rng;
     use uuid::Uuid;
 
     #[test]
     fn embedding_user_serde() -> anyhow::Result<()> {
         let user_uuid = Uuid::new_v4();
-        let embed_id: u64 = rand::thread_rng().gen();
+        let embed_id: u64 = rand::random();
         let embedding_user = EmbeddingUser {
             embed_id,
             user_uuid,
@@ -29,7 +28,7 @@ mod tests {
     #[should_panic]
     fn embedding_user_serde_fail() {
         let user_uuid = Uuid::new_v4();
-        let embed_id: u64 = rand::thread_rng().gen();
+        let embed_id: u64 = rand::random();
         let embedding_user = EmbeddingUser {
             embed_id,
             user_uuid,

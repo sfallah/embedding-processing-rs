@@ -31,7 +31,12 @@ pub fn process_document_query_request(
         Err(e) => {
             let error_message = format!("Error unpacking DocumentQueryRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
+            send_exception_response(
+                worker_socket.clone(),
+                identity,
+                &error_message,
+                message_header,
+            );
             return;
         }
     }
@@ -43,11 +48,8 @@ pub fn process_document_query_request(
         .search_mode
         .unwrap_or(SearchModeType::SplitAndSummary);
 
-    let query_embeddings =
-        process_query(
-            processing_context.clone(),
-            request.input.clone(),
-        ).expect("Failed to process query");
+    let query_embeddings = process_query(processing_context.clone(), request.input.clone())
+        .expect("Failed to process query");
     let query_embeddings = &query_embeddings[0];
 
     // 1. Search for the query in the indexes
@@ -58,13 +60,7 @@ pub fn process_document_query_request(
     if search_mode == SearchModeType::SummaryOnly || search_mode == SearchModeType::SplitAndSummary
     {
         let summaries_query_res = summary_index
-            .query_filter(
-                db,
-                &request.user_ids,
-                &query_embeddings,
-                top_k,
-            )
-
+            .query_filter(db, &request.user_ids, &query_embeddings, top_k)
             .unwrap();
         debug!("Summary query results: {:?}", summaries_query_res);
 
@@ -75,7 +71,6 @@ pub fn process_document_query_request(
             Some(&summaries_query_res),
             with_embeddings,
         )
-
         .unwrap();
     }
 
@@ -83,13 +78,7 @@ pub fn process_document_query_request(
     let mut split_query_res = IndexMap::new();
     if search_mode == SearchModeType::SplitOnly || search_mode == SearchModeType::SplitAndSummary {
         split_query_res = split_index
-            .query_filter(
-                db,
-                &request.user_ids,
-                &query_embeddings,
-                top_k,
-            )
-
+            .query_filter(db, &request.user_ids, &query_embeddings, top_k)
             .unwrap();
         debug!("Split query results: {:?}", split_query_res);
     }
@@ -116,7 +105,6 @@ pub fn process_document_query_request(
         Some(&split_summary_map),
         with_embeddings,
     )
-
     .unwrap();
 
     // Load documents from rocks db
@@ -128,7 +116,12 @@ pub fn process_document_query_request(
             Ok(None) => {
                 let error_message = format!("Document not found for id: {}", doc_id);
                 error!("{}", error_message);
-                send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
+                send_exception_response(
+                    worker_socket.clone(),
+                    identity,
+                    &error_message,
+                    message_header,
+                );
             }
             Err(e) => {
                 let error_message = format!(
@@ -136,7 +129,12 @@ pub fn process_document_query_request(
                     doc_id, e
                 );
                 error!("{}", error_message);
-                send_exception_response(worker_socket.clone(), identity, &error_message, message_header);
+                send_exception_response(
+                    worker_socket.clone(),
+                    identity,
+                    &error_message,
+                    message_header,
+                );
             }
         }
     }
@@ -150,8 +148,7 @@ pub fn process_document_query_request(
         &docs,
         &query_embeddings,
         with_embeddings,
-    )
-    ;
+    );
 }
 
 fn send_document_query_response(
@@ -172,5 +169,5 @@ fn send_document_query_response(
             None
         },
     };
-    send_success_response(socket.clone(),identity, response, message_header)
+    send_success_response(socket.clone(), identity, response, message_header)
 }

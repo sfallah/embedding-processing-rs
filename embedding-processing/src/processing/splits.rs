@@ -1,5 +1,5 @@
 use crate::processing::context::ProcessingContext;
-use crate::processing::embeddings::{get_embeddings};
+use crate::processing::embeddings::get_embeddings;
 use crate::processing::summaries::{get_sentences, process_summaries};
 use embedding_common::dtos::split_dto::SplitDto;
 use embedding_common::dtos::EmbeddingDto;
@@ -17,7 +17,8 @@ pub fn process_split(
     let split_id = ctx.hasher.hash(&format!("{}{}", doc_id, seq_id));
     trace!("Processing split: {}", split_id);
 
-    let (sentences, sentences_no_tokens) = get_sentences(ctx.clone(), split_res.split_string.clone())?;
+    let (sentences, sentences_no_tokens) =
+        get_sentences(ctx.clone(), split_res.split_string.clone())?;
 
     let mut text_vec = Vec::new();
     text_vec.push(split_res.split_string.clone());

@@ -4,13 +4,8 @@ use anyhow::anyhow;
 use embedding_common::prelude::*;
 use std::sync::Arc;
 
-pub fn get_all_summaries(
-    db: &Arc<RocksDB>,
-    summary_ids: &[u64],
-) -> anyhow::Result<Vec<Summary>> {
-    let summary_bytes = db
-        .multi_get(ColumnFamilyType::Summaries, summary_ids)
-        ?;
+pub fn get_all_summaries(db: &Arc<RocksDB>, summary_ids: &[u64]) -> anyhow::Result<Vec<Summary>> {
+    let summary_bytes = db.multi_get(ColumnFamilyType::Summaries, summary_ids)?;
     let mut summaries = Vec::new();
     for option_bytes in summary_bytes {
         if let Some(bytes) = option_bytes {

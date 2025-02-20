@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 anyhow = { workspace = true }
 uuid = { workspace = true }
-tokio = {workspace = true}
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 futures = { workspace = true }
@@ -25,6 +24,5 @@ usearch = { version = "2.16.7", default-features = false, features = ["fp16lib"]
 
 [dev-dependencies]
 tempdir = "0.3.7"
-tokio = { version = "1.41.1", features = ["test-util"] }
 simsimd = "6.2.1"
 half = "=2.4.1"

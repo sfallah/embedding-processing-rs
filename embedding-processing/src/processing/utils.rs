@@ -5,4 +5,3 @@ pub fn splits_texts(splits: &[SplitResultLite]) -> Vec<String> {
         .map(|sentence_split| sentence_split.split_string.clone())
         .collect()
 }
-

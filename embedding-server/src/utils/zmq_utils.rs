@@ -50,7 +50,14 @@ pub fn send_success_response<T: Serde + serde::Serialize>(
         .pack()
         .expect("Failed to pack message header");
     let serialized_body = response.pack().expect("Failed to pack response body");
-    if let Err(e) = socket.send_multipart(vec![identity.clone(),serialized_header.clone(), serialized_body.clone()], 0) {
+    if let Err(e) = socket.send_multipart(
+        vec![
+            identity.clone(),
+            serialized_header.clone(),
+            serialized_body.clone(),
+        ],
+        0,
+    ) {
         error!("Error sending success response: {:?}", e);
     }
 }

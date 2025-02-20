@@ -112,7 +112,6 @@ fn main() -> Result<(), anyhow::Error> {
 
     initialize_index_from_db(&db, &split_index, &summary_index)?;
 
-
     let zmq_ctx = Arc::new(zmq_ctx);
 
     // Initialize separate workers for each thread

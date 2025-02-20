@@ -10,7 +10,7 @@ pub fn split_text(
     text: Vec<u8>,
 ) -> anyhow::Result<Vec<SplitResultLite>> {
     trace!("Splitting text...");
-    let splits =  splitter.hf_splits(text.as_slice());
+    let splits = splitter.hf_splits(text.as_slice());
     trace!("Number of splits: {}", splits.len());
     Ok(splits)
 }

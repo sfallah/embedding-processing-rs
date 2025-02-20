@@ -107,10 +107,10 @@ impl RocksDB {
 
         trace!("Getting key: {} from cf: {}", key, cf_name_clone);
 
-            let cf = db
-                .cf_handle(&cf_name)
-                .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
-            let value = db.get_cf(&cf, &key_bytes)?;
+        let cf = db
+            .cf_handle(&cf_name)
+            .ok_or_else(|| anyhow!("Column family '{}' not found", cf_name))?;
+        let value = db.get_cf(&cf, &key_bytes)?;
 
         match &value {
             Some(value) => debug!(

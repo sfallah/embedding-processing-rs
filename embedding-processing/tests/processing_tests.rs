@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod tests {
-    use embedding_common::config::ModelConfig;
     use embedding_common::utils::tracting::setup_tracing;
     use embedding_processing::processing::documents::process_document;
     use embedding_processing::processing::embeddings::get_embeddings;
@@ -9,7 +8,6 @@ mod tests {
     use embedding_processing::processing::summaries::{get_sentences, process_summaries};
     use embedding_processing::utils::app_utils::init_ctx;
     use rstest::{fixture, rstest};
-    use std::sync::Arc;
     use tracing::{debug, Level};
 
     #[fixture]
@@ -73,23 +71,19 @@ mod tests {
     fn test_summaries_process(text: String) -> anyhow::Result<()> {
         let ctx = init_ctx(512, None, 384, 10);
         let text = text.clone();
-        let (sentences, no_tokens) = get_sentences(&ctx, text.clone()).expect("Failed to get sentences");
+        let (sentences, no_tokens) =
+            get_sentences(ctx.clone(), text.clone()).expect("Failed to get sentences");
         let embeddings = get_embeddings(
             ctx.zmq_context.clone(),
             &ctx.model_endpoint,
             ctx.n_embd,
             &sentences,
             0,
-        ).expect("Failed to get embeddings");
+        )
+        .expect("Failed to get embeddings");
         let embeddings = embeddings.into_iter().flatten().collect::<Vec<f32>>();
-        let summaries = process_summaries(
-            ctx,
-            &sentences,
-            &no_tokens,
-            &embeddings,
-            0,
-            0,
-        ).expect("Failed to process summaries");
+        let summaries = process_summaries(ctx, &sentences, &no_tokens, &embeddings, 0, 0)
+            .expect("Failed to process summaries");
         println!("{:?}", summaries);
         assert_eq!(summaries.len(), 2);
         let sum_texts = summaries
@@ -101,7 +95,7 @@ mod tests {
         Ok(())
     }
 
-   #[rstest]
+    #[rstest]
     fn test_split_process(text: String) -> anyhow::Result<()> {
         let ctx = init_ctx(512, None, 384, 3000);
         let text = text.clone();
@@ -110,8 +104,7 @@ mod tests {
         assert_eq!(splits.len(), 1);
         println!("{:?}", splits);
 
-        let split =
-            process_split(ctx, &splits[0], 0, 0).expect("Failed to process split");
+        let split = process_split(ctx, &splits[0], 0, 0).expect("Failed to process split");
         println!("{:?}", split);
         Ok(())
     }
@@ -140,8 +133,8 @@ mod tests {
     }
 
     #[rstest]
-    #[tokio::test(flavor = "multi_thread")]
-    async fn test_document_process_short() -> anyhow::Result<()> {
+    #[test]
+    fn test_document_process_short() -> anyhow::Result<()> {
         let ctx = init_ctx(10, None, 384, 3000); // low max_tokens to test short text
         let doc = process_document(
             ctx,

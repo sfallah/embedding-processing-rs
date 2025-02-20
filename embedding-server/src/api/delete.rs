@@ -22,7 +22,12 @@ pub fn process_document_deletion_request(
         Err(e) => {
             let error_message = format!("Error unpacking DocumentDeletionRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
+            send_exception_response(
+                worker_socket.clone(),
+                identity,
+                &error_message,
+                message_header,
+            );
             return;
         }
     };
@@ -31,15 +36,22 @@ pub fn process_document_deletion_request(
             if let Err(e) = split_index.delete(&doc.split_ids) {
                 let error_message = format!("Error deleting split from index: {:?}", e);
                 error!("{}", &error_message);
-                send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
+                send_exception_response(
+                    worker_socket.clone(),
+                    identity,
+                    &error_message,
+                    message_header,
+                );
             }
-            if let Err(e) = summary_index
-                .delete(&doc.summary_ids.unwrap_or_default())
-
-            {
+            if let Err(e) = summary_index.delete(&doc.summary_ids.unwrap_or_default()) {
                 let error_message = format!("Error deleting summary from index: {:?}", e);
                 error!("{}", &error_message);
-                send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
+                send_exception_response(
+                    worker_socket.clone(),
+                    identity,
+                    &error_message,
+                    message_header,
+                );
             }
             send_document_deletion_response(worker_socket.clone(), true, message_header, identity);
         }
@@ -50,7 +62,12 @@ pub fn process_document_deletion_request(
         Err(e) => {
             let error_message = format!("Error deleting document: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket.clone(),identity, &error_message, message_header);
+            send_exception_response(
+                worker_socket.clone(),
+                identity,
+                &error_message,
+                message_header,
+            );
         }
     }
 }
@@ -70,7 +87,6 @@ fn send_document_deletion_response(
             },
             message_header,
         )
-
     } else {
         send_success_response(
             socket.clone(),
@@ -80,6 +96,5 @@ fn send_document_deletion_response(
             },
             message_header,
         )
-
     }
 }

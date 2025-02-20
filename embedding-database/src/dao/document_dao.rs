@@ -10,16 +10,12 @@ pub fn put_document(db: &Arc<RocksDB>, document: &Document) -> anyhow::Result<()
     let data = document
         .pack()
         .map_err(|e| anyhow!("Failed to pack document: {}", e))?;
-    db.put(ColumnFamilyType::Documents, document_id, &data)
-        ?;
+    db.put(ColumnFamilyType::Documents, document_id, &data)?;
     Ok(())
 }
 
 /// Retrieves a `Document` by its ID.
-pub fn get_document(
-    db: &Arc<RocksDB>,
-    document_id: &u64,
-) -> anyhow::Result<Option<Document>> {
+pub fn get_document(db: &Arc<RocksDB>, document_id: &u64) -> anyhow::Result<Option<Document>> {
     match db.get(ColumnFamilyType::Documents, document_id)? {
         Some(data) => {
             let document =

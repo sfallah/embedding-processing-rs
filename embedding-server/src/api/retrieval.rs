@@ -22,7 +22,7 @@ pub fn process_document_retrieval_request(
         Err(e) => {
             let error_message = format!("Error unpacking DocumentRetrievalRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket,identity, &error_message, message_header);
+            send_exception_response(worker_socket, identity, &error_message, message_header);
             return;
         }
     }
@@ -37,8 +37,7 @@ pub fn process_document_retrieval_request(
             identity,
             error_message,
             message_header,
-        )
-        ;
+        );
         return;
     }
 

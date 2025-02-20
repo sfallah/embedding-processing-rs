@@ -40,12 +40,8 @@ pub fn add_to_indices(
         }
     }
 
-    splits_index
-        .upsert_batch_records(Arc::new(split_entries))
-        ?;
-    summaries_index
-        .upsert_batch_records(Arc::new(summary_entries))
-        ?;
+    splits_index.upsert_batch_records(Arc::new(split_entries))?;
+    summaries_index.upsert_batch_records(Arc::new(summary_entries))?;
     Ok(())
 }
 
@@ -96,19 +92,13 @@ pub fn initialize_index_from_db(
             summary_embeddings.push(embedding.embedding);
         }
     }
-    if let Err(e) = split_index
-        .upsert_batch(&split_embeddings, &split_labels)
-
-    {
+    if let Err(e) = split_index.upsert_batch(&split_embeddings, &split_labels) {
         error!("Failed to add split embeddings: {}", e);
     } else {
         split_no = split_labels.len();
     }
 
-    if let Err(e) = summary_index
-        .upsert_batch(&summary_embeddings, &summary_labels)
-
-    {
+    if let Err(e) = summary_index.upsert_batch(&summary_embeddings, &summary_labels) {
         error!("Failed to add summary embeddings: {}", e);
     } else {
         summary_no = summary_labels.len();

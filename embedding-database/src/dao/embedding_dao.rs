@@ -7,26 +7,21 @@ use std::sync::Arc;
 pub fn get_all_embeddings(db: &Arc<RocksDB>) -> anyhow::Result<Vec<Embedding>> {
     let embedding_data_bytes_vec = db
         .get_all(ColumnFamilyType::Embeddings)
-
         .context("Failed to get all embeddings")?;
 
-    let embeddings_data =  embedding_data_bytes_vec
+    let embeddings_data = embedding_data_bytes_vec
         .into_iter()
         .map(|embedding_data_bytes| {
             Embedding::unpack(&embedding_data_bytes).expect("Failed to unpack embedding")
-        }).collect::<Vec<_>>();
-
+        })
+        .collect::<Vec<_>>();
 
     Ok(embeddings_data)
 }
 
-pub fn get_embeddings(
-    db: &Arc<RocksDB>,
-    embedding_ids: &[u64],
-) -> anyhow::Result<Vec<Embedding>> {
+pub fn get_embeddings(db: &Arc<RocksDB>, embedding_ids: &[u64]) -> anyhow::Result<Vec<Embedding>> {
     let embedding_data_bytes_vec = db
         .multi_get(ColumnFamilyType::Embeddings, embedding_ids)
-
         .context("Failed to get all embeddings")?;
     let mut embeddings = Vec::new();
     for option_bytes in embedding_data_bytes_vec {
@@ -40,10 +35,7 @@ pub fn get_embeddings(
 }
 
 /// Retrieves an `Embedding` by its ID.
-pub fn get_embedding(
-    db: &Arc<RocksDB>,
-    embedding_id: &u64,
-) -> anyhow::Result<Option<Embedding>> {
+pub fn get_embedding(db: &Arc<RocksDB>, embedding_id: &u64) -> anyhow::Result<Option<Embedding>> {
     match db.get(ColumnFamilyType::Embeddings, embedding_id)? {
         Some(data) => {
             let embedding = Embedding::unpack(&data)

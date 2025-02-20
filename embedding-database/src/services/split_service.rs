@@ -12,11 +12,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub(crate) fn save_split(
-    db: &Arc<RocksDB>,
-    split_dto: &SplitDto,
-    user_id: Uuid,
-) -> Result<()> {
+pub(crate) fn save_split(db: &Arc<RocksDB>, split_dto: &SplitDto, user_id: Uuid) -> Result<()> {
     let mut db_records = Vec::new();
     let split = split_dto.to_model();
     let embedding = split_dto.to_embedding_backend();
@@ -119,8 +115,7 @@ pub fn get_doc_splits_map(
         splits_query_res,
         summary_map,
         with_embeddings,
-    )
-    ?;
+    )?;
     let mut split_map: IndexMap<u64, Vec<SplitDto>> = IndexMap::new();
     for split_dto in splits_dtos {
         let doc_id = split_dto.doc_id;

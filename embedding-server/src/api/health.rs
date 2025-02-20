@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use embedding_common::config::ZmqConfig;
 use crate::schema::health_check::HealthCheckResponse;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::send_success_response;
+use embedding_common::config::ZmqConfig;
+use std::sync::Arc;
 
 pub fn process_health_check(
     socket: Arc<zmq::Socket>,
@@ -17,5 +17,5 @@ pub fn process_health_check(
         worker_count: zmq_config.zmq_num_workers,
     };
 
-    send_success_response(socket.clone(),identity, response, message_header);
+    send_success_response(socket.clone(), identity, response, message_header);
 }
