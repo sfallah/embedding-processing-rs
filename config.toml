@@ -26,3 +26,4 @@ zmq_host = "127.0.0.1"
 zmq_frontend_port = 5556
 zmq_backend_port = 5570
 zmq_num_workers = 2
+zmq_control_port = 5557

@@ -14,6 +14,7 @@ serde_repr = { workspace = true }
 chrono = { workspace = true }
 indexmap = { workspace = true }
 zmq = { workspace = true }
+signal-hook = { workspace = true }
 
 embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }

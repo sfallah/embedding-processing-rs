@@ -1,14 +1,15 @@
 use crate::processing::context::ProcessingContext;
 use crate::processing::embeddings::get_embeddings;
-use crate::processing::splitter::split_text;
-use crate::processing::utils;
+//use crate::processing::splitter::split_text;
+//use crate::processing::utils;
 use std::sync::Arc;
 use tracing::trace;
 
 pub fn process_query(ctx: Arc<ProcessingContext>, query: String) -> anyhow::Result<Vec<Vec<f32>>> {
     trace!("Processing embedding...");
-    let query_splits = split_text(ctx.splitter.clone(), query.clone().into_bytes())?;
-    let query_split_texts = utils::splits_texts(&query_splits);
+    //FIXME: cleaning the query text may be necessary
+    //let query_splits = split_text(ctx.splitter.clone(), query.clone().into_bytes())?;
+    //let query_split_texts = utils::splits_texts(&query_splits);
     let query_id = ctx.hasher.hash(&query);
     let embeddings = get_embeddings(
         ctx.zmq_context.clone(),

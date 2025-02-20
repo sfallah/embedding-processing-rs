@@ -7,4 +7,5 @@ pub struct ZmqConfig {
     pub zmq_frontend_port: usize,
     pub zmq_backend_port: usize,
     pub zmq_num_workers: usize,
+    pub zmq_control_port: usize,
 }

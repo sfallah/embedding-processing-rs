@@ -42,114 +42,139 @@ pub fn worker_routine(
         error!("Failed to connect to model host: {:?}", e);
         panic!("Failed to connect to model host: {:?}", e);
     }
+
+    let controller = zmq_ctx.socket(zmq::SUB).unwrap();
+    controller
+        .connect(
+            format!(
+                "tcp://{}:{}",
+                zmq_config.zmq_host, zmq_config.zmq_control_port
+            )
+            .as_str(),
+        )
+        .expect("failed connecting controller");
+    controller.set_subscribe(b"").expect("failed subscribing");
+
     let hasher = Arc::new(DeterministicAHasher::new(None, None));
     let zmq_config = zmq_config.clone();
     let socket = Arc::new(socket);
     loop {
-        let messages = match socket.recv_multipart(0) {
-            Ok(messages) => messages,
-            Err(e) => {
-                let error_message = format!("Error receiving message: {}", e);
-                error!("{}", &error_message);
-                continue;
-            }
-        };
+        let mut items = [
+            controller.as_poll_item(zmq::POLLIN),
+            socket.as_poll_item(zmq::POLLIN),
+        ];
+        //FIXME: This is a blocking call, we need to handle shutdown signals
+        zmq::poll(&mut items, -1).expect("failed polling");
 
-        let identity = messages[0].clone();
-
-        let messages = messages.into_iter().skip(1).collect::<Vec<_>>();
-        let mut message_header: ZmqMessageHeader =
-            match ZmqMessageHeader::unpack(&messages.get(0).unwrap()) {
-                Ok(header) => header,
+        if items[0].is_readable() {
+            info!("Received shutdown control signal");
+            break;
+        } else if items[1].is_readable() {
+            let messages = match socket.recv_multipart(0) {
+                Ok(messages) => messages,
                 Err(e) => {
-                    let error_message = format!("Error unpacking message header: {}", e);
-                    handle_error_and_respond(
-                        socket.clone(),
-                        &identity,
-                        &error_message,
-                        ZmqMessageType::Unknown,
-                    );
+                    let error_message = format!("Error receiving message: {}", e);
+                    error!("{}", &error_message);
                     continue;
                 }
             };
 
-        if messages.len() < 2 && message_header.message_type != ZmqMessageType::HealthCheck {
-            let error_message = format!(
-                "Request Body received for message type: {:?}",
-                message_header.message_type
-            );
-            handle_error_and_respond(
-                socket.clone(),
-                &identity,
-                &error_message,
-                message_header.message_type,
-            );
-            continue;
-        }
+            let identity = messages[0].clone();
 
-        match message_header.message_type {
-            ZmqMessageType::DocumentInsertion => {
-                process_document_insertion_request(
-                    socket.clone(),
-                    db,
-                    processing_context.clone(),
-                    split_index,
-                    summary_index,
-                    &mut message_header,
-                    &identity,
-                    &messages.get(1).unwrap().to_vec(),
+            let messages = messages.into_iter().skip(1).collect::<Vec<_>>();
+            let mut message_header: ZmqMessageHeader =
+                match ZmqMessageHeader::unpack(&messages.get(0).unwrap()) {
+                    Ok(header) => header,
+                    Err(e) => {
+                        let error_message = format!("Error unpacking message header: {}", e);
+                        handle_error_and_respond(
+                            socket.clone(),
+                            &identity,
+                            &error_message,
+                            ZmqMessageType::Unknown,
+                        );
+                        continue;
+                    }
+                };
+
+            if messages.len() < 2 && message_header.message_type != ZmqMessageType::HealthCheck {
+                let error_message = format!(
+                    "Request Body received for message type: {:?}",
+                    message_header.message_type
                 );
-            }
-            ZmqMessageType::DocumentQuery => {
-                process_document_query_request(
-                    socket.clone(),
-                    db,
-                    processing_context.clone(),
-                    split_index,
-                    summary_index,
-                    &mut message_header,
-                    &identity,
-                    &messages.get(1).unwrap().to_vec(),
-                );
-            }
-            ZmqMessageType::DocumentRetrieval => {
-                process_document_retrieval_request(
-                    socket.clone(),
-                    hasher.clone(),
-                    db,
-                    &mut message_header,
-                    &identity,
-                    &messages.get(1).unwrap().to_vec(),
-                );
-            }
-            ZmqMessageType::DocumentDeletion => {
-                process_document_deletion_request(
-                    socket.clone(),
-                    split_index,
-                    summary_index,
-                    db,
-                    &mut message_header,
-                    &identity,
-                    &messages.get(1).unwrap().to_vec(),
-                );
-            }
-            ZmqMessageType::HealthCheck => {
-                process_health_check(
-                    socket.clone(),
-                    &identity,
-                    &mut message_header,
-                    zmq_config.clone(),
-                );
-            }
-            _ => {
-                let error_message =
-                    format!("Unknown message type: {:?}", message_header.message_type);
                 handle_error_and_respond(
                     socket.clone(),
                     &identity,
                     &error_message,
                     message_header.message_type,
                 );
+                continue;
+            }
+
+            match message_header.message_type {
+                ZmqMessageType::DocumentInsertion => {
+                    process_document_insertion_request(
+                        socket.clone(),
+                        db,
+                        processing_context.clone(),
+                        split_index,
+                        summary_index,
+                        &mut message_header,
+                        &identity,
+                        &messages.get(1).unwrap().to_vec(),
+                    );
+                }
+                ZmqMessageType::DocumentQuery => {
+                    process_document_query_request(
+                        socket.clone(),
+                        db,
+                        processing_context.clone(),
+                        split_index,
+                        summary_index,
+                        &mut message_header,
+                        &identity,
+                        &messages.get(1).unwrap().to_vec(),
+                    );
+                }
+                ZmqMessageType::DocumentRetrieval => {
+                    process_document_retrieval_request(
+                        socket.clone(),
+                        hasher.clone(),
+                        db,
+                        &mut message_header,
+                        &identity,
+                        &messages.get(1).unwrap().to_vec(),
+                    );
+                }
+                ZmqMessageType::DocumentDeletion => {
+                    process_document_deletion_request(
+                        socket.clone(),
+                        split_index,
+                        summary_index,
+                        db,
+                        &mut message_header,
+                        &identity,
+                        &messages.get(1).unwrap().to_vec(),
+                    );
+                }
+                ZmqMessageType::HealthCheck => {
+                    process_health_check(
+                        socket.clone(),
+                        &identity,
+                        &mut message_header,
+                        zmq_config.clone(),
+                    );
+                }
+                _ => {
+                    let error_message =
+                        format!("Unknown message type: {:?}", message_header.message_type);
+                    handle_error_and_respond(
+                        socket.clone(),
+                        &identity,
+                        &error_message,
+                        message_header.message_type,
+                    );
+                }
             }
         }
     }

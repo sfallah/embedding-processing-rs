@@ -28,4 +28,5 @@ chrono = "0.4.38"
 indexmap = "2.6.0"
 zmq = "0.10.0"
 config = { version = "0.15.7", features = ["toml", "async"], default-features = false }
+signal-hook = "0.3.17"
 

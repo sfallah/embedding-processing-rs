@@ -9,7 +9,10 @@ use embedding_index::initialize_index_from_db;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_server::zmq::server_worker::worker_routine;
 use embedding_server::ServerArgs;
+use signal_hook::consts::signal::{SIGINT, SIGTERM};
+use signal_hook::iterator::Signals;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use tracing::{error, info};
 
@@ -27,6 +30,7 @@ fn main() -> Result<(), anyhow::Error> {
     setup_tracing(args.log_level.to_tracing_level());
 
     info!("Starting up");
+
 
     let zmq_config = Arc::new(app_config.zmq_config);
 
@@ -105,6 +109,32 @@ fn main() -> Result<(), anyhow::Error> {
         zmq_config.zmq_host, zmq_config.zmq_backend_port
     ))?;
 
+    let controller = zmq_ctx.socket(zmq::PUB)?;
+    controller
+        .bind(format!("tcp://{}:{}", zmq_config.zmq_host, zmq_config.zmq_control_port).as_str())
+        .expect("failed connecting controller");
+
+    // Create an atomic boolean to signal shutdown
+    let shutdown_flag = Arc::new(AtomicBool::new(false));
+    let shutdown_flag_clone = Arc::clone(&shutdown_flag);
+
+    // Spawn a thread to listen for graceful shutdown signals
+    let mut signals = Signals::new(&[SIGINT, SIGTERM])?;
+    let shutdown_handler = thread::spawn(move || {
+        for signal in signals.forever() {
+            match signal {
+                SIGINT | SIGTERM => {
+                    info!("Received signal: {:?}", signal);
+                    shutdown_flag_clone.store(true, Ordering::Relaxed);
+                    controller.send("SHUTDOWN".as_bytes(), 0).unwrap();
+                    info!("Shutting down control message sent");
+                    break;
+                }
+                _ => {}
+            }
+        }
+    });
+
     // Create an Arc reference to the database
     let db = Arc::new(db);
 
@@ -146,7 +176,11 @@ fn main() -> Result<(), anyhow::Error> {
     // Start the ZMQ proxy
     if let Err(e) = zmq::proxy(&frontend, &backend) {
         error!("Failed to start proxy: {:?}", e);
-        return Err(e.into());
+    }
+    //FIXME: This is a blocking call, we need to handle timeout
+    if shutdown_flag.load(Ordering::Relaxed) {
+        info!("Shutting down gracefully...");
+        shutdown_handler.join().unwrap();
     }
 
     Ok(())
