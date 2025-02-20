@@ -45,7 +45,6 @@ pub fn worker_routine(
     let hasher = Arc::new(DeterministicAHasher::new(None, None));
     let zmq_config = zmq_config.clone();
     let socket = Arc::new(socket);
-    info!("Worker shutting down");
     loop {
         let messages = match socket.recv_multipart(0) {
             Ok(messages) => messages,

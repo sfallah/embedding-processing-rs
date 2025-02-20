@@ -172,7 +172,7 @@ pub fn benches() {
     let doc = fs::read_to_string(file_path).unwrap();
     process_doc(&mut criterion, doc.clone());
     //embedding_msgpack_benchmark(&mut criterion, doc.clone());
-    embedding_benchmark_batch(&mut criterion, doc.clone());
+    //embedding_benchmark_batch(&mut criterion, doc.clone());
     embedding_benchmark(&mut criterion, doc.clone());
 }
 criterion_main!(benches);

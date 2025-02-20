@@ -88,6 +88,11 @@ fn main() -> Result<(), anyhow::Error> {
         }
     };
 
+    frontend.bind(&format!(
+        "tcp://{}:{}",
+        zmq_config.zmq_host, zmq_config.zmq_frontend_port
+    ))?;
+
     let backend = match zmq_ctx.socket(zmq::DEALER) {
         Ok(socket) => socket,
         Err(e) => {
@@ -95,6 +100,10 @@ fn main() -> Result<(), anyhow::Error> {
             return Err(e.into());
         }
     };
+    backend.bind(&format!(
+        "tcp://{}:{}",
+        zmq_config.zmq_host, zmq_config.zmq_backend_port
+    ))?;
 
     // Create an Arc reference to the database
     let db = Arc::new(db);
