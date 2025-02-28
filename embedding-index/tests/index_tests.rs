@@ -117,7 +117,7 @@ mod tests {
         assert_eq!(
             index_file,
             format!(
-                "index_dir/summaries__L2sq_{:?}_384_16_32_32.usearch",
+                "index_dir/summaries__L2sq_{:?}_384_16_200_32.usearch",
                 scalar_kind
             )
         );

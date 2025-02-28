@@ -30,3 +30,7 @@ zmq = "0.10.0"
 config = { version = "0.15.7", features = ["toml", "async"], default-features = false }
 signal-hook = "0.3.17"
 
+[patch.crates-io]
+cc = { git = "https://github.com/rust-lang/cc-rs.git", rev = "9731605fb9b8a2a8188bf410002dfa0a096d7784" }
+
+

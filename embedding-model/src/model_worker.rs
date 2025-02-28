@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
 
     let n_ctx = model.n_ctx_train();
 
-    error!("model n_ctx_train: {}", n_ctx);
+    info!("model n_ctx_train: {}", n_ctx);
 
     // initialize the context
     let ctx_params = LlamaContextParams::default()
