@@ -43,7 +43,7 @@ impl Cli {
     pub fn validate(&self) -> Result<(), String> {
         match self.command {
             Commands::Index { ref file_path } => {
-                if file_path.is_dir() {
+                if file_path.is_dir() || file_path.is_file() {
                     Ok(())
                 } else {
                     Err(format!("{} is not a directory", file_path.display()))

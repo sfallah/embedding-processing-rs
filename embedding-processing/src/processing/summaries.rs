@@ -1,12 +1,12 @@
 use crate::processing::context::ProcessingContext;
 use crate::processing::splitter::split_text;
+use crate::processing::utils;
 use crate::services::embeddings::{async_get_embeddings, EmbeddingsRequest};
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::summary_dto::SummaryDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;
-use crate::processing::utils;
 
 #[tracing::instrument(skip(ctx, embed_sender, text))]
 pub async fn process_summaries(

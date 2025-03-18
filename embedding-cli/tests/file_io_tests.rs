@@ -7,7 +7,7 @@ mod tests {
         let dir_path = Path::new("tests/test_data");
         let extensions = vec!["txt".to_string()];
         let res = list_files(dir_path, &extensions).await?;
-        assert_eq!(res.len(), 10);
+        assert_eq!(res.len(), 11);
         for file in res.iter() {
             println!("{}", file.display());
         }

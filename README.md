@@ -2,7 +2,7 @@
 
 ## Set up the environment
 ```shell
-export LLAMA_PATH=/usr/local/llama_b4153
+export LLAMA_PATH=/usr/local/llama_b4570
 export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$LLAMA_PATH/lib
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$LLAMA_PATH/lib
 ```

@@ -15,7 +15,7 @@ chrono = "0.4.38"
 async-channel = {workspace = true}
 
 
-fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }
+fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async_sent" }
 lexrank-ndarray = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/lexrank-ndarray.git", branch = "main" }
 llama-cxx-rs = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cxx-rs.git", branch = "feat/release_b4570" }
 rayon = "1.10.0"

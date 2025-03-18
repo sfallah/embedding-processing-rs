@@ -59,7 +59,7 @@ mod tests {
     #[tokio::test]
     async fn test_splitter() -> anyhow::Result<()> {
         let text = "This is a test text".to_string();
-        let ctx = init_ctx(512, None, 384, 0).await;
+        let ctx = init_ctx(510, None, 384, 0).await;
         let splitter = ctx.splitter.clone();
         let splits = split_text(splitter, text.as_bytes().to_vec())
             .await
@@ -72,9 +72,9 @@ mod tests {
     #[rstest]
     #[tokio::test(flavor = "multi_thread")]
     async fn test_summaries_process(text: String) -> anyhow::Result<()> {
-        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
+        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, false);
         let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await;
+        let ctx = init_ctx(510, None, 384, model.model_id).await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
         let summaries = process_summaries(ctx, embed_sender, text, 0, 0)
@@ -101,7 +101,7 @@ mod tests {
     async fn test_split_process(text: String) -> anyhow::Result<()> {
         let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
         let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await;
+        let ctx = init_ctx(510, None, 384, model.model_id).await;
         let text = text.clone();
         let embed_sender = embed_sender.clone();
         let splitter = ctx.clone().splitter.clone();
@@ -126,9 +126,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_document_process(#[future] text_from_file: String) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
-        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, true);
+        let model_config = ModelConfig::new(MODEL_PATH.to_string(), 1, false);
         let (embed_sender, shutdown, handles, model) = init(model_config).await?;
-        let ctx = init_ctx(512, None, 384, model.model_id).await;
+        let ctx = init_ctx(510, None, 384, model.model_id).await;
         let embed_sender = embed_sender.clone();
         let doc = process_document(
             ctx,

@@ -4,14 +4,14 @@ use embedding_processing::utils::app_utils::{init, init_ctx};
 use std::fs;
 use embedding_common::config::ModelConfig;
 
-pub fn process_doc(c: &mut Criterion, doc: String) {
-    c.bench_function("embeddings_splits_batch", |b| {
+pub fn process_doc(c: &mut Criterion, name: &str, doc: String) {
+    c.bench_function(format!("embeddings_splits_{}", name).as_str(), |b| {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let model_config = ModelConfig::new("../models/all-minilm-l6-v2-q2_k.gguf".to_string(), 2, false);
         let (embed_sender, _shutdown, _handle, model) = rt
             .block_on(init(model_config))
             .unwrap();
-        let proc_ctx = rt.block_on(init_ctx(512, None, 384, model.model_id));
+        let proc_ctx = rt.block_on(init_ctx(510, None, 384, model.model_id));
         b.to_async(rt).iter(|| {
             process_document(
                 proc_ctx.clone(),
@@ -29,9 +29,14 @@ pub fn benches() {
         .measurement_time(std::time::Duration::from_secs(20))
         .configure_from_args();
 
-    let file_path = "tests/test_data/superlinear.txt".to_string();
-    // read the file
-    let doc = fs::read_to_string(file_path).unwrap();
-    process_doc(&mut criterion, doc);
+    let superlinear_path = "tests/test_data/superlinear.txt".to_string();
+    let superlinear = fs::read_to_string(superlinear_path).unwrap();
+    process_doc(&mut criterion, "superlinear", superlinear);
+
+    let paper_path = "tests/test_data/paper_arxiv_org__2108.07258v3.txt".to_string();
+    let paper = fs::read_to_string(paper_path).unwrap();
+    process_doc(&mut criterion, "paper", paper);
+
+
 }
 criterion_main!(benches);

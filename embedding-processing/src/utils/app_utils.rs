@@ -1,16 +1,16 @@
 use crate::processing::context::ProcessingContext;
 use crate::services::embeddings::{async_embeddings_routine, EmbeddingsRequest};
+use embedding_common::config::ModelConfig;
 use embedding_common::prelude::Model;
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
+use llama_cxx_rs::LlamaContext;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
-use llama_cxx_rs::LlamaContext;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use embedding_common::config::ModelConfig;
 
 pub async fn init(
     model_config: ModelConfig,
@@ -31,7 +31,13 @@ pub async fn init(
 
     let mut embed_handles = Vec::new();
     for _ in 0..model_config.instances {
-        let llama = LlamaContext::new(model_config.gguf_file.as_str(), 512, 1000, 4, model_config.verbose)?;
+        let llama = LlamaContext::new(
+            model_config.gguf_file.as_str(),
+            512,
+            1000,
+            4,
+            model_config.verbose,
+        )?;
 
         if n_ctx.is_none() {
             n_ctx = Some(llama.get_n_ctx());
@@ -70,13 +76,15 @@ pub async fn init_ctx(
     model_id: u64,
 ) -> Arc<ProcessingContext> {
     let splitter_patterns = vec![
+        vec!["<SENT>".to_string()],
         vec!["\n\n".to_string()],
         vec!["\n".to_string()],
         vec![
-            ".".to_string(),
-            "!".to_string(),
-            "?".to_string(),
             ". ".to_string(),
+            "! ".to_string(),
+            "? ".to_string(),
+            ", ".to_string(),
+            "; ".to_string(),
         ],
     ];
     let nw_splitter = SplitterLiteConfig::new_hf(
@@ -90,7 +98,7 @@ pub async fn init_ctx(
     let sentence_splitter = SplitterLiteConfig::new_hf(
         splitter_patterns.clone(),
         Some(max_tokens),
-        Some(splitter_patterns.len()),
+        Some(0),
         true,
         None,
     );
