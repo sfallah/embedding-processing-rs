@@ -11,7 +11,7 @@ pub fn process_doc(c: &mut Criterion, name: &str, doc: String) {
         let (embed_sender, _shutdown, _handle, model) = rt
             .block_on(init(model_config))
             .unwrap();
-        let proc_ctx = rt.block_on(init_ctx(510, None, 384, model.model_id));
+        let proc_ctx = rt.block_on(init_ctx(400, None, 384, model.model_id));
         b.to_async(rt).iter(|| {
             process_document(
                 proc_ctx.clone(),
@@ -32,6 +32,10 @@ pub fn benches() {
     let superlinear_path = "tests/test_data/superlinear.txt".to_string();
     let superlinear = fs::read_to_string(superlinear_path).unwrap();
     process_doc(&mut criterion, "superlinear", superlinear);
+
+    let superlinear_path = "tests/test_data/bert_paper.txt".to_string();
+    let superlinear = fs::read_to_string(superlinear_path).unwrap();
+    process_doc(&mut criterion, "bert_paper", superlinear);
 
     let paper_path = "tests/test_data/paper_arxiv_org__2108.07258v3.txt".to_string();
     let paper = fs::read_to_string(paper_path).unwrap();

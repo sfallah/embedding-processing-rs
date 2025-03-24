@@ -16,6 +16,9 @@ build:
 
 release:
 	cargo build --release
+
+release_metal: clean
+	cargo build --release --features metal
 # Clean target
 clean:
 	cargo clean
