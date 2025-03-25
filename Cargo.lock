@@ -213,7 +213,7 @@ dependencies = [
  "bitflags 2.6.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "log",
  "prettyplease",
  "proc-macro2",
@@ -308,9 +308,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.11"
+version = "1.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4730490333d58093109dc02c23174c3f4d490998c3fed3cc8e82d57afedb9cf"
+checksum = "1fcb57c740ae1daf453ae85f16e37396f672b039e00d9d866e07ddb24e328e3a"
 dependencies = [
  "jobserver",
  "libc",
@@ -1073,6 +1073,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "find_cuda_helper"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9f9e65c593dd01ac77daad909ea4ad17f0d6d1776193fc8ea766356177abdad"
+dependencies = [
+ "glob",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1673,7 +1682,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -1737,23 +1746,26 @@ checksum = "4ee93343901ab17bd981295f2cf0026d4ad018c7c31ba84549a4ddbb47a45104"
 [[package]]
 name = "llama-cpp"
 version = "0.1.0"
-source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git?branch=llama.cpp_b4574_2025-01-28#9cf6cb2617127643c44d1a32dd77f769f85a13b0"
+source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git?branch=llama.cpp_b4820_2025-03-04#a87a387449109e7bb508944b19eaa4e9a929eeeb"
 dependencies = [
  "enumflags2",
  "llama-cpp-sys",
  "thiserror 2.0.11",
  "tracing",
+ "tracing-core",
 ]
 
 [[package]]
 name = "llama-cpp-sys"
 version = "0.1.0"
-source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git?branch=llama.cpp_b4574_2025-01-28#9cf6cb2617127643c44d1a32dd77f769f85a13b0"
+source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git?branch=llama.cpp_b4820_2025-03-04#a87a387449109e7bb508944b19eaa4e9a929eeeb"
 dependencies = [
  "bindgen 0.71.1",
  "cc",
  "cmake",
+ "find_cuda_helper",
  "glob",
+ "walkdir",
 ]
 
 [[package]]
@@ -2472,6 +2484,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3acd125665422973a33ac9d3dd2df85edad0f4ae9b00dafb1a05e43a9f5ef8e7"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "reranking-model"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "embedding-common",
+ "llama-cpp",
+ "rmp-serde",
+ "serde",
+ "serde_json",
+ "tracing",
+ "uuid",
+ "zmq",
 ]
 
 [[package]]

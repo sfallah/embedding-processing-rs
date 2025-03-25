@@ -7,6 +7,7 @@ members = [
     "embedding-index",
     #"embedding-server",
     "embedding-model",
+    "reranking-model"
 ]
 
 [workspace.dependencies]
@@ -29,4 +30,6 @@ chrono = "0.4.38"
 indexmap = "2.6.0"
 zmq = "0.10.0"
 config = { version = "0.15.7", features = ["toml", "async"], default-features = false }
+llama-cpp = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/llama-cpp-rs.git", branch = "llama.cpp_b4820_2025-03-04"}
+
 

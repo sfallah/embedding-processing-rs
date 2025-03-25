@@ -1,0 +1,15 @@
+
+
+[model]
+gguf_file = "models/bge-reranker-v2-m3-q4_k_m.gguf"
+#cpu = false
+ngl = 1000
+max_tokens = 2048
+verbose = true
+
+
+[zmq]
+host = "127.0.0.1"
+frontend_port = 5559
+backend_port = 5560
+num_workers = 1

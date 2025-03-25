@@ -26,7 +26,7 @@ pub trait Serde {
     where
         Self: Sized + Serialize,
     {
-        Ok(to_vec_named(&self).unwrap())
+        Ok(to_vec_named(&self)?)
     }
 
     /// Unpacks a MsgPack byte slice into an object of invoking type.
