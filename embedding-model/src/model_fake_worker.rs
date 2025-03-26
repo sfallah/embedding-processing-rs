@@ -32,7 +32,6 @@ fn main() -> anyhow::Result<()> {
     //let uuid = uuid::Uuid::new_v4();
     //let worker_id = uuid.to_string();
 
-
     setup_tracing(args.log_level.to_tracing_level());
 
     let config = match ModelAppConfig::from_file(args.config_file) {

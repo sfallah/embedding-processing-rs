@@ -19,10 +19,8 @@ pub struct ServerArgs {
     #[arg(long, default_value = "info", value_enum)]
     pub log_level: LogLevel,
 
-
     #[arg(long)]
     pub user_id: Option<String>,
-
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]

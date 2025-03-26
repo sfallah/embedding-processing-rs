@@ -4,7 +4,9 @@ use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 fn main() {
     let context = zmq::Context::new();
     let socket = context.socket(zmq::DEALER).unwrap();
-    socket.connect("tcp://localhost:5559").expect("Failed to connect");
+    socket
+        .connect("tcp://localhost:5559")
+        .expect("Failed to connect");
     socket.set_linger(0).expect("Failed to set linger");
     socket
         .set_sndtimeo(1000)
@@ -21,7 +23,7 @@ fn main() {
     let n_msgs = 2;
     for i in 0..n_msgs {
         let text = format!("Hello model! Please get the embedding for me, msg: {}.", i);
-        let request = EmbeddingsRequest::new(0,0,384, vec![text]);
+        let request = EmbeddingsRequest::new(0, 0, 384, vec![text]);
         let msg = request.pack().expect("Failed to pack");
         socket.send(msg, 0).expect("Failed to send");
         let rsp = socket.recv_bytes(0).expect("Failed to receive");

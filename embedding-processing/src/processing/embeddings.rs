@@ -1,8 +1,8 @@
+use embedding_common::prelude::Serde;
+use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 use std::sync::Arc;
 use tracing::trace;
 use zmq::Context;
-use embedding_common::prelude::Serde;
-use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
 
 pub fn get_embeddings(
     zmq_ctx: Arc<Context>,

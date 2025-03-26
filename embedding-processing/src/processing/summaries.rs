@@ -1,11 +1,11 @@
 use crate::processing::context::ProcessingContext;
+use crate::processing::splitter::split_text;
 use crate::processing::utils;
 use embedding_common::dtos::embedding_dto::EmbeddingDto;
 use embedding_common::dtos::summary_dto::SummaryDto;
 use fast_text_splitter::splitter::split_node::utils::SplitResultLite;
 use std::sync::Arc;
 use tracing::trace;
-use crate::processing::splitter::split_text;
 
 pub fn process_summaries(
     ctx: Arc<ProcessingContext>,
@@ -53,7 +53,10 @@ pub fn process_summaries(
     Ok(summaries)
 }
 
-pub fn get_sentences(ctx: Arc<ProcessingContext>, text: String) -> anyhow::Result<(Vec<String>, Vec<usize>)> {
+pub fn get_sentences(
+    ctx: Arc<ProcessingContext>,
+    text: String,
+) -> anyhow::Result<(Vec<String>, Vec<usize>)> {
     let splits = split_text(ctx.sentence_splitter.clone(), text.into_bytes())?;
     let splits: Vec<_> = filter_splits(&splits, 4);
     let splits_no_tokens: Vec<_> = splits.iter().map(|res| res.tokens.len()).collect();

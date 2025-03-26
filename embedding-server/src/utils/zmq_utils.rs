@@ -1,6 +1,6 @@
-use std::collections::VecDeque;
 use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageStatus, ZmqMessageType};
 use embedding_common::prelude::Serde;
+use std::collections::VecDeque;
 use tracing::error;
 use zeromq::{RepSocket, SocketSend, ZmqMessage};
 

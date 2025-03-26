@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use embedding_common::prelude::Serde;
+use serde::{Deserialize, Serialize};
 
 /// represents the response data for a health check of the server.
 #[derive(Serialize, Deserialize, Debug)]

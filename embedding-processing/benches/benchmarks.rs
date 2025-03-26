@@ -1,15 +1,15 @@
 use criterion::{black_box, criterion_main, Criterion};
-use embedding_processing::processing::documents::process_document;
-use embedding_processing::processing::embeddings::{get_embeddings};
-use embedding_processing::utils::app_utils::init_ctx;
-use fast_text_splitter::config::SplitterLiteConfig;
-use std::fs;
-use std::sync::Arc;
-use rand::distr::Uniform;
-use rand::Rng;
 use embedding_common::prelude::Serde;
 use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
+use embedding_processing::processing::documents::process_document;
+use embedding_processing::processing::embeddings::get_embeddings;
+use embedding_processing::utils::app_utils::init_ctx;
+use fast_text_splitter::config::SplitterLiteConfig;
+use rand::distr::Uniform;
+use rand::Rng;
 use rayon::prelude::*;
+use std::fs;
+use std::sync::Arc;
 
 fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
     // Create a uniform distribution for f32 values between 0.0 and 1.0

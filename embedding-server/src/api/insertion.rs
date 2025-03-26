@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use crate::schema::document::{DocumentInsertionRequest, DocumentInsertionResponse};
 use crate::schema::document_status::DocumentInsertionStatus;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
@@ -10,6 +9,7 @@ use embedding_index::add_to_indices;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::documents::process_document;
+use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 use zeromq::RepSocket;
@@ -37,12 +37,12 @@ pub async fn process_document_insertion_request(
     debug!("insertion request: {:?}", request);
 
     let document_dto = tokio::task::spawn_blocking(move || {
-
         process_document(
-        processing_context,
-        request.doc_url.to_string(),
-        request.input.clone().into_bytes().to_vec(),
-    ).expect("Failed to process document")
+            processing_context,
+            request.doc_url.to_string(),
+            request.input.clone().into_bytes().to_vec(),
+        )
+        .expect("Failed to process document")
     })
     .await
     .unwrap();

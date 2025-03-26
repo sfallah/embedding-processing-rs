@@ -12,21 +12,17 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub(crate) async fn save_split(
-    db: &Arc<RocksDB>,
-    split_dto: &SplitDto,
-    user_id: Uuid,
-) -> Result<()> {
+pub(crate) fn save_split(db: &Arc<RocksDB>, split_dto: &SplitDto, user_id: Uuid) -> Result<()> {
     let mut db_records = Vec::new();
     let split = split_dto.to_model();
     let embedding = split_dto.to_embedding_backend();
     let embedding_user = split_dto.to_embedding_user_model(user_id);
     if let Some(embedding) = embedding {
-        let embedding_record = to_embedding_record(&embedding).await?;
+        let embedding_record = to_embedding_record(&embedding)?;
         db_records.push(embedding_record);
     }
     if let Some(embedding_user) = embedding_user {
-        let embedding_user_record = to_embedding_user_record(&embedding_user).await?;
+        let embedding_user_record = to_embedding_user_record(&embedding_user)?;
         db_records.push(embedding_user_record);
     }
     db_records.push(DbRecordValue::new(
@@ -34,22 +30,22 @@ pub(crate) async fn save_split(
         split.split_id,
         split.pack()?,
     ));
-    save_summary_aux(&split_dto.summaries, user_id, &mut db_records).await?;
-    db.save_records(Arc::new(db_records)).await?;
+    save_summary_aux(&split_dto.summaries, user_id, &mut db_records)?;
+    db.save_records(Arc::new(db_records))?;
     Ok(())
 }
 
-pub async fn delete_split_full(db: &Arc<RocksDB>, split_id: &u64) -> anyhow::Result<Option<Split>> {
-    let split = get_split(db, *split_id).await?;
+pub fn delete_split_full(db: &Arc<RocksDB>, split_id: &u64) -> anyhow::Result<Option<Split>> {
+    let split = get_split(db, *split_id)?;
     match split {
         None => Ok(None),
         Some(split) => {
             let mut key_records = Vec::new();
             key_records.push(DbRecordKey::new(ColumnFamilyType::Splits, *split_id));
             let summary_ids = split.summary_ids.clone().unwrap_or_default();
-            delete_summaries_aux(&summary_ids, &mut key_records).await?;
-            delete_split_aux(*split_id, &mut key_records).await?;
-            match db.delete_records(Arc::new(key_records)).await {
+            delete_summaries_aux(&summary_ids, &mut key_records)?;
+            delete_split_aux(*split_id, &mut key_records)?;
+            match db.delete_records(Arc::new(key_records)) {
                 Ok(_) => Ok(Some(split)),
                 Err(e) => Err(e),
             }
@@ -57,7 +53,7 @@ pub async fn delete_split_full(db: &Arc<RocksDB>, split_id: &u64) -> anyhow::Res
     }
 }
 
-pub async fn delete_split_aux(split_id: u64, db_records: &mut Vec<DbRecordKey>) -> Result<()> {
+pub fn delete_split_aux(split_id: u64, db_records: &mut Vec<DbRecordKey>) -> Result<()> {
     let split_key = DbRecordKey::new(ColumnFamilyType::Splits, split_id);
     db_records.push(split_key);
     let embedding_key = DbRecordKey::new(ColumnFamilyType::Embeddings, split_id);
@@ -67,18 +63,18 @@ pub async fn delete_split_aux(split_id: u64, db_records: &mut Vec<DbRecordKey>) 
     Ok(())
 }
 
-pub async fn get_splits_full(
+pub fn get_splits_full(
     db: &Arc<RocksDB>,
     split_ids: &[u64],
     splits_query_res: Option<&IndexMap<u64, f32>>,
     summary_map: Option<&IndexMap<u64, Vec<SummaryDto>>>,
     with_embeddings: bool,
 ) -> Result<Vec<SplitDto>> {
-    let splits = get_all_splits(&db, split_ids).await?;
+    let splits = get_all_splits(&db, split_ids)?;
 
     let split_ids: Vec<_> = splits.iter().map(|s| s.split_id).collect();
     let embeddings_map = if with_embeddings {
-        get_embeddings_map(db, split_ids.as_slice()).await?
+        get_embeddings_map(db, split_ids.as_slice())?
     } else {
         IndexMap::new()
     };
@@ -90,7 +86,7 @@ pub async fn get_splits_full(
                 .iter()
                 .flat_map(|split| split.summary_ids.clone().unwrap_or_default())
                 .collect();
-            &get_split_summaries_map(db, summary_ids.as_slice(), None, with_embeddings).await?
+            &get_split_summaries_map(db, summary_ids.as_slice(), None, with_embeddings)?
         }
     };
     let mut splits_dtos = Vec::new();
@@ -106,7 +102,7 @@ pub async fn get_splits_full(
     Ok(splits_dtos)
 }
 
-pub async fn get_doc_splits_map(
+pub fn get_doc_splits_map(
     db: &Arc<RocksDB>,
     split_ids: &[u64],
     splits_query_res: Option<&IndexMap<u64, f32>>,
@@ -119,8 +115,7 @@ pub async fn get_doc_splits_map(
         splits_query_res,
         summary_map,
         with_embeddings,
-    )
-    .await?;
+    )?;
     let mut split_map: IndexMap<u64, Vec<SplitDto>> = IndexMap::new();
     for split_dto in splits_dtos {
         let doc_id = split_dto.doc_id;
