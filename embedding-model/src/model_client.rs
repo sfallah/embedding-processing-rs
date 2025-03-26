@@ -1,5 +1,4 @@
-use embedding_common::prelude::Serde;
-use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
+use embedding_common::prelude::{EmbeddingsRequest, EmbeddingsResponse, Serde};
 
 fn main() {
     let context = zmq::Context::new();

@@ -1,5 +1,5 @@
-use embedding_common::prelude::Serde;
 use serde::{Deserialize, Serialize};
+use crate::prelude::Serde;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum TruncationDirection {
