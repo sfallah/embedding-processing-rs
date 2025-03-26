@@ -1,5 +1,4 @@
-use embedding_common::prelude::Serde;
-use reranking_model::types::{Ranking, RerankRequest};
+use embedding_common::prelude::{Ranking, RerankRequest, Serde};
 use serde::{Deserialize, Serialize};
 use std::fs;
 

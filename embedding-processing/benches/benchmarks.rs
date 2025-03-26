@@ -1,6 +1,5 @@
 use criterion::{black_box, criterion_main, Criterion};
-use embedding_common::prelude::Serde;
-use embedding_model::types::{EmbeddingsRequest, EmbeddingsResponse};
+use embedding_common::prelude::{EmbeddingsRequest, EmbeddingsResponse, Serde};
 use embedding_processing::processing::documents::process_document;
 use embedding_processing::processing::embeddings::get_embeddings;
 use embedding_processing::utils::app_utils::init_ctx;
