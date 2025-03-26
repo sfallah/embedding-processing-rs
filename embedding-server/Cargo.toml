@@ -4,14 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-zeromq = "0.4.1"
-async-channel = "2.3.1"
 anyhow = { workspace = true }
-futures = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true}
 num_cpus = { workspace = true }
-tokio = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
 serde_repr = { workspace = true }

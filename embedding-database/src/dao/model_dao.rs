@@ -5,11 +5,11 @@ use embedding_common::prelude::*;
 use std::sync::Arc;
 
 #[allow(unused)]
-pub async fn put_model(db: &Arc<RocksDB>, model: &Model) -> anyhow::Result<()> {
+pub fn put_model(db: &Arc<RocksDB>, model: &Model) -> anyhow::Result<()> {
     let model_id = &model.model_id;
     let data = model
         .pack()
         .map_err(|e| anyhow!("Failed to pack model: {}", e))?;
-    db.put(ColumnFamilyType::Models, model_id, &data).await?;
+    db.put(ColumnFamilyType::Models, model_id, &data)?;
     Ok(())
 }

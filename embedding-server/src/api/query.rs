@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use crate::schema::document::DocumentQueryRequest;
 use crate::schema::document::DocumentQueryResponse;
 use crate::schema::search_mode::SearchModeType;
@@ -12,6 +11,7 @@ use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::query::process_query;
 use indexmap::IndexMap;
+use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 use zeromq::RepSocket;
@@ -45,11 +45,11 @@ pub async fn process_document_query_request(
         .unwrap_or(SearchModeType::SplitAndSummary);
 
     let query_embeddings = tokio::task::spawn_blocking(move || {
-        process_query(
-            processing_context.clone(),
-            request.input.clone(),
-        ).expect("Failed to process query")
-    }).await.unwrap();
+        process_query(processing_context.clone(), request.input.clone())
+            .expect("Failed to process query")
+    })
+    .await
+    .unwrap();
     let query_embeddings = &query_embeddings[0];
 
     // 1. Search for the query in the indexes
@@ -60,12 +60,7 @@ pub async fn process_document_query_request(
     if search_mode == SearchModeType::SummaryOnly || search_mode == SearchModeType::SplitAndSummary
     {
         let summaries_query_res = summary_index
-            .query_filter(
-                db,
-                &request.user_ids,
-                &query_embeddings,
-                top_k,
-            )
+            .query_filter(db, &request.user_ids, &query_embeddings, top_k)
             .await
             .unwrap();
         debug!("Summary query results: {:?}", summaries_query_res);
@@ -85,12 +80,7 @@ pub async fn process_document_query_request(
     let mut split_query_res = IndexMap::new();
     if search_mode == SearchModeType::SplitOnly || search_mode == SearchModeType::SplitAndSummary {
         split_query_res = split_index
-            .query_filter(
-                db,
-                &request.user_ids,
-                &query_embeddings,
-                top_k,
-            )
+            .query_filter(db, &request.user_ids, &query_embeddings, top_k)
             .await
             .unwrap();
         debug!("Split query results: {:?}", split_query_res);

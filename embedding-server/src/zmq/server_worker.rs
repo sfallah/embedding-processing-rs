@@ -1,20 +1,20 @@
 use crate::api::delete::process_document_deletion_request;
-use crate::api::insertion::{process_document_insertion_request};
+use crate::api::health::process_health_check;
+use crate::api::insertion::process_document_insertion_request;
 use crate::api::query::process_document_query_request;
 use crate::api::retrieval::process_document_retrieval_request;
 use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
-use crate::utils::zmq_utils::{handle_error_and_respond};
+use crate::utils::zmq_utils::handle_error_and_respond;
+use embedding_common::config::ZmqConfig;
+use embedding_common::prelude::{DeterministicAHasher, Serde};
 use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use std::sync::Arc;
+use tokio::select;
 use tokio::sync::broadcast::Receiver;
-use tokio::{select};
 use tracing::info;
 use zeromq::{RepSocket, Socket, SocketRecv};
-use embedding_common::config::ZmqConfig;
-use embedding_common::prelude::{DeterministicAHasher, Serde};
-use crate::api::health::process_health_check;
 
 pub struct ServerWorker {
     pub worker: RepSocket,
@@ -25,14 +25,21 @@ pub struct ServerWorker {
 impl ServerWorker {
     pub async fn init(zmq_config: Arc<ZmqConfig>) -> Self {
         let mut worker = RepSocket::new();
-        let endpoint = format!("tcp://{}:{}", zmq_config.zmq_host, zmq_config.zmq_backend_port);
+        let endpoint = format!(
+            "tcp://{}:{}",
+            zmq_config.zmq_host, zmq_config.zmq_backend_port
+        );
         worker
             .connect(&endpoint)
             .await
             .expect("Worker failed to connect to backend");
         let hasher = Arc::new(DeterministicAHasher::new(None, None));
         let zmq_config = zmq_config.clone();
-        ServerWorker { worker, zmq_config, hasher }
+        ServerWorker {
+            worker,
+            zmq_config,
+            hasher,
+        }
     }
 }
 

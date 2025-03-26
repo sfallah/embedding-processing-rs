@@ -1,10 +1,9 @@
-use std::sync::Arc;
 use crate::processing::context::ProcessingContext;
 use embedding_common::utils::hashing::DeterministicAHasher;
 use fast_text_splitter::config::SplitterLiteConfig;
+use std::sync::Arc;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-
 
 pub fn init_ctx(
     max_tokens: usize,

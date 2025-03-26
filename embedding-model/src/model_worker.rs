@@ -1,4 +1,3 @@
-use std::num::NonZero;
 use anyhow::Context;
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
@@ -14,6 +13,7 @@ use llama_cpp::llama_backend::LlamaBackend;
 use llama_cpp::llama_batch::LlamaBatch;
 use llama_cpp::model::params::LlamaModelParams;
 use llama_cpp::model::{AddBos, LlamaModel};
+use std::num::NonZero;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
 
@@ -44,7 +44,6 @@ fn main() -> anyhow::Result<()> {
     } else {
         LlamaModelParams::default()
     };
-
 
     let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
 

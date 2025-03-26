@@ -2,8 +2,8 @@ use crate::processing::context::ProcessingContext;
 use crate::processing::splits::process_split;
 use crate::processing::splitter::split_text;
 use embedding_common::dtos::document_dto::DocumentDto;
-use std::sync::Arc;
 use rayon::prelude::*;
+use std::sync::Arc;
 use tracing::{error, trace};
 
 #[tracing::instrument(skip(ctx, text))]
@@ -16,7 +16,6 @@ pub fn process_document(
 
     let doc_id = ctx.clone().hasher.hash(&url);
     trace!("Document ID: {}", doc_id);
-
 
     let split_dtos: Vec<_> = splits
         .par_iter()

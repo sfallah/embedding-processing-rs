@@ -57,7 +57,6 @@ fn main() -> anyhow::Result<()> {
     error!("model n_ctx_train: {}", n_ctx);
     let pooling_type = LlamaPoolingType::Rank;
 
-
     // initialize the context
     let ctx_params = LlamaContextParams::default()
         .with_n_threads_batch(std::thread::available_parallelism()?.get().try_into()?)

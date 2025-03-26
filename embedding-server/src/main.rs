@@ -11,11 +11,9 @@ use embedding_server::zmq::server_task::ServerTask;
 use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
 use embedding_server::ServerArgs;
 use std::sync::Arc;
-use tokio::select;
 use tracing::{error, info};
 
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), anyhow::Error> {
     error!("Starting up");
     // Parse command line arguments
     let args = ServerArgs::parse();
@@ -44,14 +42,17 @@ async fn main() -> Result<(), anyhow::Error> {
     let rocksdb = RocksDB::open(&db_path).await?;
     let db = Arc::new(rocksdb);
 
-    let model_config = embedding_model::config::ModelConfig::new(
-        model_config.gguf_file,
-        model_config.verbose,
-    );
+    let model_config =
+        embedding_model::config::ModelConfig::new(model_config.gguf_file, model_config.verbose);
 
     let (shutdown_sender, mut shutdown_receiver) = tokio::sync::broadcast::channel(1);
 
-    let model = Model::new(&DeterministicAHasher::new(None, None), model_config.gguf_file, 512, 384);
+    let model = Model::new(
+        &DeterministicAHasher::new(None, None),
+        model_config.gguf_file,
+        512,
+        384,
+    );
 
     put_model(&db, &model).await?;
 
@@ -68,14 +69,15 @@ async fn main() -> Result<(), anyhow::Error> {
         splitter_config.max_tokens
     };
 
-    let processing_ctx =  tokio::task::spawn_blocking(move || {
+    let processing_ctx = tokio::task::spawn_blocking(move || {
         init_ctx(
-        splitter_max_tokens,
-        splitter_config.merge_level,
-        model.n_embd as usize,
-        model.model_id,
-    )
-    }).await?;
+            splitter_max_tokens,
+            splitter_config.merge_level,
+            model.n_embd as usize,
+            model.model_id,
+        )
+    })
+    .await?;
     let clients = ServerTask::init(
         &zmq_config.zmq_host,
         zmq_config.zmq_frontend_port,

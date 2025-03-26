@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use zeromq::RepSocket;
-use embedding_common::config::ZmqConfig;
 use crate::schema::health_check::HealthCheckResponse;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::send_success_response;
+use embedding_common::config::ZmqConfig;
+use std::sync::Arc;
+use zeromq::RepSocket;
 
 pub async fn process_health_check(
     socket: &mut RepSocket,

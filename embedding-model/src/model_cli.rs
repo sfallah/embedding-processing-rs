@@ -1,8 +1,8 @@
 use clap::Parser;
-use embedding_model::config::ModelAppConfig;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::utils::tracting::setup_tracing;
+use embedding_model::config::ModelAppConfig;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Child, Command};
@@ -23,9 +23,11 @@ fn find_binary_path(binary_name: &str) -> PathBuf {
 /// Spawns another binary and returns its Child process handle.
 fn spawn_process(binary_name: &str, config_file: &str) -> anyhow::Result<Child> {
     let binary_path = find_binary_path(binary_name);
-    Command::new(binary_path).args(&["--config-file", config_file])
+    Command::new(binary_path)
+        .args(&["--config-file", config_file])
         // You can add arguments if needed, e.g. .arg("some_argument")
-        .spawn().map_err(|e| {
+        .spawn()
+        .map_err(|e| {
             error!("failed to spawn {}: {}", binary_name, e);
             e.into()
         })
@@ -44,7 +46,7 @@ fn main() -> anyhow::Result<()> {
     // Spawn multiple worker processes concurrently.
     let mut children = Vec::new();
 
-    let broker = match spawn_process("model_broker",args.config_file.as_str()) {
+    let broker = match spawn_process("model_broker", args.config_file.as_str()) {
         Ok(broker) => broker,
         Err(e) => {
             error!("Failed to spawn model_broker: {:?}", e);
@@ -53,7 +55,7 @@ fn main() -> anyhow::Result<()> {
     };
     children.push(broker);
     for _ in 0..config.zmq_config.num_workers {
-        let worker = match spawn_process("model_worker",args.config_file.as_str()) {
+        let worker = match spawn_process("model_worker", args.config_file.as_str()) {
             Ok(worker) => worker,
             Err(e) => {
                 error!("Failed to spawn model_worker: {:?}", e);
