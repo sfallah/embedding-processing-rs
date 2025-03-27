@@ -270,7 +270,7 @@ impl HnswIndex {
         Ok(count)
     }
 
-    #[tracing::instrument(skip(self, db, query))]
+    //#[tracing::instrument(skip(self, db, query))]
     pub  fn query_filter(
         &self,
         db: &Arc<RocksDB>,

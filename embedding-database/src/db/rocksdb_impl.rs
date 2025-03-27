@@ -105,7 +105,7 @@ impl RocksDB {
         let cf_name = cf.name().to_string();
         let cf_name_clone = cf_name.clone();
 
-        trace!("Getting key: {} from cf: {}", key, cf_name_clone);
+        //trace!("Getting key: {} from cf: {}", key, cf_name_clone);
 
         let cf = db
             .cf_handle(&cf_name)
@@ -129,9 +129,6 @@ impl RocksDB {
         let key_bytes = Self::key_to_bytes(key);
         let db = self.db.clone();
         let cf_name = cf.name().to_string();
-        let cf_name_clone = cf_name.clone();
-
-        debug!("Getting key: {} from cf: {}", key, cf_name_clone);
 
         let cf = db
             .cf_handle(&cf_name)
@@ -173,14 +170,7 @@ impl RocksDB {
     pub fn multi_get(&self, cf: ColumnFamilyType, keys: &[u64]) -> Result<Vec<Option<Vec<u8>>>> {
         let db = self.db.clone();
         let keys = keys.to_vec();
-        let keys_len = keys.len();
         let cf_name = cf.name().to_string();
-        let cf_name_clone = cf_name.clone();
-
-        debug!(
-            "Performing multi_get for {} keys in cf: {}",
-            keys_len, cf_name_clone
-        );
 
         let cf = db
             .cf_handle(&cf_name)
@@ -192,11 +182,6 @@ impl RocksDB {
             let value = db.get_cf(&cf, &key_bytes)?;
             results.push(value);
         }
-
-        debug!(
-            "multi_get completed for {} keys in column family: {}",
-            keys_len, cf_name_clone
-        );
 
         Ok(results)
     }

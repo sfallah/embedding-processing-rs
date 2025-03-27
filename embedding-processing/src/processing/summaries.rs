@@ -47,6 +47,7 @@ pub fn process_summaries(
                 score,
                 Some(embedding),
                 None,
+                None,
             )
         })
         .collect();

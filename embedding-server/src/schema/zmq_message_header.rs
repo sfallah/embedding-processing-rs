@@ -18,6 +18,8 @@ pub enum ZmqMessageType {
     DocumentRetrieval = 3,
     /// Message type for retrieval operations for summaries of document.
     DocumentDeletion = 6,
+    /// Message type for reranking operations.
+    Rerank = 7,
     /// Message type for health check operations, used to verify the operational status of the server.
     HealthCheck = 9,
     /// Represents an undefined or unrecognized message type, used as a fallback or error state.
@@ -32,6 +34,7 @@ impl fmt::Display for ZmqMessageType {
             ZmqMessageType::DocumentQuery => "DocumentQuery",
             ZmqMessageType::DocumentRetrieval => "DocumentRetrieval",
             ZmqMessageType::DocumentDeletion => "DocumentDeletion",
+            ZmqMessageType::Rerank => "Rerank",
             ZmqMessageType::HealthCheck => "HealthCheck",
             ZmqMessageType::Unknown => "UNKNOWN",
         };

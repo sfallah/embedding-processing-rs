@@ -2,7 +2,7 @@ use anyhow::Context;
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
-use embedding_common::prelude::{Ranking, RerankRequest, Serde};
+use embedding_common::prelude::{Rank, RerankRequest, RerankResponse, Serde};
 use embedding_common::utils::tracting::setup_tracing;
 use llama_cpp::context::params::{LlamaContextParams, LlamaPoolingType};
 use llama_cpp::context::LlamaContext;
@@ -117,7 +117,7 @@ fn main() -> anyhow::Result<()> {
                 continue;
             }
         };
-
+        let req_id = request.req_id;
         let query = request.query;
         let prompt_lines = {
             let mut lines = Vec::new();
@@ -188,11 +188,12 @@ fn main() -> anyhow::Result<()> {
         let scores: Vec<f32> = output.iter().map(|embeddings| embeddings[0]).collect();
         let mut scores_indexed: Vec<(usize, &f32)> = scores.iter().enumerate().collect();
         scores_indexed.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-        let rankings: Vec<Ranking> = scores_indexed
+        let rankings: Vec<Rank> = scores_indexed
             .into_iter()
-            .map(|(idx, score)| Ranking::new(idx, *score, request.texts[idx].clone()))
+            .map(|(idx, score)| Rank::new(idx, Some(request.texts[idx].clone()), *score))
             .collect();
-        let response_bytes = rmp_serde::to_vec(&rankings).expect("Failed to serialize");
+        let response = RerankResponse::new(req_id, rankings);
+        let response_bytes = response.pack()?;
         if let Err(e) = socket.send_multipart(vec![identity, response_bytes.into()], 0) {
             error!("Failed to send response: {:?}", e);
             continue;

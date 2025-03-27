@@ -18,3 +18,4 @@ mod index_config;
 mod model_config;
 mod splitter_config;
 mod zmq_config;
+mod endpoints;

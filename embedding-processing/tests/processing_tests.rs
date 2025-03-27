@@ -43,7 +43,7 @@ mod tests {
         let text2 = "This is another test text".to_string();
         let embeddings = get_embeddings(
             ctx.zmq_context.clone(),
-            &ctx.model_endpoint,
+            &ctx.embedding_endpoint,
             ctx.n_embd,
             &vec![text, text2],
             0,
@@ -75,7 +75,7 @@ mod tests {
             get_sentences(ctx.clone(), text.clone()).expect("Failed to get sentences");
         let embeddings = get_embeddings(
             ctx.zmq_context.clone(),
-            &ctx.model_endpoint,
+            &ctx.embedding_endpoint,
             ctx.n_embd,
             &sentences,
             0,

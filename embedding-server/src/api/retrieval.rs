@@ -6,14 +6,15 @@ use embedding_common::prelude::*;
 use embedding_database::prelude::*;
 use std::sync::Arc;
 use tracing::error;
-use zeromq::RepSocket;
+use zmq::Socket;
 
-pub async fn process_document_retrieval_request(
-    worker_socket: &mut RepSocket,
+pub fn process_document_retrieval_request(
+    worker_socket: &Socket,
     hasher: Arc<DeterministicAHasher>,
     db: &Arc<RocksDB>,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
+    identity: &Vec<u8>,
 ) {
     // unpack into DocumentRetrievalRequest
     let request: DocumentRetrievalRequest;
@@ -22,7 +23,7 @@ pub async fn process_document_retrieval_request(
         Err(e) => {
             let error_message = format!("Error unpacking DocumentRetrievalRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket, &error_message, message_header).await;
+            send_exception_response(worker_socket, &error_message, message_header, identity);
             return;
         }
     }
@@ -32,7 +33,7 @@ pub async fn process_document_retrieval_request(
         let error_message =
             "DocumentRetrievalRequest must have either a document_id or document_url";
         error!("{}", error_message);
-        send_exception_response(worker_socket, error_message, message_header).await;
+        send_exception_response(worker_socket, error_message, message_header, identity);
         return;
     }
 
@@ -45,23 +46,24 @@ pub async fn process_document_retrieval_request(
         document_id = hasher.hash(&document_url);
     }
 
-    match get_full_doc(db, document_id, request.verbose.unwrap_or(false), None).await {
+    match get_full_doc(db, document_id, request.verbose.unwrap_or(false), None) {
         Ok(doc_dto) => {
-            send_document_retrieval_response(worker_socket, &doc_dto, message_header).await
+            send_document_retrieval_response(worker_socket, &doc_dto, message_header, identity)
         }
         Err(e) => {
             let error_message = format!("Error retrieving document: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket, &error_message, message_header).await;
+            send_exception_response(worker_socket, &error_message, message_header, identity);
             return;
         }
     }
 }
 
-async fn send_document_retrieval_response(
-    socket: &mut RepSocket,
+fn send_document_retrieval_response(
+    socket: &Socket,
     document: &Option<DocumentDto>,
     message_header: &mut ZmqMessageHeader,
+    identity: &Vec<u8>,
 ) {
     let response = match document {
         Some(doc) => DocumentRetrievalResponse {
@@ -74,5 +76,5 @@ async fn send_document_retrieval_response(
         },
     };
 
-    send_success_response(socket, response, message_header).await
+    send_success_response(socket, response, message_header, identity)
 }

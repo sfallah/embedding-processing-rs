@@ -10,6 +10,6 @@ verbose = true
 
 [zmq]
 host = "127.0.0.1"
-frontend_port = 5559
-backend_port = 5560
+frontend_port = 5557
+backend_port = 5570
 num_workers = 1
