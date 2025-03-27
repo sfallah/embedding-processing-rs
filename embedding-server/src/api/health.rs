@@ -3,12 +3,13 @@ use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::send_success_response;
 use embedding_common::config::ZmqConfig;
 use std::sync::Arc;
-use zeromq::RepSocket;
+use zmq::Socket;
 
-pub async fn process_health_check(
-    socket: &mut RepSocket,
+pub fn process_health_check(
+    socket: &Socket,
     message_header: &mut ZmqMessageHeader,
     zmq_config: Arc<ZmqConfig>,
+    identity: &Vec<u8>,
 ) {
     let response = HealthCheckResponse {
         status: "OK".to_string(),
@@ -16,5 +17,5 @@ pub async fn process_health_check(
         worker_count: zmq_config.zmq_num_workers,
     };
 
-    send_success_response(socket, response, message_header).await;
+    send_success_response(socket, response, message_header, identity);
 }

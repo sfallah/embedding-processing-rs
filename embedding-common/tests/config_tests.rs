@@ -69,4 +69,15 @@ mod tests {
         assert_eq!(zmq_config.zmq_num_workers, 2);
         Ok(())
     }
+    #[test]
+    fn test_endpoints_config() -> anyhow::Result<()> {
+        let conf_file = "tests/test_config.toml".to_string();
+        let app_config = AppConfig::from_file(conf_file)?;
+        let endpoints_config = app_config.endpoints;
+        println!("endpoints config: {:?}", endpoints_config);
+        assert_eq!(endpoints_config.embedding_endpoint, "tcp://localhost:5559".to_string());
+        assert!(endpoints_config.reranking_endpoint.is_some());
+        assert_eq!(endpoints_config.reranking_endpoint.unwrap(), "tcp://localhost:5557".to_string());
+        Ok(())
+    }
 }

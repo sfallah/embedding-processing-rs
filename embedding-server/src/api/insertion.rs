@@ -9,19 +9,19 @@ use embedding_index::add_to_indices;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::documents::process_document;
-use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info};
-use zeromq::RepSocket;
+use zmq::Socket;
 
-pub async fn process_document_insertion_request(
-    worker_socket: &mut RepSocket,
+pub fn process_document_insertion_request(
+    worker_socket: &Socket,
     db: &Arc<RocksDB>,
-    processing_context: Rc<ProcessingContext>,
+    processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
+    identity: &Vec<u8>,
 ) {
     let request: DocumentInsertionRequest;
     match DocumentInsertionRequest::unpack(&body_message) {
@@ -29,33 +29,26 @@ pub async fn process_document_insertion_request(
         Err(e) => {
             let error_message = format!("Error unpacking DocumentInsertionRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket, &error_message, message_header).await;
+            send_exception_response(worker_socket, &error_message, message_header, identity);
             return;
         }
     }
 
     debug!("insertion request: {:?}", request);
-
-    let document_dto = tokio::task::spawn_blocking(move || {
-        process_document(
+     let document_dto=   process_document(
             processing_context,
             request.doc_url.to_string(),
             request.input.clone().into_bytes().to_vec(),
         )
-        .expect("Failed to process document")
-    })
-    .await
-    .unwrap();
+        .expect("Failed to process document");
 
     let user_id = request.user;
     debug!("User ID: {}", user_id);
 
     save_doc(db, &document_dto, user_id)
-        .await
         .expect("Failed to write models to DB");
 
     add_to_indices(split_index.clone(), summary_index.clone(), &document_dto)
-        .await
         .expect("Failed to add to indices");
 
     send_document_insertion_response(
@@ -63,18 +56,19 @@ pub async fn process_document_insertion_request(
         message_header,
         &document_dto,
         request.verbose.unwrap_or(false),
-    )
-    .await;
+        identity,
+    );
 
     info!("Document processed and response sent")
 }
 
 // Responses
-pub async fn send_document_insertion_response(
-    socket: &mut RepSocket,
+pub fn send_document_insertion_response(
+    socket: &Socket,
     message_header: &mut ZmqMessageHeader,
     document_dto: &DocumentDto,
     verbose: bool,
+    identity: &Vec<u8>,
 ) {
     let response = DocumentInsertionResponse {
         status: DocumentInsertionStatus::Success,
@@ -84,5 +78,5 @@ pub async fn send_document_insertion_response(
             None
         },
     };
-    zmq_utils::send_success_response(socket, response, message_header).await;
+    zmq_utils::send_success_response(socket, response, message_header, identity);
 }

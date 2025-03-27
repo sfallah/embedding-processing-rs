@@ -26,7 +26,7 @@ pub fn process_split(
 
     let embeddings = get_embeddings(
         ctx.zmq_context.clone(),
-        ctx.model_endpoint.as_str(),
+        ctx.embedding_endpoint.as_str(),
         ctx.n_embd,
         &text_vec,
         split_id,
@@ -53,6 +53,7 @@ pub fn process_split(
         split_res.tokens.len(),
         summaries,
         Some(embedding),
+        None,
         None,
     ))
 }

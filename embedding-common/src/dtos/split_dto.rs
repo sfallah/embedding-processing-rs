@@ -1,6 +1,4 @@
-use crate::prelude::{
-    Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Split, SummaryDto,
-};
+use crate::prelude::{Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Rank, Split, SummaryDto};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use uuid::Uuid;
@@ -15,6 +13,7 @@ pub struct SplitDto {
     pub summaries: Vec<SummaryDto>,
     pub embedding: Option<EmbeddingDto>,
     pub query_distance: Option<f32>,
+    pub rank: Option<Rank>,
 }
 
 impl Hash for SplitDto {
@@ -41,6 +40,7 @@ impl SplitDto {
         summaries: Vec<SummaryDto>,
         embedding: Option<EmbeddingDto>,
         query_distance: Option<f32>,
+        rank: Option<Rank>,
     ) -> Self {
         SplitDto {
             split_id,
@@ -51,6 +51,7 @@ impl SplitDto {
             summaries,
             embedding,
             query_distance,
+            rank,
         }
     }
     pub fn to_model(&self) -> Split {

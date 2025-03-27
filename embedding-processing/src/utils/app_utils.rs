@@ -10,6 +10,8 @@ pub fn init_ctx(
     merge_level: Option<usize>,
     n_embd: usize,
     model_id: u64,
+    embedding_endpoint: String,
+    reranking_endpoint: Option<String>,
 ) -> Arc<ProcessingContext> {
     let splitter_patterns = vec![
         vec!["\n\n".to_string()],
@@ -41,7 +43,9 @@ pub fn init_ctx(
     let zmq_context = zmq::Context::new();
     Arc::new(ProcessingContext {
         zmq_context: Arc::new(zmq_context),
-        model_endpoint: "tcp://localhost:5559".to_string(),
+        //FIXME: SHOULD BE CONFIGURABLE
+        embedding_endpoint,
+        reranking_endpoint,
         splitter: Arc::new(nw_splitter),
         sentence_splitter: Arc::new(sentence_splitter),
         hasher: Arc::new(hasher),

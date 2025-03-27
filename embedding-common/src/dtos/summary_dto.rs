@@ -1,4 +1,4 @@
-use crate::prelude::{Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Summary};
+use crate::prelude::{Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Rank, Summary};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -13,6 +13,7 @@ pub struct SummaryDto {
     pub centrality: f32,
     pub embedding: Option<EmbeddingDto>,
     pub query_distance: Option<f32>,
+    pub rank: Option<Rank>,
 }
 
 impl SummaryDto {
@@ -26,6 +27,7 @@ impl SummaryDto {
         centrality: f32,
         embedding: Option<EmbeddingDto>,
         query_distance: Option<f32>,
+        rank: Option<Rank>,
     ) -> Self {
         SummaryDto {
             summary_id,
@@ -37,6 +39,7 @@ impl SummaryDto {
             centrality,
             embedding,
             query_distance,
+            rank,
         }
     }
     pub fn to_model(&self) -> Summary {

@@ -46,6 +46,7 @@ impl Split {
             summaries,
             embedding,
             query_score,
+            None,
         )
     }
 }

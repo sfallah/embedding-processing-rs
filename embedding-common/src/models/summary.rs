@@ -48,6 +48,7 @@ impl Summary {
             self.centrality,
             embedding,
             query_distance,
+            None,
         )
     }
 }

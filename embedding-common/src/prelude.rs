@@ -14,11 +14,12 @@ pub use crate::models::summary::Summary;
 
 pub use crate::utils::hashing::DeterministicAHasher;
 
-pub use crate::services::embedding::EmbeddingsRequest;
-pub use crate::services::embedding::EmbeddingsResponse;
+pub use crate::services::embedding_types::EmbeddingsRequest;
+pub use crate::services::embedding_types::EmbeddingsResponse;
 
-pub use crate::services::reranking::RerankRequest;
-pub use crate::services::reranking::Ranking;
+pub use crate::services::rerank_types::RerankRequest;
+pub use crate::services::rerank_types::Rank;
+pub use crate::services::rerank_types::RerankResponse;
 
 
 pub use crate::types::common::Serde;

@@ -7,10 +7,10 @@ use embedding_database::prelude::{put_model, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_index::initialize_index_from_db;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
-use embedding_server::zmq::server_task::ServerTask;
-use embedding_server::zmq::server_worker::{worker_routine, ServerWorker};
+use embedding_server::zmq::server_worker::worker_routine;
 use embedding_server::ServerArgs;
 use std::sync::Arc;
+use std::thread;
 use tracing::{error, info};
 
 fn main() -> Result<(), anyhow::Error> {
@@ -39,13 +39,11 @@ fn main() -> Result<(), anyhow::Error> {
     let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
     let db_path = db_path_binding.to_str().unwrap();
     create_directory(db_path).expect("Failed to create directory");
-    let rocksdb = RocksDB::open(&db_path).await?;
+    let rocksdb = RocksDB::open(&db_path)?;
     let db = Arc::new(rocksdb);
 
     let model_config =
         embedding_model::config::ModelConfig::new(model_config.gguf_file, model_config.verbose);
-
-    let (shutdown_sender, mut shutdown_receiver) = tokio::sync::broadcast::channel(1);
 
     let model = Model::new(
         &DeterministicAHasher::new(None, None),
@@ -54,7 +52,7 @@ fn main() -> Result<(), anyhow::Error> {
         384,
     );
 
-    put_model(&db, &model).await?;
+    put_model(&db, &model)?;
 
     let splitter_max_tokens = if model.n_ctx - 2 <= splitter_config.max_tokens as i32 {
         info!(
@@ -69,24 +67,54 @@ fn main() -> Result<(), anyhow::Error> {
         splitter_config.max_tokens
     };
 
-    let processing_ctx = tokio::task::spawn_blocking(move || {
-        init_ctx(
-            splitter_max_tokens,
-            splitter_config.merge_level,
-            model.n_embd as usize,
-            model.model_id,
-        )
-    })
-    .await?;
-    let clients = ServerTask::init(
-        &zmq_config.zmq_host,
-        zmq_config.zmq_frontend_port,
-        zmq_config.zmq_backend_port,
-    )
-    .await;
+    let processing_ctx = init_ctx(
+        splitter_max_tokens,
+        splitter_config.merge_level,
+        model.n_embd as usize,
+        model.model_id,
+        app_config.endpoints.embedding_endpoint.clone(),
+        app_config.endpoints.reranking_endpoint.clone(),
+    );
+
+    let context = zmq::Context::new();
+    let frontend = match context.socket(zmq::ROUTER) {
+        Ok(socket) => socket,
+        Err(e) => {
+            error!("Failed to create frontend socket: {:?}", e);
+            return Err(e.into());
+        }
+    };
+
+    let backend = match context.socket(zmq::DEALER) {
+        Ok(socket) => socket,
+        Err(e) => {
+            error!("Failed to create backend socket: {:?}", e);
+            return Err(e.into());
+        }
+    };
+
+    let frontend_endpoint = format!(
+        "tcp://{}:{:?}",
+        &zmq_config.zmq_host, zmq_config.zmq_frontend_port
+    );
+    if let Err(e) = frontend.bind(&frontend_endpoint) {
+        error!("Failed to bind frontend socket: {:?}", e);
+        return Err(e.into());
+    }
+
+    let backend_endpoint = format!(
+        "tcp://{}:{:?}",
+        &zmq_config.zmq_host, zmq_config.zmq_backend_port
+    );
+
+    if let Err(e) = backend.bind(&backend_endpoint) {
+        error!("Failed to bind backend socket: {:?}", e);
+        return Err(e.into());
+    }
 
     // Set up signal handling
 
+    /*
     let shutdown_clone = shutdown_sender.clone();
     let shutdown_handle = tokio::spawn(async move {
         if let Err(e) = tokio::signal::ctrl_c().await {
@@ -97,63 +125,54 @@ fn main() -> Result<(), anyhow::Error> {
         }
         info!("Sent shutdown signal");
     });
+     */
 
     // Create an Arc reference to the database
     let db = Arc::new(db);
 
     // Create an HNSW index and initialize it from the database
-    let split_index = Arc::new(
-        HnswIndex::async_create_index("splits".to_string(), app_config.index_config.clone())
-            .await?,
-    );
+    let split_index = Arc::new(HnswIndex::async_create_index(
+        "splits".to_string(),
+        app_config.index_config.clone(),
+    )?);
 
-    let summary_index = Arc::new(
-        HnswIndex::async_create_index("summaries".to_string(), app_config.index_config).await?,
-    );
+    let summary_index = Arc::new(HnswIndex::async_create_index(
+        "summaries".to_string(),
+        app_config.index_config,
+    )?);
 
-    initialize_index_from_db(&db, &split_index, &summary_index).await?;
-
-    let mut worker_handles = Vec::new();
+    initialize_index_from_db(&db, &split_index, &summary_index)?;
 
     // Initialize separate workers for each thread
+    let mut worker_thread_pool = Vec::new();
     for _ in 0..parallel_workers {
-        let mut worker = ServerWorker::init(zmq_config.clone()).await;
         let processing_ctx = Arc::clone(&processing_ctx);
         let split_index_clone = Arc::clone(&split_index);
         let summary_index_clone = Arc::clone(&summary_index);
         let db_clone = Arc::clone(&db);
-        let shutdown_receiver = shutdown_sender.subscribe();
-        let handle = tokio::task::spawn(async move {
+        let zmq_config = Arc::clone(&zmq_config);
+        let context = context.clone();
+        let worker_handler = thread::spawn(move || {
             worker_routine(
-                shutdown_receiver,
-                &mut worker,
+                zmq_config,
+                &context,
                 processing_ctx,
                 &split_index_clone,
                 &summary_index_clone,
                 &db_clone,
             )
-            .await;
         });
-
-        worker_handles.push(handle);
+        worker_thread_pool.push(worker_handler);
     }
 
-    // Start the ZMQ proxy
-    select! {
-        _ =  shutdown_receiver.recv() => {
-            //save_index(split_index, summary_index).await?;
-            info!("Shutting down");
-        }
-        _ = zeromq::proxy(clients.frontend, clients.backend, None) => {
-            info!("Proxy exited");
-        }
+    if let Err(e) = zmq::proxy(&frontend, &backend) {
+        error!("Failed to proxy: {:?}", e);
+        return Err(e.into());
     }
 
-    // Shut down
-    info!("embedding routines handles joined");
-    futures::future::join_all(worker_handles).await;
-    info!("worker handles joined");
-    shutdown_handle.await?;
-
+    info!("Model broker shutting down");
+    for worker in worker_thread_pool {
+        worker.join().unwrap();
+    }
     Ok(())
 }

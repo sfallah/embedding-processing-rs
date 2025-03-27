@@ -7,58 +7,60 @@ use embedding_database::prelude::{delete_doc_full, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
 use std::sync::Arc;
 use tracing::error;
-use zeromq::RepSocket;
+use zmq::Socket;
 
-pub async fn process_document_deletion_request(
-    worker_socket: &mut RepSocket,
+pub fn process_document_deletion_request(
+    worker_socket: &Socket,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     db: &Arc<RocksDB>,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
+    identity: &Vec<u8>,
 ) {
     let request: DocumentDeletionRequest = match DocumentDeletionRequest::unpack(&body_message) {
         Ok(req) => req,
         Err(e) => {
             let error_message = format!("Error unpacking DocumentDeletionRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket, &error_message, message_header).await;
+            send_exception_response(worker_socket, &error_message, message_header, identity);
             return;
         }
     };
-    match delete_doc_full(db, request.document_id).await {
+    match delete_doc_full(db, request.document_id) {
         Ok(Some(doc)) => {
-            if let Err(e) = split_index.delete(&doc.split_ids).await {
+            if let Err(e) = split_index.delete(&doc.split_ids) {
                 let error_message = format!("Error deleting split from index: {:?}", e);
                 error!("{}", &error_message);
-                send_exception_response(worker_socket, &error_message, message_header).await;
+                send_exception_response(worker_socket, &error_message, message_header, identity);
             }
             if let Err(e) = summary_index
                 .delete(&doc.summary_ids.unwrap_or_default())
-                .await
+                
             {
                 let error_message = format!("Error deleting summary from index: {:?}", e);
                 error!("{}", &error_message);
-                send_exception_response(worker_socket, &error_message, message_header).await;
+                send_exception_response(worker_socket, &error_message, message_header, identity);
             }
-            send_document_deletion_response(worker_socket, true, message_header).await;
+            send_document_deletion_response(worker_socket, true, message_header, identity);
         }
 
         Ok(None) => {
-            send_document_deletion_response(worker_socket, false, message_header).await;
+            send_document_deletion_response(worker_socket, false, message_header, identity);
         }
         Err(e) => {
             let error_message = format!("Error deleting document: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket, &error_message, message_header).await;
+            send_exception_response(worker_socket, &error_message, message_header, identity);
         }
     }
 }
 
-async fn send_document_deletion_response(
-    socket: &mut RepSocket,
+fn send_document_deletion_response(
+    socket: &Socket,
     removed: bool,
     message_header: &mut ZmqMessageHeader,
+    identity: &Vec<u8>,
 ) {
     if removed {
         send_success_response(
@@ -67,8 +69,9 @@ async fn send_document_deletion_response(
                 status: DeletionStatus::Success,
             },
             message_header,
+            identity
         )
-        .await
+        
     } else {
         send_success_response(
             socket,
@@ -76,7 +79,8 @@ async fn send_document_deletion_response(
                 status: DeletionStatus::NotFound,
             },
             message_header,
+            identity
         )
-        .await
+        
     }
 }

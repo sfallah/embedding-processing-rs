@@ -11,140 +11,162 @@ use embedding_database::prelude::RocksDB;
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use std::sync::Arc;
-use tokio::select;
-use tokio::sync::broadcast::Receiver;
-use tracing::info;
-use zeromq::{RepSocket, Socket, SocketRecv};
+use tracing::{error, info};
+use crate::api::rerank::process_rerank;
 
-pub struct ServerWorker {
-    pub worker: RepSocket,
-    pub zmq_config: Arc<ZmqConfig>,
-    pub hasher: Arc<DeterministicAHasher>,
-}
-
-impl ServerWorker {
-    pub async fn init(zmq_config: Arc<ZmqConfig>) -> Self {
-        let mut worker = RepSocket::new();
-        let endpoint = format!(
-            "tcp://{}:{}",
-            zmq_config.zmq_host, zmq_config.zmq_backend_port
-        );
-        worker
-            .connect(&endpoint)
-            .await
-            .expect("Worker failed to connect to backend");
-        let hasher = Arc::new(DeterministicAHasher::new(None, None));
-        let zmq_config = zmq_config.clone();
-        ServerWorker {
-            worker,
-            zmq_config,
-            hasher,
-        }
-    }
-}
-
-pub async fn worker_routine(
-    mut shutdown: Receiver<String>,
-    worker_socket: &mut ServerWorker,
+pub fn worker_routine(
+    zmq_config: Arc<ZmqConfig>,
+    context: &zmq::Context,
     processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     db: &Arc<RocksDB>,
 ) {
+    let hasher = Arc::new(DeterministicAHasher::new(None, None));
+
+    //  Prepare our context and socket
+    let socket = match context.socket(zmq::DEALER) {
+        Ok(socket) => socket,
+        Err(e) => {
+            error!("Failed to create socket: {:?}", e);
+            return;
+        }
+    };
+
+    if let Err(e) = socket.set_linger(0) {
+        error!("Failed to set linger: {:?}", e);
+        return;
+    }
+
+    let backend_endpoint = format!(
+        "tcp://{}:{}",
+        zmq_config.zmq_host, zmq_config.zmq_backend_port
+    );
+    info!("Connecting to model host: {}", backend_endpoint);
+    if let Err(e) = socket.connect(&backend_endpoint) {
+        error!("Failed to connect to model host: {:?}", e);
+        return;
+    }
+    info!("Embedding-Server worker started on endpoint: {}", backend_endpoint);
     loop {
-        select! {
-          msg  = worker_socket.worker.recv() => {
-                let messages = match msg {
-                    Ok(messages) => messages,
-                    Err(e) => {
-                        let error_message = format!("Error receiving message: {}", e);
-                        handle_error_and_respond(
-                            &mut worker_socket.worker,
-                            &error_message,
-                            ZmqMessageType::Unknown,
-                        )
-                            .await;
-                        continue;
-                    }
-                };
+        let messages = match socket.recv_multipart(0) {
+            Ok(messages) => messages,
+            Err(e) => {
+                error!("Error receiving message: {}", e);
+                break;
+            }
+        };
+        let identity = messages[0].clone();
 
         let mut message_header: ZmqMessageHeader =
-            match ZmqMessageHeader::unpack(&messages.get(0).unwrap()) {
+            match ZmqMessageHeader::unpack(&messages.get(1).unwrap()) {
                 Ok(header) => header,
                 Err(e) => {
                     let error_message = format!("Error unpacking message header: {}", e);
                     handle_error_and_respond(
-                        &mut worker_socket.worker,
+                        &socket,
                         &error_message,
                         ZmqMessageType::Unknown,
-                    )
-                        .await;
+                        &identity,
+                    );
                     continue;
                 }
             };
 
-        if messages.len() < 2 && message_header.message_type != ZmqMessageType::HealthCheck {
+        if message_header.message_type == ZmqMessageType::HealthCheck {
+            process_health_check(
+                &socket,
+                &mut message_header,
+                zmq_config.clone(),
+                &identity,
+            );
+            continue;
+        }
+
+        if messages.len() < 3 {
             let error_message = format!(
                 "Request Body received for message type: {:?}",
                 message_header.message_type
             );
             handle_error_and_respond(
-                &mut worker_socket.worker,
+                &socket,
                 &error_message,
                 message_header.message_type,
-            )
-                .await;
+                &identity,
+            );
             continue;
         }
 
+        let message_body = match messages.get(2) {
+            Some(body) => body,
+            None => {
+                let error_message = format!(
+                    "No Request Body for message type: {:?}",
+                    message_header.message_type
+                );
+                handle_error_and_respond(
+                    &socket,
+                    &error_message,
+                    message_header.message_type,
+                    &identity,
+                );
+                continue;
+            }
+        };
         match message_header.message_type {
             ZmqMessageType::DocumentInsertion => {
                 process_document_insertion_request(
-                    &mut worker_socket.worker,
+                    &socket,
                     db,
                     processing_context.clone(),
                     split_index,
                     summary_index,
                     &mut message_header,
-                    &messages.get(1).unwrap().to_vec(),
-                )
-                    .await;
+                    &message_body,
+                    &identity,
+                );
             }
             ZmqMessageType::DocumentQuery => {
                 process_document_query_request(
-                    &mut worker_socket.worker,
+                    &socket,
                     db,
                     processing_context.clone(),
                     split_index,
                     summary_index,
                     &mut message_header,
-                    &messages.get(1).unwrap().to_vec(),
-                )
-                    .await;
+                    &message_body,
+                    &identity,
+                );
             }
             ZmqMessageType::DocumentRetrieval => {
-                        process_document_retrieval_request(
-                            &mut worker_socket.worker,
-                            worker_socket.hasher.clone(),
-                            db,
-                            &mut message_header,
-                            &messages.get(1).unwrap().to_vec(),
-                        )
-                            .await;
-                    }
+                process_document_retrieval_request(
+                    &socket,
+                    hasher.clone(),
+                    db,
+                    &mut message_header,
+                    &message_body,
+                    &identity,
+                );
+            }
             ZmqMessageType::DocumentDeletion => {
-                        process_document_deletion_request(
-                            &mut worker_socket.worker,
-                            split_index,
-                            summary_index,
-                            db,
-                            &mut message_header,
-                            &messages.get(1).unwrap().to_vec(),
-                        )
-                            .await;
-                    }
-                    ZmqMessageType::HealthCheck => {
-                process_health_check(&mut worker_socket.worker, &mut message_header, worker_socket.zmq_config.clone()).await;
+                process_document_deletion_request(
+                    &socket,
+                    split_index,
+                    summary_index,
+                    db,
+                    &mut message_header,
+                    &message_body,
+                    &identity,
+                );
+            }
+            ZmqMessageType::Rerank => {
+                process_rerank(
+                    &socket,
+                    processing_context.clone(),
+                    &mut message_header,
+                    &message_body,
+                    &identity,
+                );
             }
             _ => {
                 let error_message = format!(
@@ -152,18 +174,12 @@ pub async fn worker_routine(
                     message_header.message_type
                 );
                 handle_error_and_respond(
-                    &mut worker_socket.worker,
+                    &socket,
                     &error_message,
                     message_header.message_type,
-                )
-                    .await;
+                    &identity,
+                );
             }
-        }
-        },
-            _kill = shutdown.recv() => {
-                info!("Shutting down worker routine");
-                break;
-        }
         }
     }
     info!("Worker shutting down");

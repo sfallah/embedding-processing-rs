@@ -4,27 +4,26 @@ use crate::schema::search_mode::SearchModeType;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use embedding_common::prelude::*;
-use embedding_database::prelude::{
-    get_doc_splits_map, get_full_doc, get_split_summaries_map, RocksDB,
-};
+use embedding_database::prelude::{get_doc_splits_map, get_full_doc, get_summaries_full, RocksDB};
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::query::process_query;
+use embedding_processing::processing::rerankings::get_rerankings;
 use indexmap::IndexMap;
-use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info};
-use zeromq::RepSocket;
+use zmq::Socket;
 
 // Requests calling embedding model
-pub async fn process_document_query_request(
-    worker_socket: &mut RepSocket,
+pub fn process_document_query_request(
+    worker_socket: &Socket,
     db: &Arc<RocksDB>,
-    processing_context: Rc<ProcessingContext>,
+    processing_context: Arc<ProcessingContext>,
     split_index: &Arc<HnswIndex>,
     summary_index: &Arc<HnswIndex>,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
+    identity: &Vec<u8>,
 ) {
     let request: DocumentQueryRequest;
     match DocumentQueryRequest::unpack(&body_message) {
@@ -32,7 +31,7 @@ pub async fn process_document_query_request(
         Err(e) => {
             let error_message = format!("Error unpacking DocumentQueryRequest: {:?}", e);
             error!("{}", &error_message);
-            send_exception_response(worker_socket, &error_message, message_header).await;
+            send_exception_response(worker_socket, &error_message, message_header, identity);
             return;
         }
     }
@@ -44,13 +43,8 @@ pub async fn process_document_query_request(
         .search_mode
         .unwrap_or(SearchModeType::SplitAndSummary);
 
-    let query_embeddings = tokio::task::spawn_blocking(move || {
-        process_query(processing_context.clone(), request.input.clone())
-            .expect("Failed to process query")
-    })
-    .await
-    .unwrap();
-    let query_embeddings = &query_embeddings[0];
+    let query_embeddings = process_query(processing_context.clone(), request.input.clone())
+        .expect("Failed to process query");
 
     // 1. Search for the query in the indexes
     // Search for summary indexes in summary index
@@ -61,19 +55,73 @@ pub async fn process_document_query_request(
     {
         let summaries_query_res = summary_index
             .query_filter(db, &request.user_ids, &query_embeddings, top_k)
-            .await
-            .unwrap();
+            .expect("Failed to query summaries");
         debug!("Summary query results: {:?}", summaries_query_res);
 
         let summary_ids: Vec<u64> = summaries_query_res.keys().map(|x| *x).collect();
-        split_summary_map = get_split_summaries_map(
+        let all_summaries = get_summaries_full(
             db,
             summary_ids.as_slice(),
             Some(&summaries_query_res),
             with_embeddings,
         )
-        .await
-        .unwrap();
+        .expect("Failed to get summaries");
+
+        let all_summaries = match request.rerank {
+            Some(rerank) => {
+                if rerank {
+                    let id = uuid::Uuid::new_v4();
+                    let req_id = processing_context.hasher.hash(&id.to_string());
+                    let mut texts: Vec<String> = Vec::new();
+                    for summary in all_summaries.iter() {
+                        texts.push(summary.text_content.clone());
+                    }
+                    let rerank_scores = get_rerankings(
+                        processing_context.zmq_context.clone(),
+                        &processing_context.reranking_endpoint.clone().unwrap(),
+                        request.input.clone(),
+                        texts,
+                        req_id,
+                    )
+                    .expect("Failed to query rerankings");
+
+                    let mut rerank_scores = rerank_scores
+                        .iter()
+                        .enumerate()
+                        .collect::<Vec<(usize, &f32)>>();
+                    rerank_scores.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+
+                    let mut rerank_map: IndexMap<usize, (usize, &f32)> = IndexMap::new();
+                    for (i, (idx, score)) in rerank_scores.iter().enumerate() {
+                        rerank_map.insert(*idx, (i, *score));
+                    }
+                    let mut reranked_summaries: Vec<SummaryDto> = Vec::new();
+                    for (idx, summary) in all_summaries.iter().enumerate() {
+                        if let Some((rerank_idx, rerank_score)) = rerank_map.get(&idx) {
+                            let mut new_summary = summary.clone();
+                            new_summary.rank = Some(Rank::new(*rerank_idx, None, **rerank_score));
+                            reranked_summaries.push(new_summary);
+                        }
+                    }
+                    reranked_summaries
+                } else {
+                    all_summaries
+                }
+            }
+            None => all_summaries,
+        };
+
+        for summary_dto in all_summaries {
+            let split_id = summary_dto.split_id;
+            if split_summary_map.contains_key(&split_id) {
+                split_summary_map
+                    .get_mut(&split_id)
+                    .unwrap()
+                    .push(summary_dto);
+            } else {
+                split_summary_map.insert(split_id, vec![summary_dto]);
+            }
+        }
     }
 
     // Search for split indexes in hnswlib index
@@ -81,8 +129,7 @@ pub async fn process_document_query_request(
     if search_mode == SearchModeType::SplitOnly || search_mode == SearchModeType::SplitAndSummary {
         split_query_res = split_index
             .query_filter(db, &request.user_ids, &query_embeddings, top_k)
-            .await
-            .unwrap();
+            .expect("Failed to query splits");
         debug!("Split query results: {:?}", split_query_res);
     }
 
@@ -108,19 +155,63 @@ pub async fn process_document_query_request(
         Some(&split_summary_map),
         with_embeddings,
     )
-    .await
-    .unwrap();
+    .expect("Failed to get doc splits map");
 
     // Load documents from rocks db
     let mut docs: Vec<DocumentDto> = Vec::new();
     for (doc_id, doc_splits) in doc_split_map.into_iter() {
-        let doc_dto = get_full_doc(db, doc_id, with_embeddings, Some(doc_splits)).await;
+        let doc_dto = get_full_doc(db, doc_id, with_embeddings, Some(doc_splits));
         match doc_dto {
-            Ok(Some(doc)) => docs.push(doc),
+            Ok(Some(doc)) => {
+                let mut doc_clone = doc.clone();
+                match doc.summaries {
+                    Some(summaries) => {
+                        let sum_texts = summaries
+                            .iter()
+                            .map(|s| s.text_content.clone())
+                            .collect::<Vec<String>>();
+                        match get_rerankings(
+                            processing_context.zmq_context.clone(),
+                            &processing_context.reranking_endpoint.clone().unwrap(),
+                            request.input.clone(),
+                            sum_texts,
+                            doc_id,
+                        ) {
+                            Ok(rerank_scores) => {
+                                let mut rerank_scores = rerank_scores
+                                    .iter()
+                                    .enumerate()
+                                    .collect::<Vec<(usize, &f32)>>();
+
+                                rerank_scores.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+
+                                let mut rerank_map: IndexMap<usize, (usize, &f32)> =
+                                    IndexMap::new();
+                                for (rank, (idx, score)) in rerank_scores.iter().enumerate() {
+                                    rerank_map.insert(*idx, (rank, *score));
+                                }
+                                let mut reranked_summaries: Vec<SummaryDto> = Vec::new();
+                                for (idx, (rank, score)) in rerank_map.iter() {
+                                    let mut new_summary = summaries[*idx].clone();
+                                    new_summary.rank = Some(Rank::new(*rank, None, **score));
+                                    reranked_summaries.push(new_summary);
+                                }
+                                doc_clone.summaries = Some(reranked_summaries);
+                                rerank_scores.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+                            }
+                            Err(e) => {
+                                error!("Error getting reranking scores: {:?}", e);
+                            }
+                        }
+                    }
+                    None => {}
+                }
+                docs.push(doc_clone)
+            }
             Ok(None) => {
                 let error_message = format!("Document not found for id: {}", doc_id);
                 error!("{}", error_message);
-                send_exception_response(worker_socket, &error_message, message_header).await;
+                send_exception_response(worker_socket, &error_message, message_header, identity);
             }
             Err(e) => {
                 let error_message = format!(
@@ -128,7 +219,7 @@ pub async fn process_document_query_request(
                     doc_id, e
                 );
                 error!("{}", error_message);
-                send_exception_response(worker_socket, &error_message, message_header).await;
+                send_exception_response(worker_socket, &error_message, message_header, identity);
             }
         }
     }
@@ -141,17 +232,18 @@ pub async fn process_document_query_request(
         &docs,
         &query_embeddings,
         with_embeddings,
+        identity,
     )
-    .await;
 }
 
-async fn send_document_query_response(
-    socket: &mut RepSocket,
+fn send_document_query_response(
+    socket: &Socket,
     model: &str,
     message_header: &mut ZmqMessageHeader,
     documents: &Vec<DocumentDto>,
     query_embeddings: &Vec<f32>,
     verbose: bool,
+    identity: &Vec<u8>,
 ) {
     let response = DocumentQueryResponse {
         documents: documents.clone(),
@@ -162,5 +254,5 @@ async fn send_document_query_response(
             None
         },
     };
-    send_success_response(socket, response, message_header).await
+    send_success_response(socket, response, message_header, identity);
 }

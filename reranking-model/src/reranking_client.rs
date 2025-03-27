@@ -1,4 +1,4 @@
-use embedding_common::prelude::{Ranking, RerankRequest, Serde};
+use embedding_common::prelude::{RerankRequest, RerankResponse, Serde};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -12,7 +12,7 @@ fn main() -> anyhow::Result<()> {
     let context = zmq::Context::new();
     let socket = context.socket(zmq::DEALER)?;
     socket
-        .connect("tcp://localhost:5559")
+        .connect("tcp://localhost:5557")
         .expect("Failed to connect");
     socket.set_linger(0).expect("Failed to set linger");
     socket
@@ -33,15 +33,15 @@ fn main() -> anyhow::Result<()> {
     let query = query_summaries.query;
     let texts = query_summaries.summaries;
 
-    let request = RerankRequest::new(1, query, texts);
+    let request = RerankRequest::new(Some(1), query, texts);
     let msg = request.pack().expect("Failed to pack");
     socket.send(msg, 0).expect("Failed to send");
     let rsp = socket.recv_bytes(0).expect("Failed to receive");
-    let rankings: Vec<Ranking> = rmp_serde::from_slice(&rsp).expect("Failed to decode");
-    for ranking in rankings {
-        println!("--------------- {} ---------------", ranking.idx);
+    let response: RerankResponse = RerankResponse::unpack(&rsp).expect("Failed to unpack");
+    for ranking in response.ranks {
+        println!("--------------- {} ---------------", ranking.index);
         println!("score: {}", ranking.score);
-        println!("summary: {}", ranking.text);
+        println!("summary: {}", ranking.text.expect("Missing summary"));
     }
     Ok(())
 }
