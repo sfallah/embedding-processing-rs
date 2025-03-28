@@ -1,7 +1,7 @@
 use crate::config::config_file::ConfigFromFile;
+use crate::config::endpoints::EndpointsConfig;
 use crate::config::*;
 use serde::Deserialize;
-use crate::config::endpoints::EndpointsConfig;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]

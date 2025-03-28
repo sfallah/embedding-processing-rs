@@ -1,6 +1,7 @@
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
+use embedding_common::prelude::LogLevel;
 use embedding_common::utils::tracting::setup_tracing;
 use reranking_model::config::ModelAppConfig;
 use std::env;
@@ -21,10 +22,19 @@ fn find_binary_path(binary_name: &str) -> PathBuf {
 }
 
 /// Spawns another binary and returns its Child process handle.
-fn spawn_process(binary_name: &str, config_file: &str) -> anyhow::Result<Child> {
+fn spawn_process(
+    binary_name: &str,
+    config_file: &str,
+    log_level: LogLevel,
+) -> anyhow::Result<Child> {
     let binary_path = find_binary_path(binary_name);
     Command::new(binary_path)
-        .args(&["--config-file", config_file])
+        .args(&[
+            "--config-file",
+            config_file,
+            "--log-level",
+            &log_level.to_string(),
+        ])
         // You can add arguments if needed, e.g. .arg("some_argument")
         .spawn()
         .map_err(|e| {
@@ -46,7 +56,11 @@ fn main() -> anyhow::Result<()> {
     // Spawn multiple worker processes concurrently.
     let mut children = Vec::new();
 
-    let broker = match spawn_process("reranking_broker", args.config_file.as_str()) {
+    let broker = match spawn_process(
+        "reranking_broker",
+        args.config_file.as_str(),
+        args.log_level,
+    ) {
         Ok(broker) => broker,
         Err(e) => {
             error!("Failed to spawn model_broker: {:?}", e);
@@ -55,7 +69,11 @@ fn main() -> anyhow::Result<()> {
     };
     children.push(broker);
     for _ in 0..config.zmq_config.num_workers {
-        let worker = match spawn_process("reranking_worker", args.config_file.as_str()) {
+        let worker = match spawn_process(
+            "reranking_worker",
+            args.config_file.as_str(),
+            args.log_level,
+        ) {
             Ok(worker) => worker,
             Err(e) => {
                 error!("Failed to spawn model_worker: {:?}", e);

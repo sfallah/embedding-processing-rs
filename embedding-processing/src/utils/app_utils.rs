@@ -14,13 +14,15 @@ pub fn init_ctx(
     reranking_endpoint: Option<String>,
 ) -> Arc<ProcessingContext> {
     let splitter_patterns = vec![
+        vec!["<SENT>".to_string()],
         vec!["\n\n".to_string()],
         vec!["\n".to_string()],
         vec![
-            ".".to_string(),
-            "!".to_string(),
-            "?".to_string(),
             ". ".to_string(),
+            "! ".to_string(),
+            "? ".to_string(),
+            ", ".to_string(),
+            "; ".to_string(),
         ],
     ];
     let nw_splitter = SplitterLiteConfig::new_hf(
@@ -34,7 +36,7 @@ pub fn init_ctx(
     let sentence_splitter = SplitterLiteConfig::new_hf(
         splitter_patterns.clone(),
         Some(max_tokens),
-        Some(splitter_patterns.len()),
+        Some(0),
         true,
         None,
     );

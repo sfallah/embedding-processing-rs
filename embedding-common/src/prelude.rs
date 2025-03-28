@@ -17,9 +17,10 @@ pub use crate::utils::hashing::DeterministicAHasher;
 pub use crate::services::embedding_types::EmbeddingsRequest;
 pub use crate::services::embedding_types::EmbeddingsResponse;
 
-pub use crate::services::rerank_types::RerankRequest;
 pub use crate::services::rerank_types::Rank;
+pub use crate::services::rerank_types::RerankRequest;
 pub use crate::services::rerank_types::RerankResponse;
 
+pub use crate::config::args::LogLevel;
 
 pub use crate::types::common::Serde;

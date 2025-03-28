@@ -14,6 +14,7 @@ zmq = {workspace = true}
 uuid = {workspace = true}
 rmp-serde = { workspace = true }
 serde_json = {workspace = true}
+#bstr = "1.11.3"
 
 
 

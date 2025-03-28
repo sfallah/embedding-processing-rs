@@ -53,53 +53,78 @@ pub fn process_document_query_request(
     let mut split_summary_map: IndexMap<u64, Vec<SummaryDto>> = IndexMap::new();
     if search_mode == SearchModeType::SummaryOnly || search_mode == SearchModeType::SplitAndSummary
     {
-        let summaries_query_res = summary_index
-            .query_filter(db, &request.user_ids, &query_embeddings, top_k)
-            .expect("Failed to query summaries");
+        let summaries_query_res =
+            match summary_index.query_filter(db, &request.user_ids, &query_embeddings, top_k) {
+                Ok(res) => res,
+                Err(e) => {
+                    let error_message = format!("Failed to query summaries: {:?}", e);
+                    error!("{}", &error_message);
+                    send_exception_response(
+                        worker_socket,
+                        &error_message,
+                        message_header,
+                        identity,
+                    );
+                    return;
+                }
+            };
         debug!("Summary query results: {:?}", summaries_query_res);
 
         let summary_ids: Vec<u64> = summaries_query_res.keys().map(|x| *x).collect();
-        let all_summaries = get_summaries_full(
+        let all_summaries = match get_summaries_full(
             db,
             summary_ids.as_slice(),
             Some(&summaries_query_res),
             with_embeddings,
-        )
-        .expect("Failed to get summaries");
+        ) {
+            Ok(summaries) => summaries,
+            Err(e) => {
+                let error_message = format!("Failed to get summaries: {:?}", e);
+                error!("{}", &error_message);
+                send_exception_response(worker_socket, &error_message, message_header, identity);
+                return;
+            }
+        };
 
         let all_summaries = match request.rerank {
             Some(rerank) => {
-                if rerank {
+                if rerank && !all_summaries.is_empty() {
                     let id = uuid::Uuid::new_v4();
                     let req_id = processing_context.hasher.hash(&id.to_string());
                     let mut texts: Vec<String> = Vec::new();
                     for summary in all_summaries.iter() {
                         texts.push(summary.text_content.clone());
                     }
-                    let rerank_scores = get_rerankings(
+                    let ranks = match get_rerankings(
                         processing_context.zmq_context.clone(),
                         &processing_context.reranking_endpoint.clone().unwrap(),
                         request.input.clone(),
                         texts,
                         req_id,
-                    )
-                    .expect("Failed to query rerankings");
+                    ) {
+                        Ok(ranks) => ranks,
+                        Err(e) => {
+                            let error_message = format!("Error getting reranking scores: {:?}", e);
+                            error!("{}", &error_message);
+                            send_exception_response(
+                                worker_socket,
+                                &error_message,
+                                message_header,
+                                identity,
+                            );
+                            return;
+                        }
+                    };
 
-                    let mut rerank_scores = rerank_scores
-                        .iter()
-                        .enumerate()
-                        .collect::<Vec<(usize, &f32)>>();
-                    rerank_scores.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-
-                    let mut rerank_map: IndexMap<usize, (usize, &f32)> = IndexMap::new();
-                    for (i, (idx, score)) in rerank_scores.iter().enumerate() {
-                        rerank_map.insert(*idx, (i, *score));
+                    let mut rerank_map: IndexMap<usize, Rank> = IndexMap::new();
+                    for (i, rank) in ranks.iter().enumerate() {
+                        rerank_map.insert(rank.index, Rank::new(i, None, rank.score));
                     }
                     let mut reranked_summaries: Vec<SummaryDto> = Vec::new();
                     for (idx, summary) in all_summaries.iter().enumerate() {
-                        if let Some((rerank_idx, rerank_score)) = rerank_map.get(&idx) {
+                        if let Some(rank) = rerank_map.get(&idx) {
                             let mut new_summary = summary.clone();
-                            new_summary.rank = Some(Rank::new(*rerank_idx, None, **rerank_score));
+                            new_summary.rank = Some(rank.clone());
                             reranked_summaries.push(new_summary);
                         }
                     }
@@ -127,9 +152,21 @@ pub fn process_document_query_request(
     // Search for split indexes in hnswlib index
     let mut split_query_res = IndexMap::new();
     if search_mode == SearchModeType::SplitOnly || search_mode == SearchModeType::SplitAndSummary {
-        split_query_res = split_index
-            .query_filter(db, &request.user_ids, &query_embeddings, top_k)
-            .expect("Failed to query splits");
+        split_query_res =
+            match split_index.query_filter(db, &request.user_ids, &query_embeddings, top_k) {
+                Ok(res) => res,
+                Err(e) => {
+                    let error_message = format!("Failed to query splits: {:?}", e);
+                    error!("{}", &error_message);
+                    send_exception_response(
+                        worker_socket,
+                        &error_message,
+                        message_header,
+                        identity,
+                    );
+                    return;
+                }
+            };
         debug!("Split query results: {:?}", split_query_res);
     }
 
@@ -148,14 +185,21 @@ pub fn process_document_query_request(
     let final_split_ids: Vec<_> = splits_min_distances.keys().map(|x| *x).collect();
 
     // Load splits from rocks db
-    let doc_split_map: IndexMap<u64, Vec<SplitDto>> = get_doc_splits_map(
+    let doc_split_map: IndexMap<u64, Vec<SplitDto>> = match get_doc_splits_map(
         db,
         final_split_ids.as_slice(),
         Some(&split_query_res),
         Some(&split_summary_map),
         with_embeddings,
-    )
-    .expect("Failed to get doc splits map");
+    ) {
+        Ok(splits) => splits,
+        Err(e) => {
+            let error_message = format!("Failed to get splits: {:?}", e);
+            error!("{}", &error_message);
+            send_exception_response(worker_socket, &error_message, message_header, identity);
+            return;
+        }
+    };
 
     // Load documents from rocks db
     let mut docs: Vec<DocumentDto> = Vec::new();
@@ -177,27 +221,19 @@ pub fn process_document_query_request(
                             sum_texts,
                             doc_id,
                         ) {
-                            Ok(rerank_scores) => {
-                                let mut rerank_scores = rerank_scores
-                                    .iter()
-                                    .enumerate()
-                                    .collect::<Vec<(usize, &f32)>>();
-
-                                rerank_scores.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
-
-                                let mut rerank_map: IndexMap<usize, (usize, &f32)> =
-                                    IndexMap::new();
-                                for (rank, (idx, score)) in rerank_scores.iter().enumerate() {
-                                    rerank_map.insert(*idx, (rank, *score));
+                            Ok(ranks) => {
+                                let mut rerank_map: IndexMap<usize, Rank> = IndexMap::new();
+                                for (rank_idx, rank) in ranks.iter().enumerate() {
+                                    rerank_map
+                                        .insert(rank.index, Rank::new(rank_idx, None, rank.score));
                                 }
                                 let mut reranked_summaries: Vec<SummaryDto> = Vec::new();
-                                for (idx, (rank, score)) in rerank_map.iter() {
+                                for (idx, rank) in rerank_map.iter() {
                                     let mut new_summary = summaries[*idx].clone();
-                                    new_summary.rank = Some(Rank::new(*rank, None, **score));
+                                    new_summary.rank = Some(rank.clone());
                                     reranked_summaries.push(new_summary);
                                 }
                                 doc_clone.summaries = Some(reranked_summaries);
-                                rerank_scores.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
                             }
                             Err(e) => {
                                 error!("Error getting reranking scores: {:?}", e);

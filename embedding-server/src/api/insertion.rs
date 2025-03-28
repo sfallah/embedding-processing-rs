@@ -35,18 +35,17 @@ pub fn process_document_insertion_request(
     }
 
     debug!("insertion request: {:?}", request);
-     let document_dto=   process_document(
-            processing_context,
-            request.doc_url.to_string(),
-            request.input.clone().into_bytes().to_vec(),
-        )
-        .expect("Failed to process document");
+    let document_dto = process_document(
+        processing_context,
+        request.doc_url.to_string(),
+        request.input.clone().into_bytes().to_vec(),
+    )
+    .expect("Failed to process document");
 
     let user_id = request.user;
     debug!("User ID: {}", user_id);
 
-    save_doc(db, &document_dto, user_id)
-        .expect("Failed to write models to DB");
+    save_doc(db, &document_dto, user_id).expect("Failed to write models to DB");
 
     add_to_indices(split_index.clone(), summary_index.clone(), &document_dto)
         .expect("Failed to add to indices");

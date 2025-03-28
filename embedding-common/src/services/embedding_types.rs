@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::prelude::Serde;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EmbeddingsRequest {

@@ -89,7 +89,7 @@ pub struct DocumentQueryRequest {
     /// optional UUID of the user making the request.
     pub user_ids: Vec<Uuid>,
     /// optional
-    pub rerank:Option<bool>,
+    pub rerank: Option<bool>,
     /// optional boolean for detailed response
     pub verbose: Option<bool>,
 }

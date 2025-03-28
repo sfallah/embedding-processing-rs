@@ -1,6 +1,6 @@
-use embedding_common::prelude::{RerankRequest, RerankResponse, Serde};
+use embedding_common::prelude::{Rank, RerankRequest, RerankResponse, Serde};
 use std::sync::Arc;
-use tracing::trace;
+use tracing::error;
 use zmq::Context;
 
 pub fn get_rerankings(
@@ -8,26 +8,55 @@ pub fn get_rerankings(
     endpoint: &str,
     query: String,
     texts: Vec<String>,
-    rerank_id: u64,
-) -> anyhow::Result<Vec<f32>> {
+    req_id: u64,
+) -> anyhow::Result<Vec<Rank>> {
     let socket = zmq_ctx.socket(zmq::DEALER)?;
-    socket.connect(endpoint).expect("Failed to connect");
-    socket.set_linger(0).expect("Failed to set linger");
-    socket
-        .set_sndtimeo(1000)
-        .expect("Failed to set send timeout");
-    socket
-        .set_rcvtimeo(30000)
-        .expect("Failed to set receive timeout");
-    socket
-        .set_identity(rerank_id.to_string().as_bytes())
-        .expect("Failed to set identity");
-    trace!("Processing reranking...");
-    let request = RerankRequest::new(None, query, texts.to_vec());
-    let msg = request.pack().expect("Failed to pack");
-    socket.send(msg, 0).expect("Failed to send");
-    let rsp = socket.recv_bytes(0).expect("Failed to receive");
-    let response: RerankResponse = RerankResponse::unpack(&rsp).expect("Failed to unpack");
-    let result = response.ranks.iter().map(|rank| rank.score).collect();
-    Ok(result)
+    if let Err(e) = socket.connect(endpoint) {
+        let error_message = format!("Failed to connect to endpoint: {}", e);
+        return Err(anyhow::anyhow!(error_message));
+    }
+    socket.set_linger(0)?;
+    socket.set_sndtimeo(1000)?;
+    socket.set_rcvtimeo(30000)?;
+    socket.set_identity(req_id.to_string().as_bytes())?;
+    let request = RerankRequest::new(Some(req_id), query, texts.to_vec(), false);
+    let msg = match request.pack() {
+        Ok(msg) => msg,
+        Err(e) => {
+            let error_message = format!("Failed to pack RerankRequest: {}", e);
+            error!("{}", &error_message);
+            return Err(anyhow::anyhow!(error_message));
+        }
+    };
+    if let Err(e) = socket.send(msg, 0) {
+        let error_message = format!("Failed to send RerankRequest: {}", e);
+        error!("{}", &error_message);
+        return Err(anyhow::anyhow!(error_message));
+    }
+    let rsp = match socket.recv_bytes(0) {
+        Ok(rsp) => rsp,
+        Err(e) => {
+            let error_message = format!("Failed to receive RerankResponse: {}", e);
+            error!("{}", &error_message);
+            return Err(anyhow::anyhow!(error_message));
+        }
+    };
+    match RerankResponse::unpack::<RerankResponse>(&rsp) {
+        Ok(response) => {
+            if !request.return_text {
+                Ok(response.ranks)
+            } else {
+                let mut ranks = response.ranks;
+                for rank in &mut ranks {
+                    rank.text = Some(texts[rank.index].clone());
+                }
+                Ok(ranks)
+            }
+        }
+        Err(e) => {
+            let error_message = format!("Failed to unpack RerankResponse: {}", e);
+            error!("{}", &error_message);
+            Err(anyhow::anyhow!(error_message))
+        }
+    }
 }

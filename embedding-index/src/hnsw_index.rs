@@ -87,20 +87,20 @@ impl HnswIndex {
     }
 
     #[tracing::instrument]
-    pub  fn async_create_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
+    pub fn async_create_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
         let index_config = index_config.clone();
         let index_name = index_name.clone();
         HnswIndex::create_index(index_name, index_config)
     }
 
     #[tracing::instrument]
-    pub  fn async_load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
+    pub fn async_load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
         let index_config = index_config.clone();
         let index_name = index_name.clone();
         HnswIndex::create_load_index(index_name, index_config)
     }
 
-    pub  fn get_by_label(&self, label: u64) -> Result<Vec<f32>> {
+    pub fn get_by_label(&self, label: u64) -> Result<Vec<f32>> {
         let index = self.index.clone();
         let dimensions = self.index_config.dimensions;
         let index = index.lock().expect("Failed to lock index");
@@ -111,7 +111,7 @@ impl HnswIndex {
         }
     }
 
-    pub  fn add(&self, embd: &Vec<f32>, label: u64) -> Result<()> {
+    pub fn add(&self, embd: &Vec<f32>, label: u64) -> Result<()> {
         let index = self.index.clone();
         let embd = embd.clone();
         let index = index.lock().expect("Failed to lock index");
@@ -127,7 +127,7 @@ impl HnswIndex {
     }
 
     #[tracing::instrument(skip(self, embeddings, labels))]
-    pub  fn add_batch(&self, embeddings: &Vec<Vec<f32>>, labels: &Vec<u64>) -> Result<()> {
+    pub fn add_batch(&self, embeddings: &Vec<Vec<f32>>, labels: &Vec<u64>) -> Result<()> {
         let index = self.index.clone();
         let embeddings = embeddings.clone();
         let labels = labels.clone();
@@ -156,7 +156,7 @@ impl HnswIndex {
     }
 
     #[tracing::instrument(skip(self, records))]
-    pub  fn upsert_batch_records(&self, records: Arc<Vec<IndexRecord>>) -> Result<()> {
+    pub fn upsert_batch_records(&self, records: Arc<Vec<IndexRecord>>) -> Result<()> {
         let index = self.index.clone();
         let records = records.clone();
         let index = index.lock().expect("Failed to lock index");
@@ -193,7 +193,7 @@ impl HnswIndex {
         Ok(())
     }
 
-    pub  fn upsert(&self, embd: &Vec<f32>, label: u64) -> Result<bool> {
+    pub fn upsert(&self, embd: &Vec<f32>, label: u64) -> Result<bool> {
         let index = self.index.clone();
         let embd = embd.clone();
         let index = index.lock().expect("Failed to lock index");
@@ -217,11 +217,7 @@ impl HnswIndex {
         Ok(exists)
     }
 
-    pub  fn upsert_batch(
-        &self,
-        embeddings: &Vec<Vec<f32>>,
-        labels: &Vec<u64>,
-    ) -> Result<Vec<u64>> {
+    pub fn upsert_batch(&self, embeddings: &Vec<Vec<f32>>, labels: &Vec<u64>) -> Result<Vec<u64>> {
         let index = self.index.clone();
         let embeddings = embeddings.clone();
         let labels = labels.clone();
@@ -252,7 +248,7 @@ impl HnswIndex {
         Ok(removed_keys)
     }
 
-    pub  fn delete(&self, labels: &Vec<u64>) -> Result<usize> {
+    pub fn delete(&self, labels: &Vec<u64>) -> Result<usize> {
         let index = self.index.clone();
         let labels = labels.clone();
         let index_name = self.index_name.clone();
@@ -271,7 +267,7 @@ impl HnswIndex {
     }
 
     //#[tracing::instrument(skip(self, db, query))]
-    pub  fn query_filter(
+    pub fn query_filter(
         &self,
         db: &Arc<RocksDB>,
         user_uuids: &Vec<Uuid>,
@@ -294,7 +290,7 @@ impl HnswIndex {
         Ok(IndexMap::from_iter(combined))
     }
 
-    pub  fn save(&self) -> Result<()> {
+    pub fn save(&self) -> Result<()> {
         let index = self.index.clone();
         let index_file = index_file(self.index_name.clone(), &self.index_config);
         let index = index.lock().expect("Failed to lock index");
@@ -365,12 +361,12 @@ impl HnswIndex {
         Ok(())
     }
 
-    pub  fn size(&self) -> Result<usize> {
+    pub fn size(&self) -> Result<usize> {
         let index = self.index.lock().expect("Failed to lock index");
         Ok(index.size())
     }
 
-    pub  fn capacity(&self) -> Result<usize> {
+    pub fn capacity(&self) -> Result<usize> {
         let index = self.index.lock().expect("Failed to lock index");
         Ok(index.capacity())
     }
