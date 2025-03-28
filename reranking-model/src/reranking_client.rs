@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
     let query = query_summaries.query;
     let texts = query_summaries.summaries;
 
-    let request = RerankRequest::new(Some(1), query, texts);
+    let request = RerankRequest::new(None, query, texts.to_vec(), false);
     let msg = request.pack().expect("Failed to pack");
     socket.send(msg, 0).expect("Failed to send");
     let rsp = socket.recv_bytes(0).expect("Failed to receive");
@@ -41,7 +41,7 @@ fn main() -> anyhow::Result<()> {
     for ranking in response.ranks {
         println!("--------------- {} ---------------", ranking.index);
         println!("score: {}", ranking.score);
-        println!("summary: {}", ranking.text.expect("Missing summary"));
+        println!("summary: {}", texts[ranking.index]);
     }
     Ok(())
 }

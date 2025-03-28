@@ -11,7 +11,7 @@ pub mod utils;
 use index_record::IndexRecord;
 
 #[tracing::instrument(skip(splits_index, summaries_index, doc_dto))]
-pub  fn add_to_indices(
+pub fn add_to_indices(
     splits_index: Arc<HnswIndex>,
     summaries_index: Arc<HnswIndex>,
     doc_dto: &DocumentDto,
@@ -40,17 +40,13 @@ pub  fn add_to_indices(
         }
     }
 
-    splits_index
-        .upsert_batch_records(Arc::new(split_entries))
-        ?;
-    summaries_index
-        .upsert_batch_records(Arc::new(summary_entries))
-        ?;
+    splits_index.upsert_batch_records(Arc::new(split_entries))?;
+    summaries_index.upsert_batch_records(Arc::new(summary_entries))?;
     Ok(())
 }
 
 #[tracing::instrument(skip(splits_index, summaries_index))]
-pub  fn save_index(
+pub fn save_index(
     splits_index: Arc<HnswIndex>,
     summaries_index: Arc<HnswIndex>,
 ) -> anyhow::Result<()> {
@@ -59,7 +55,7 @@ pub  fn save_index(
     Ok(())
 }
 
-pub  fn initialize_index_from_db(
+pub fn initialize_index_from_db(
     db: &Arc<RocksDB>,
     split_index: &HnswIndex,
     summary_index: &HnswIndex,
@@ -96,19 +92,13 @@ pub  fn initialize_index_from_db(
             summary_embeddings.push(embedding.embedding);
         }
     }
-    if let Err(e) = split_index
-        .upsert_batch(&split_embeddings, &split_labels)
-
-    {
+    if let Err(e) = split_index.upsert_batch(&split_embeddings, &split_labels) {
         error!("Failed to add split embeddings: {}", e);
     } else {
         split_no = split_labels.len();
     }
 
-    if let Err(e) = summary_index
-        .upsert_batch(&summary_embeddings, &summary_labels)
-
-    {
+    if let Err(e) = summary_index.upsert_batch(&summary_embeddings, &summary_labels) {
         error!("Failed to add summary embeddings: {}", e);
     } else {
         summary_no = summary_labels.len();

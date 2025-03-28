@@ -15,7 +15,7 @@ zmq = {workspace = true}
 async-channel = {workspace = true}
 
 
-fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async" }
+fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async_sent" }
 lexrank-ndarray = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/lexrank-ndarray.git", branch = "main" }
 rayon = "1.10.0"
 

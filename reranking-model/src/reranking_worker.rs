@@ -190,7 +190,7 @@ fn main() -> anyhow::Result<()> {
         scores_indexed.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
         let rankings: Vec<Rank> = scores_indexed
             .into_iter()
-            .map(|(idx, score)| Rank::new(idx, Some(request.texts[idx].clone()), *score))
+            .map(|(idx, score)| Rank::new(idx, None, *score))
             .collect();
         let response = RerankResponse::new(req_id, rankings);
         let response_bytes = response.pack()?;

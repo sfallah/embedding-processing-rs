@@ -11,11 +11,11 @@ pub use self::app_config::AppConfig;
 pub use self::args::ServerArgs;
 
 mod app_config;
-mod args;
+pub(crate) mod args;
 pub mod config_file;
 mod database_config;
+mod endpoints;
 mod index_config;
 mod model_config;
 mod splitter_config;
 mod zmq_config;
-mod endpoints;

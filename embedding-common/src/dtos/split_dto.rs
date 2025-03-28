@@ -1,4 +1,6 @@
-use crate::prelude::{Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Rank, Split, SummaryDto};
+use crate::prelude::{
+    Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Rank, Split, SummaryDto,
+};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use uuid::Uuid;

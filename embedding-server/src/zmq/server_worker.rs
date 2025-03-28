@@ -2,6 +2,7 @@ use crate::api::delete::process_document_deletion_request;
 use crate::api::health::process_health_check;
 use crate::api::insertion::process_document_insertion_request;
 use crate::api::query::process_document_query_request;
+use crate::api::rerank::process_rerank;
 use crate::api::retrieval::process_document_retrieval_request;
 use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
 use crate::utils::zmq_utils::handle_error_and_respond;
@@ -12,7 +13,6 @@ use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use std::sync::Arc;
 use tracing::{error, info};
-use crate::api::rerank::process_rerank;
 
 pub fn worker_routine(
     zmq_config: Arc<ZmqConfig>,
@@ -47,7 +47,10 @@ pub fn worker_routine(
         error!("Failed to connect to model host: {:?}", e);
         return;
     }
-    info!("Embedding-Server worker started on endpoint: {}", backend_endpoint);
+    info!(
+        "Embedding-Server worker started on endpoint: {}",
+        backend_endpoint
+    );
     loop {
         let messages = match socket.recv_multipart(0) {
             Ok(messages) => messages,
@@ -74,12 +77,7 @@ pub fn worker_routine(
             };
 
         if message_header.message_type == ZmqMessageType::HealthCheck {
-            process_health_check(
-                &socket,
-                &mut message_header,
-                zmq_config.clone(),
-                &identity,
-            );
+            process_health_check(&socket, &mut message_header, zmq_config.clone(), &identity);
             continue;
         }
 

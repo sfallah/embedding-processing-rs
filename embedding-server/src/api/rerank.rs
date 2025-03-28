@@ -1,6 +1,6 @@
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
-use embedding_common::prelude::{Rank, RerankRequest, RerankResponse, Serde};
+use embedding_common::prelude::{RerankRequest, RerankResponse, Serde};
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::rerankings::get_rerankings;
 use std::sync::Arc;
@@ -35,12 +35,16 @@ pub fn process_rerank(
         request.texts.to_vec(),
         req_id,
     ) {
-        Ok(scores) => {
-            let mut ranks = Vec::new();
-            for (idx, (score, text)) in scores.iter().zip(request.texts).enumerate() {
-                ranks.push(Rank::new(idx, Some(text), *score));
+        Ok(ranks) => {
+            if request.return_text {
+                let mut ranks = ranks;
+                for rank in &mut ranks {
+                    rank.text = Some(request.texts[rank.index].clone());
+                }
+                RerankResponse::new(None, ranks)
+            } else {
+                RerankResponse::new(None, ranks)
             }
-            RerankResponse::new(None, ranks)
         }
         Err(e) => {
             let error_message = format!("Error processing rerankings: {:?}", e);

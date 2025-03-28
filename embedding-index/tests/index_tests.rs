@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
+    use embedding_common::config::config_file::ConfigFromFile;
     use embedding_common::config::AppConfig;
     use embedding_common::prelude::EmbeddingUser;
     use embedding_database::prelude::{to_embedding_user_record, RocksDB};
@@ -14,14 +15,13 @@ mod tests {
     use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
     use uuid::Uuid;
-    use embedding_common::config::config_file::ConfigFromFile;
 
     fn read_config() -> anyhow::Result<AppConfig> {
         let config_file = "tests/test_config/index_config_test.toml".to_string();
         AppConfig::from_file(config_file)
     }
 
-     fn generate_test_data(
+    fn generate_test_data(
         num_users: usize,
         num_user_embeds: usize,
     ) -> anyhow::Result<Vec<(Uuid, Vec<u64>, Vec<Vec<f32>>)>> {
@@ -60,7 +60,7 @@ mod tests {
         Ok(records)
     }
 
-     fn add_records(
+    fn add_records(
         rocksdb: &Arc<RocksDB>,
         index: &HnswIndex,
         records: &Vec<(Uuid, Vec<u64>, Vec<Vec<f32>>)>,
@@ -83,9 +83,7 @@ mod tests {
             }
         }
         rocksdb.save_records(Arc::new(db_records.clone()))?;
-        index
-            .upsert_batch_records(Arc::new(index_records.clone()))
-            ?;
+        index.upsert_batch_records(Arc::new(index_records.clone()))?;
         Ok(())
     }
 
@@ -96,10 +94,9 @@ mod tests {
         Ok(())
     }
     #[test]
-     fn index_add_test() -> anyhow::Result<()> {
+    fn index_add_test() -> anyhow::Result<()> {
         let config = read_config()?;
-        let index =
-            HnswIndex::async_create_index("test_index".to_string(), config.index_config)?;
+        let index = HnswIndex::async_create_index("test_index".to_string(), config.index_config)?;
 
         let embeddings = generate_random_vectors(2, 384);
         let embedding1 = embeddings.get(0).ok_or(anyhow!("No embeddings"))?;
@@ -111,7 +108,7 @@ mod tests {
     }
 
     #[test]
-     fn config_load() -> anyhow::Result<()> {
+    fn config_load() -> anyhow::Result<()> {
         let app_config = read_config()?;
         let index_config = app_config.index_config;
         println!("index_config: {:?}", index_config);
@@ -130,7 +127,7 @@ mod tests {
 
     #[test]
     #[tracing::instrument]
-     fn index_filter_test() -> anyhow::Result<()> {
+    fn index_filter_test() -> anyhow::Result<()> {
         setup_tracing(Level::INFO);
         let db_temp_dir = tempdir::TempDir::new("test_embedding_users")?;
         let db_path = db_temp_dir.path().to_str().unwrap();
@@ -141,9 +138,10 @@ mod tests {
         let index_path = index_tmp_dir.path().to_str().unwrap();
         app_config.index_config.index_dir = index_path.to_string();
 
-        let index =
-            HnswIndex::async_create_index("summaries".to_string(), app_config.index_config.clone())
-                ?;
+        let index = HnswIndex::async_create_index(
+            "summaries".to_string(),
+            app_config.index_config.clone(),
+        )?;
 
         let num_users = 2;
         let num_user_embeds = 10;
@@ -176,8 +174,7 @@ mod tests {
         index.save()?;
 
         let index2 =
-            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone())
-                ?;
+            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone())?;
         let size2 = index2.size()?;
         assert_eq!(size2, num_users * num_user_embeds);
         println!("Old Size: {:?}", size2);
@@ -195,8 +192,7 @@ mod tests {
         index2.save()?;
 
         let index3 =
-            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone())
-                ?;
+            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone())?;
         let size4 = index3.size()?;
         assert_eq!(size4, num_users * num_user_embeds * 2);
         println!("Reload Size: {:?}", size4);
@@ -205,16 +201,14 @@ mod tests {
         Ok(())
     }
 
-     fn check_contained_embeddings(
+    fn check_contained_embeddings(
         rocksdb: &Arc<RocksDB>,
         index: &HnswIndex,
         records: &Vec<(Uuid, Vec<u64>, Vec<Vec<f32>>)>,
     ) -> anyhow::Result<()> {
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.iter().zip(embeddings.iter()) {
-                let res = index
-                    .query_filter(&rocksdb, &vec![user_id.clone()], embedding, 4)
-                    ?;
+                let res = index.query_filter(&rocksdb, &vec![user_id.clone()], embedding, 4)?;
                 println!("embed_id: {}, res: {:?}", embed_id, res);
                 assert_eq!(res.len(), 4);
                 let first_label = res.keys()[0];
@@ -227,7 +221,7 @@ mod tests {
     }
 
     #[test]
-     fn load_index() -> anyhow::Result<()> {
+    fn load_index() -> anyhow::Result<()> {
         let temp_dir = tempdir::TempDir::new("test_embedding_users")?;
         let db_path = temp_dir.path().to_str().unwrap();
         let rocksdb = Arc::new(RocksDB::open(db_path)?);
@@ -274,9 +268,7 @@ mod tests {
 
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.into_iter().zip(embeddings.into_iter()) {
-                let res = index
-                    .query_filter(&rocksdb, &vec![user_id.clone()], embedding, 10)
-                    ?;
+                let res = index.query_filter(&rocksdb, &vec![user_id.clone()], embedding, 10)?;
                 assert_eq!(res.len(), 10);
                 let first_label = res.keys()[0];
                 let first_dist = *res.first().unwrap().1;
