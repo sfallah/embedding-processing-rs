@@ -89,46 +89,19 @@ pub fn process_document_query_request(
         let all_summaries = match request.rerank {
             Some(rerank) => {
                 if rerank && !all_summaries.is_empty() {
-                    let id = uuid::Uuid::new_v4();
-                    let req_id = processing_context.hasher.hash(&id.to_string());
-                    let mut texts: Vec<String> = Vec::new();
-                    for summary in all_summaries.iter() {
-                        texts.push(summary.text_content.clone());
-                    }
-                    let ranks = match get_rerankings(
-                        processing_context.zmq_context.clone(),
-                        &processing_context.reranking_endpoint.clone().unwrap(),
-                        request.input.clone(),
-                        texts,
-                        req_id,
-                    ) {
-                        Ok(ranks) => ranks,
+                    match rerank_summaries(&processing_context, &request, &all_summaries) {
+                        Ok(ranked_summaries) => ranked_summaries,
                         Err(e) => {
-                            let error_message = format!("Error getting reranking scores: {:?}", e);
-                            error!("{}", &error_message);
+                            error!("{}", &e);
                             send_exception_response(
                                 worker_socket,
-                                &error_message,
+                                &e.to_string(),
                                 message_header,
                                 identity,
                             );
                             return;
                         }
-                    };
-
-                    let mut rerank_map: IndexMap<usize, Rank> = IndexMap::new();
-                    for (i, rank) in ranks.iter().enumerate() {
-                        rerank_map.insert(rank.index, Rank::new(i, None, rank.score));
                     }
-                    let mut reranked_summaries: Vec<SummaryDto> = Vec::new();
-                    for (idx, summary) in all_summaries.iter().enumerate() {
-                        if let Some(rank) = rerank_map.get(&idx) {
-                            let mut new_summary = summary.clone();
-                            new_summary.rank = Some(rank.clone());
-                            reranked_summaries.push(new_summary);
-                        }
-                    }
-                    reranked_summaries
                 } else {
                     all_summaries
                 }
@@ -210,35 +183,29 @@ pub fn process_document_query_request(
                 let mut doc_clone = doc.clone();
                 match doc.summaries {
                     Some(summaries) => {
-                        let sum_texts = summaries
-                            .iter()
-                            .map(|s| s.text_content.clone())
-                            .collect::<Vec<String>>();
-                        match get_rerankings(
-                            processing_context.zmq_context.clone(),
-                            &processing_context.reranking_endpoint.clone().unwrap(),
-                            request.input.clone(),
-                            sum_texts,
-                            doc_id,
-                        ) {
-                            Ok(ranks) => {
-                                let mut rerank_map: IndexMap<usize, Rank> = IndexMap::new();
-                                for (rank_idx, rank) in ranks.iter().enumerate() {
-                                    rerank_map
-                                        .insert(rank.index, Rank::new(rank_idx, None, rank.score));
+                        let doc_summaries = match request.rerank {
+                            Some(rerank) => {
+                                if rerank && !summaries.is_empty() {
+                                    match rerank_summaries(&processing_context, &request, &summaries) {
+                                        Ok(ranked_summaries) => ranked_summaries,
+                                        Err(e) => {
+                                            error!("{}", &e);
+                                            send_exception_response(
+                                                worker_socket,
+                                                &e.to_string(),
+                                                message_header,
+                                                identity,
+                                            );
+                                            return;
+                                        }
+                                    }
+                                } else {
+                                    summaries
                                 }
-                                let mut reranked_summaries: Vec<SummaryDto> = Vec::new();
-                                for (idx, rank) in rerank_map.iter() {
-                                    let mut new_summary = summaries[*idx].clone();
-                                    new_summary.rank = Some(rank.clone());
-                                    reranked_summaries.push(new_summary);
-                                }
-                                doc_clone.summaries = Some(reranked_summaries);
                             }
-                            Err(e) => {
-                                error!("Error getting reranking scores: {:?}", e);
-                            }
-                        }
+                            None => summaries,
+                        };
+                        doc_clone.summaries = Some(doc_summaries);
                     }
                     None => {}
                 }
@@ -270,6 +237,47 @@ pub fn process_document_query_request(
         with_embeddings,
         identity,
     )
+}
+
+fn rerank_summaries(
+    processing_context: &Arc<ProcessingContext>,
+    request: &DocumentQueryRequest,
+    all_summaries: &Vec<SummaryDto>,
+) -> anyhow::Result<Vec<SummaryDto>> {
+    let id = uuid::Uuid::new_v4();
+    let req_id = processing_context.hasher.hash(&id.to_string());
+
+    let texts: Vec<_> = all_summaries
+        .iter()
+        .map(|summary| summary.text_content.clone())
+        .collect();
+
+    let ranks = match get_rerankings(
+        processing_context.zmq_context.clone(),
+        &processing_context.reranking_endpoint.clone().unwrap(),
+        request.input.clone(),
+        texts,
+        req_id,
+    ) {
+        Ok(ranks) => ranks,
+        Err(e) => {
+            return Err(anyhow::anyhow!("Error getting reranking scores: {:?}", e));
+        }
+    };
+
+    let mut rerank_map = IndexMap::new();
+    for rank in ranks.iter() {
+        rerank_map.insert(rank.index, rank.clone());
+    }
+    let mut ranked_summaries = Vec::new();
+    for (idx, summary) in all_summaries.iter().enumerate() {
+        if let Some(rank) = rerank_map.get(&idx) {
+            let mut new_summary = summary.clone();
+            new_summary.rank = Some(rank.clone());
+            ranked_summaries.push(new_summary);
+        }
+    }
+    Ok(ranked_summaries)
 }
 
 fn send_document_query_response(

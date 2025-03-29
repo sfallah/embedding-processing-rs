@@ -40,7 +40,7 @@ fn main() -> anyhow::Result<()> {
     let response: RerankResponse = RerankResponse::unpack(&rsp).expect("Failed to unpack");
     for ranking in response.ranks {
         println!("--------------- {} ---------------", ranking.index);
-        println!("score: {}", ranking.score);
+        println!("score: {:?}", ranking.score);
         println!("summary: {}", texts[ranking.index]);
     }
     Ok(())

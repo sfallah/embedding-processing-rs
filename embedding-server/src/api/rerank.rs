@@ -35,16 +35,13 @@ pub fn process_rerank(
         request.texts.to_vec(),
         req_id,
     ) {
-        Ok(ranks) => {
+        Ok(mut ranks) => {
             if request.return_text {
-                let mut ranks = ranks;
                 for rank in &mut ranks {
                     rank.text = Some(request.texts[rank.index].clone());
                 }
-                RerankResponse::new(None, ranks)
-            } else {
-                RerankResponse::new(None, ranks)
             }
+            RerankResponse::new(ranks, None, None)
         }
         Err(e) => {
             let error_message = format!("Error processing rerankings: {:?}", e);

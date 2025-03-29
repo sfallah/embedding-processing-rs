@@ -2,6 +2,7 @@
 
 [model]
 gguf_file = "models/bge-reranker-v2-m3-q4_k_m.gguf"
+#gguf_file = "models/bge-reranker-v2-m3-f16.gguf"
 #cpu = false
 ngl = 1000
 max_tokens = 2048
