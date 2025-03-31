@@ -186,7 +186,11 @@ pub fn process_document_query_request(
                         let doc_summaries = match request.rerank {
                             Some(rerank) => {
                                 if rerank && !summaries.is_empty() {
-                                    match rerank_summaries(&processing_context, &request, &summaries) {
+                                    match rerank_summaries(
+                                        &processing_context,
+                                        &request,
+                                        &summaries,
+                                    ) {
                                         Ok(ranked_summaries) => ranked_summaries,
                                         Err(e) => {
                                             error!("{}", &e);

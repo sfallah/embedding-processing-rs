@@ -9,11 +9,12 @@ use llama_cpp::context::LlamaContext;
 use llama_cpp::llama_backend::LlamaBackend;
 use llama_cpp::llama_batch::LlamaBatch;
 use llama_cpp::model::params::LlamaModelParams;
-use llama_cpp::model::{AddBos, LlamaModel};
+use llama_cpp::model::{AddBos, LlamaModel, Special};
 use reranking_model::config::ModelAppConfig;
 use std::num::NonZero;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
+use zmq::Socket;
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
@@ -96,24 +97,30 @@ fn main() -> anyhow::Result<()> {
         return Err(e.into());
     }
 
-    let eos = "</s>";
-    let sep = "</s>";
-    let bos = "<s>";
+    let bos_token = model.token_bos();
+    let eos_token = model.token_eos();
+    let sep_token = model.token_sep();
+    let bos = model.token_to_str(bos_token, Special::Plaintext)?;
+    let eos = model.token_to_str(eos_token, Special::Plaintext)?;
+    let sep = model.token_to_str(sep_token, Special::Plaintext)?;
 
     loop {
         let messages = match socket.recv_multipart(0) {
             Ok(messages) => messages,
             Err(e) => {
                 error!("Failed to receive: {:?}", e);
+                // can we send error message without identity?
                 break;
             }
         };
         //debug!("Worker {} received messages", worker_id);
-        let identity = messages[0].clone();
+        let identity = &messages[0];
         let request = match RerankRequest::unpack::<RerankRequest>(&messages[1]) {
             Ok(request) => request,
             Err(e) => {
-                error!("Failed to parse request: {:?}", e);
+                let error_msg = format!("Failed to unpack Rerank request: {:?}", e);
+                error!("{}", e);
+                send_error(&socket, identity, &error_msg);
                 continue;
             }
         };
@@ -195,7 +202,7 @@ fn main() -> anyhow::Result<()> {
             .collect();
         let response = RerankResponse::new(ranks, req_id, None);
         let response_bytes = response.pack()?;
-        if let Err(e) = socket.send_multipart(vec![identity, response_bytes.into()], 0) {
+        if let Err(e) = socket.send_multipart(vec![identity, &response_bytes], 0) {
             error!("Failed to send response: {:?}", e);
             continue;
         }
@@ -203,6 +210,21 @@ fn main() -> anyhow::Result<()> {
     info!("Worker Shutting down");
     Ok(())
 }
+
+fn send_error(socket: &Socket, identity: &Vec<u8>, error_msg: &str) {
+    let response = RerankResponse::new(vec![], None, Some(error_msg.to_string()));
+    match response.pack() {
+        Ok(response_bytes) => {
+            if let Err(e) = socket.send_multipart(vec![identity, &response_bytes], 0) {
+                error!("Failed to send error response: {:?}", e);
+            }
+        }
+        Err(e) => {
+            error!("Failed to pack error response: {:?}", e);
+        }
+    }
+}
+
 fn batch_decode(
     ctx: &mut LlamaContext,
     batch: &mut LlamaBatch,

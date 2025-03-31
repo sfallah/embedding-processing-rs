@@ -34,8 +34,18 @@ pub struct Rank {
 }
 
 impl Rank {
-    pub fn new(index: usize, rank: Option<usize>, score: Option<f32>, text: Option<String>) -> Self {
-        Rank { index, rank, score, text }
+    pub fn new(
+        index: usize,
+        rank: Option<usize>,
+        score: Option<f32>,
+        text: Option<String>,
+    ) -> Self {
+        Rank {
+            index,
+            rank,
+            score,
+            text,
+        }
     }
 }
 unsafe impl Sync for Rank {}
@@ -52,7 +62,11 @@ pub struct RerankResponse {
 
 impl RerankResponse {
     pub fn new(ranks: Vec<Rank>, req_id: Option<u64>, error: Option<String>) -> Self {
-        RerankResponse { ranks, req_id, error }
+        RerankResponse {
+            ranks,
+            req_id,
+            error,
+        }
     }
 }
 
