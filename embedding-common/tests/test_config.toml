@@ -28,5 +28,5 @@ zmq_backend_port = 5560
 zmq_num_workers = 2
 
 [endpoints]
-embedding_endpoint = "tcp://localhost:5559"
-reranking_endpoint = "tcp://localhost:5557"
+EMBEDDING_ENDPOINT = "tcp://localhost:5559"
+RERANKING_ENDPOINT = "tcp://localhost:5557"

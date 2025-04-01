@@ -15,7 +15,14 @@ uuid = {workspace = true}
 rmp-serde = { workspace = true }
 serde_json = {workspace = true}
 #bstr = "1.11.3"
+indexmap = { workspace = true }
 
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "benchmarks"
+harness = false
 
 
 [features]

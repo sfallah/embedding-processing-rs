@@ -76,8 +76,8 @@ pub fn generate_random_vectors(num_vectors: usize, dim: usize) -> Vec<Vec<f32>> 
     (0..num_vectors)
         .into_par_iter() // Use rayon's parallel iterator
         .map(|_| {
-            let mut rng = rand::thread_rng();
-            (0..dim).map(|_| rng.gen::<f32>()).collect()
+            let mut rng = rand::rng();
+            (0..dim).map(|_| rng.random::<f32>()).collect()
         })
         .collect()
 }

@@ -10,6 +10,9 @@ use rayon::prelude::*;
 use std::fs;
 use std::sync::Arc;
 
+const EMBEDDING_ENDPOINT: &str = "tcp://localhost:5559";
+const RERANKING_ENDPOINT: &str = "tcp://localhost:5557";
+
 fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
     // Create a uniform distribution for f32 values between 0.0 and 1.0
     let distribution = Uniform::new(0.0, 1.0).expect("Failed to create distribution");
@@ -30,7 +33,7 @@ fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
     c.bench_function("process_doc", |b| {
-        let proc_ctx = init_ctx(512, None, 384, 30600);
+        let proc_ctx = init_ctx(512, None, 384, 30600, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string()));
         b.iter(|| {
             process_document(
                 proc_ctx.clone(),
