@@ -9,6 +9,16 @@ pub struct QuerySummaries {
 }
 
 fn main() -> anyhow::Result<()> {
+
+
+    let data_path = "reranking-model/tests/test_data/bert_paper_query_summaries.json";
+    let input_str = fs::read_to_string(data_path)?;
+    let query_summaries = serde_json::from_str::<QuerySummaries>(&input_str)?;
+    let query = query_summaries.query;
+    let texts = query_summaries.summaries;
+
+
+
     let context = zmq::Context::new();
     let socket = context.socket(zmq::DEALER)?;
     socket
@@ -27,12 +37,8 @@ fn main() -> anyhow::Result<()> {
         .set_identity(identity.as_bytes())
         .expect("Failed to set identity");
 
-    let data_path = "reranking-model/tests/test_data/bert_paper_query_summaries.json";
-    let input_str = fs::read_to_string(data_path)?;
-    let query_summaries = serde_json::from_str::<QuerySummaries>(&input_str)?;
-    let query = query_summaries.query;
-    let texts = query_summaries.summaries;
-
+    // measure time
+    let start = std::time::Instant::now();
     let request = RerankRequest::new(None, query, texts.to_vec(), false);
     let msg = request.pack().expect("Failed to pack");
     socket.send(msg, 0).expect("Failed to send");
@@ -43,5 +49,7 @@ fn main() -> anyhow::Result<()> {
         println!("score: {:?}", ranking.score);
         println!("summary: {}", texts[ranking.index]);
     }
+    let elapsed = start.elapsed();
+    println!("Elapsed time: {:?}", elapsed);
     Ok(())
 }

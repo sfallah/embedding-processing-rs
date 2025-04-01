@@ -4,16 +4,17 @@ use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::prelude::{Rank, RerankRequest, RerankResponse, Serde};
 use embedding_common::utils::tracting::setup_tracing;
+use indexmap::IndexMap;
 use llama_cpp::context::params::{LlamaContextParams, LlamaPoolingType};
 use llama_cpp::context::LlamaContext;
 use llama_cpp::llama_backend::LlamaBackend;
 use llama_cpp::llama_batch::LlamaBatch;
 use llama_cpp::model::params::LlamaModelParams;
-use llama_cpp::model::{AddBos, LlamaModel, Special};
+use llama_cpp::model::{AddBos, LlamaModel};
 use reranking_model::config::ModelAppConfig;
 use std::num::NonZero;
 use std::path::PathBuf;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 use zmq::Socket;
 
 fn main() -> anyhow::Result<()> {
@@ -53,6 +54,12 @@ fn main() -> anyhow::Result<()> {
         .model_config
         .max_tokens
         .unwrap_or(model.n_ctx_train());
+
+    let n_ctx = if n_ctx > model.n_ctx_train() {
+        model.n_ctx_train()
+    } else {
+        n_ctx
+    };
 
     error!("model n_ctx_train: {}", n_ctx);
     let pooling_type = LlamaPoolingType::Rank;
@@ -100,9 +107,6 @@ fn main() -> anyhow::Result<()> {
     let bos_token = model.token_bos();
     let eos_token = model.token_eos();
     let sep_token = model.token_sep();
-    let bos = model.token_to_str(bos_token, Special::Plaintext)?;
-    let eos = model.token_to_str(eos_token, Special::Plaintext)?;
-    let sep = model.token_to_str(sep_token, Special::Plaintext)?;
 
     loop {
         let messages = match socket.recv_multipart(0) {
@@ -126,44 +130,71 @@ fn main() -> anyhow::Result<()> {
         };
         let req_id = request.req_id;
         let query = request.query;
-        let prompt_lines = {
-            let mut lines = Vec::new();
-            for doc in &request.texts {
-                // Todo!  update to get eos and sep from model instead of hardcoding
-                lines.push(format!("{bos}{query}{eos}{sep}{doc}{eos}"));
+
+        if query.is_empty() {
+            let error_msg = "Query is empty";
+            error!("{}", error_msg);
+            send_error(&socket, identity, &error_msg);
+            continue;
+        }
+        let query_tokens = match model.str_to_token(&query, AddBos::Never) {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                let error_msg = format!("Failed to tokenize query: {:?}", e);
+                error!("{}", error_msg);
+                send_error(&socket, identity, &error_msg);
+                continue;
             }
-            lines
         };
 
-        let tokens_lines_list = prompt_lines
-            .iter()
-            .filter_map(|text| {
-                let res = model.str_to_token(text, AddBos::Never);
-                match res {
-                    Ok(tokens) => {
-                        if tokens.len() > 0 {
-                            if tokens.len() > n_ctx as usize {
-                                warn!("Token sequence exceeds context window, truncating");
-                                Some(tokens[..n_ctx as usize].to_vec())
-                            } else {
-                                Some(tokens)
-                            }
-                        } else {
-                            None
-                        }
-                    }
-                    Err(e) => {
-                        error!("Failed to tokenize: {}", e);
-                        None
-                    }
+        let query_no_tokens = query_tokens.len();
+
+        if query_no_tokens + 2 > n_ctx as usize {
+            let error_msg = format!(
+                "Query no_tokens: {} exceeds n_ctx: {}",
+                query_no_tokens, n_ctx
+            );
+            error!("{}", error_msg);
+            send_error(&socket, identity, &error_msg);
+            continue;
+        }
+
+        let mut sequence_pairs_map = IndexMap::new();
+        for (idx, text) in request.texts.iter().enumerate() {
+            let text_tokens = match model.str_to_token(text, AddBos::Never) {
+                Ok(tokens) => tokens,
+                Err(e) => {
+                    let error_msg = format!(
+                        "Failed to tokenize seq: {}\n, text: {:?}\n, error: {:?}",
+                        idx, text, e
+                    );
+                    error!("{}", error_msg);
+                    continue;
                 }
-            })
-            .collect::<Vec<_>>();
+            };
+            let text_no_tokens = text_tokens.len();
+            if text_no_tokens + query_no_tokens + 4 > n_ctx as usize {
+                let error_msg = format!(
+                    "Sequence Pair no_tokens exceeds n_ctx. Query: {}, text: {}, n_ctx: {}",
+                    query_no_tokens, text_no_tokens, n_ctx
+                );
+                error!("{}", error_msg);
+                continue;
+            }
+            //"{bos}{query}{eos}{sep}{doc}{eos}"
+            let mut sequence_pairs_tokens = query_tokens.clone();
+            sequence_pairs_tokens.insert(0, bos_token);
+            sequence_pairs_tokens.push(eos_token);
+            sequence_pairs_tokens.push(sep_token);
+            sequence_pairs_tokens.append(&mut text_tokens.clone());
+            sequence_pairs_tokens.push(eos_token);
+            sequence_pairs_map.insert(idx, sequence_pairs_tokens);
+        }
 
         let mut max_seq_id_batch = 0;
-        let mut output = Vec::with_capacity(tokens_lines_list.len());
+        let mut output = Vec::with_capacity(sequence_pairs_map.len());
 
-        for tokens in &tokens_lines_list {
+        for tokens in sequence_pairs_map.values().into_iter() {
             // Flush the batch if the next prompt would exceed our batch size
             if (batch.n_tokens() as usize + tokens.len()) > n_ctx as usize {
                 batch_decode(
@@ -182,7 +213,6 @@ fn main() -> anyhow::Result<()> {
             max_seq_id_batch += 1;
         }
         // Handle final batch
-        // Handle final batch
         batch_decode(
             &mut ctx,
             &mut batch,
@@ -193,12 +223,16 @@ fn main() -> anyhow::Result<()> {
         )?;
 
         let scores: Vec<f32> = output.iter().map(|embeddings| embeddings[0]).collect();
-        let mut scores_indexed: Vec<(usize, &f32)> = scores.iter().enumerate().collect();
+        let mut scores_indexed: Vec<(&usize, &f32)> = sequence_pairs_map
+            .keys()
+            .into_iter()
+            .zip(scores.iter())
+            .collect();
         scores_indexed.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
         let ranks: Vec<Rank> = scores_indexed
             .into_iter()
             .enumerate()
-            .map(|(rank, (idx, score))| Rank::new(idx, Some(rank), Some(*score), None))
+            .map(|(rank, (idx, score))| Rank::new(*idx, Some(rank), Some(*score), None))
             .collect();
         let response = RerankResponse::new(ranks, req_id, None);
         let response_bytes = response.pack()?;
@@ -249,6 +283,7 @@ fn batch_decode(
         let embeddings = ctx
             .embeddings_seq_ith(i)
             .with_context(|| "Failed to get sequence embeddings")?;
+        println!("embeddings: {:?}", embeddings.iter().take(20).collect::<Vec<_>>());
         let normalized = if normalise {
             if pooling == "rank" {
                 normalize_embeddings(&embeddings, -1)
@@ -259,9 +294,6 @@ fn batch_decode(
             embeddings.to_vec()
         };
         output.push(normalized);
-    }
-    for out in output.clone().iter() {
-        debug!("Output: {}", out[0].to_string());
     }
     batch.clear();
 

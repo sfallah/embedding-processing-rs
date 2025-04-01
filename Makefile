@@ -33,6 +33,12 @@ test_processing: build
 bench_processing: release
 	cargo bench -p embedding-processing
 
+bench_reranking_metal:
+	cargo bench -F metal -p reranking-model
+
+bench_reranking_cuda:
+	cargo bench -F cuda -p reranking-model
+
 cli: build
 	@echo "file-path: $(FILE_PATH)"
 	cargo run --package embedding-cli --bin embedding-cli -- index --file-path=$(FILE_PATH)
