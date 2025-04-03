@@ -53,21 +53,21 @@ pub fn process_document_query_request(
     let mut split_summary_map: IndexMap<u64, Vec<SummaryDto>> = IndexMap::new();
     if search_mode == SearchModeType::SummaryOnly || search_mode == SearchModeType::SplitAndSummary
     {
-        let summaries_query_res =
-            match summary_index.query_filter(db, &request.user_ids, &query_embeddings, top_k) {
-                Ok(res) => res,
-                Err(e) => {
-                    let error_message = format!("Failed to query summaries: {:?}", e);
-                    error!("{}", &error_message);
-                    send_exception_response(
-                        worker_socket,
-                        &error_message,
-                        message_header,
-                        identity,
-                    );
-                    return;
-                }
-            };
+        let summaries_query_res = match summary_index.query_filter(
+            db,
+            &request.workspace_ids,
+            &request.doc_ids,
+            &query_embeddings,
+            top_k,
+        ) {
+            Ok(res) => res,
+            Err(e) => {
+                let error_message = format!("Failed to query summaries: {:?}", e);
+                error!("{}", &error_message);
+                send_exception_response(worker_socket, &error_message, message_header, identity);
+                return;
+            }
+        };
         debug!("Summary query results: {:?}", summaries_query_res);
 
         let summary_ids: Vec<u64> = summaries_query_res.keys().map(|x| *x).collect();
@@ -125,21 +125,21 @@ pub fn process_document_query_request(
     // Search for split indexes in hnswlib index
     let mut split_query_res = IndexMap::new();
     if search_mode == SearchModeType::SplitOnly || search_mode == SearchModeType::SplitAndSummary {
-        split_query_res =
-            match split_index.query_filter(db, &request.user_ids, &query_embeddings, top_k) {
-                Ok(res) => res,
-                Err(e) => {
-                    let error_message = format!("Failed to query splits: {:?}", e);
-                    error!("{}", &error_message);
-                    send_exception_response(
-                        worker_socket,
-                        &error_message,
-                        message_header,
-                        identity,
-                    );
-                    return;
-                }
-            };
+        split_query_res = match split_index.query_filter(
+            db,
+            &request.workspace_ids,
+            &request.doc_ids,
+            &query_embeddings,
+            top_k,
+        ) {
+            Ok(res) => res,
+            Err(e) => {
+                let error_message = format!("Failed to query splits: {:?}", e);
+                error!("{}", &error_message);
+                send_exception_response(worker_socket, &error_message, message_header, identity);
+                return;
+            }
+        };
         debug!("Split query results: {:?}", split_query_res);
     }
 

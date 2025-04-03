@@ -1,12 +1,12 @@
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
+use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 use embedding_common::config::ServerArgs;
 use embedding_common::utils::tracting::setup_tracing;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use tracing::error;
-use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 
 /// Given the name of another binary (as defined in Cargo.toml), find its path
 /// relative to the current executable.

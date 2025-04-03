@@ -1,6 +1,7 @@
 use anyhow::Context;
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
+use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 use embedding_common::config::ServerArgs;
 use embedding_common::prelude::{EmbeddingsRequest, EmbeddingsResponse, Serde};
 use embedding_common::utils::tracting::setup_tracing;
@@ -14,7 +15,6 @@ use llama_cpp::model::{AddBos, LlamaModel};
 use std::num::NonZero;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
-use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
 
     let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
 
-    let model =  match LlamaModel::load_from_file(&backend, model_path, &model_params) {
+    let model = match LlamaModel::load_from_file(&backend, model_path, &model_params) {
         Ok(model) => model,
         Err(e) => {
             error!("Failed to load model: {:?}", e);
@@ -59,7 +59,6 @@ fn main() -> anyhow::Result<()> {
     };
 
     let n_ctx = model.n_ctx_train();
-
 
     // initialize the context
     let ctx_params = LlamaContextParams::default()

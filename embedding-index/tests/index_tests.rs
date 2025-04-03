@@ -3,7 +3,7 @@ mod tests {
     use anyhow::anyhow;
     use embedding_common::config::config_file::ConfigFromFile;
     use embedding_common::config::AppConfig;
-    use embedding_common::prelude::EmbeddingUser;
+    use embedding_common::prelude::EmbeddingFilterInfo;
     use embedding_database::prelude::{to_embedding_user_record, RocksDB};
     use embedding_index::hnsw_index::HnswIndex;
     use embedding_index::index_record::IndexRecord;
@@ -70,7 +70,7 @@ mod tests {
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.iter().zip(embeddings.iter()) {
                 {
-                    let embedding_user = EmbeddingUser {
+                    let embedding_user = EmbeddingFilterInfo {
                         user_uuid: *user_id,
                         embed_id: *embed_id,
                     };
@@ -132,10 +132,8 @@ mod tests {
         let index_path = index_tmp_dir.path().to_str().unwrap();
         app_config.index_config.index_dir = index_path.to_string();
 
-        let index = HnswIndex::create_index(
-            "summaries".to_string(),
-            app_config.index_config.clone(),
-        )?;
+        let index =
+            HnswIndex::create_index("summaries".to_string(), app_config.index_config.clone())?;
 
         let num_users = 2;
         let num_user_embeds = 10;
@@ -221,8 +219,7 @@ mod tests {
         let rocksdb = Arc::new(RocksDB::open(db_path)?);
 
         let app_config = read_config()?;
-        let index =
-            HnswIndex::create_index("summaries".to_string(), app_config.index_config)?;
+        let index = HnswIndex::create_index("summaries".to_string(), app_config.index_config)?;
 
         let mut user_ids = vec![];
         for _ in 0..4 {

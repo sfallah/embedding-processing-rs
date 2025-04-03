@@ -1,5 +1,5 @@
-use serde::Deserialize;
 use crate::prelude::Serde;
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]

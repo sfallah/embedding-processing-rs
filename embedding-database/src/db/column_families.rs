@@ -5,7 +5,7 @@ pub enum ColumnFamilyType {
     Splits,
     Summaries,
     Embeddings,
-    EmbeddingUsers,
+    EmbeddingFilterInfo,
     Models,
 }
 
@@ -17,7 +17,7 @@ impl ColumnFamilyType {
             ColumnFamilyType::Splits => "splits",
             ColumnFamilyType::Summaries => "summaries",
             ColumnFamilyType::Embeddings => "embeddings",
-            ColumnFamilyType::EmbeddingUsers => "embedding_users",
+            ColumnFamilyType::EmbeddingFilterInfo => "embedding_filter_info",
             ColumnFamilyType::Models => "models",
         }
     }

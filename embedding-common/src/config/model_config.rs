@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::prelude::Serde;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
@@ -34,4 +34,3 @@ fn default_ngl() -> usize {
 }
 
 impl Serde for ModelConfig {}
-

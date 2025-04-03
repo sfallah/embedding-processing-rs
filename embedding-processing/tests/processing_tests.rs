@@ -41,7 +41,14 @@ mod tests {
 
     #[test]
     fn test_embeddings() -> anyhow::Result<()> {
-        let ctx = init_ctx(510, Some(3), 384, 500, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string()));
+        let ctx = init_ctx(
+            510,
+            Some(3),
+            384,
+            500,
+            EMBEDDING_ENDPOINT.to_string(),
+            Some(RERANKING_ENDPOINT.to_string()),
+        );
         let text = "This is a test text".to_string();
         let text2 = "This is another test text".to_string();
         let embeddings = get_embeddings(
@@ -62,7 +69,14 @@ mod tests {
     #[test]
     fn test_splitter() -> anyhow::Result<()> {
         let text = "This is a test text".to_string();
-        let ctx = init_ctx(512, None, 384, 0, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string()));
+        let ctx = init_ctx(
+            512,
+            None,
+            384,
+            0,
+            EMBEDDING_ENDPOINT.to_string(),
+            Some(RERANKING_ENDPOINT.to_string()),
+        );
         let splitter = ctx.splitter.clone();
         let splits = split_text(splitter, text.as_bytes().to_vec()).expect("Failed to split text");
         assert_eq!(splits.len(), 1);
@@ -72,7 +86,14 @@ mod tests {
 
     #[rstest]
     fn test_summaries_process(text: String) -> anyhow::Result<()> {
-        let ctx = init_ctx(512, None, 384, 10, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string()));
+        let ctx = init_ctx(
+            512,
+            None,
+            384,
+            10,
+            EMBEDDING_ENDPOINT.to_string(),
+            Some(RERANKING_ENDPOINT.to_string()),
+        );
         let text = text.clone();
         let (sentences, no_tokens) =
             get_sentences(ctx.clone(), text.clone()).expect("Failed to get sentences");
@@ -100,7 +121,14 @@ mod tests {
 
     #[rstest]
     fn test_split_process(text: String) -> anyhow::Result<()> {
-        let ctx = init_ctx(512, None, 384, 3000, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string()));
+        let ctx = init_ctx(
+            512,
+            None,
+            384,
+            3000,
+            EMBEDDING_ENDPOINT.to_string(),
+            Some(RERANKING_ENDPOINT.to_string()),
+        );
         let text = text.clone();
         let splitter = ctx.clone().splitter.clone();
         let splits = split_text(splitter, text.as_bytes().to_vec()).expect("Failed to split text");
@@ -115,7 +143,14 @@ mod tests {
     #[rstest]
     fn test_document_process(text_from_file: String) -> anyhow::Result<()> {
         setup_tracing(Level::DEBUG);
-        let ctx = init_ctx(512, None, 384, 100, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string()));
+        let ctx = init_ctx(
+            512,
+            None,
+            384,
+            100,
+            EMBEDDING_ENDPOINT.to_string(),
+            Some(RERANKING_ENDPOINT.to_string()),
+        );
         let doc = process_document(
             ctx,
             "test_url".to_string(),
@@ -137,7 +172,14 @@ mod tests {
 
     #[test]
     fn test_document_process_short() -> anyhow::Result<()> {
-        let ctx = init_ctx(10, None, 384, 3000, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string())); // low max_tokens to test short text
+        let ctx = init_ctx(
+            10,
+            None,
+            384,
+            3000,
+            EMBEDDING_ENDPOINT.to_string(),
+            Some(RERANKING_ENDPOINT.to_string()),
+        ); // low max_tokens to test short text
         let doc = process_document(
             ctx,
             "test_url".to_string(),

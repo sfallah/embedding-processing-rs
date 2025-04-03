@@ -58,7 +58,7 @@ pub fn delete_split_aux(split_id: u64, db_records: &mut Vec<DbRecordKey>) -> Res
     db_records.push(split_key);
     let embedding_key = DbRecordKey::new(ColumnFamilyType::Embeddings, split_id);
     db_records.push(embedding_key);
-    let embedding_user_key = DbRecordKey::new(ColumnFamilyType::EmbeddingUsers, split_id);
+    let embedding_user_key = DbRecordKey::new(ColumnFamilyType::EmbeddingFilterInfo, split_id);
     db_records.push(embedding_user_key);
     Ok(())
 }

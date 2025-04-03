@@ -38,10 +38,7 @@ pub fn worker_routine(
         return;
     }
 
-    let backend_endpoint = format!(
-        "tcp://{}:{}",
-        zmq_config.host, zmq_config.backend_port
-    );
+    let backend_endpoint = format!("tcp://{}:{}", zmq_config.host, zmq_config.backend_port);
     info!("Connecting to model host: {}", backend_endpoint);
     if let Err(e) = socket.connect(&backend_endpoint) {
         error!("Failed to connect to model host: {:?}", e);

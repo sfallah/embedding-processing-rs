@@ -1,4 +1,6 @@
-use crate::prelude::{Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Rank, Summary};
+use crate::prelude::{
+    Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingFilterInfo, Rank, Summary,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -59,9 +61,9 @@ impl SummaryDto {
             .map(|embedding_dto| embedding_dto.to_model(EmbeddingDataType::Summary))
     }
 
-    pub fn to_embedding_user_model(&self, user_id: Uuid) -> Option<EmbeddingUser> {
-        self.embedding
-            .as_ref()
-            .map(|embedding_dto| EmbeddingUser::new(embedding_dto.embedding_id, user_id))
+    pub fn to_embedding_filter_info(&self, user_id: Uuid) -> Option<EmbeddingFilterInfo> {
+        self.embedding.as_ref().map(|embedding_dto| {
+            EmbeddingFilterInfo::new(embedding_dto.embedding_id, self.document_id, user_id)
+        })
     }
 }

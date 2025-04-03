@@ -9,15 +9,11 @@ pub struct QuerySummaries {
 }
 
 fn main() -> anyhow::Result<()> {
-
-
     let data_path = "reranking-model/tests/test_data/bert_paper_query_summaries.json";
     let input_str = fs::read_to_string(data_path)?;
     let query_summaries = serde_json::from_str::<QuerySummaries>(&input_str)?;
     let query = query_summaries.query;
     let texts = query_summaries.summaries;
-
-
 
     let context = zmq::Context::new();
     let socket = context.socket(zmq::DEALER)?;

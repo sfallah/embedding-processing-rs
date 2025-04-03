@@ -10,7 +10,7 @@ use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::documents::process_document;
 use std::sync::Arc;
-use tracing::{error};
+use tracing::error;
 use zmq::Socket;
 
 pub fn process_document_insertion_request(
@@ -55,7 +55,6 @@ pub fn process_document_insertion_request(
         request.verbose.unwrap_or(false),
         identity,
     );
-
 }
 
 // Responses

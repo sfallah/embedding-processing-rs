@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_main, Criterion};
 use embedding_common::prelude::{RerankRequest, RerankResponse, Serde};
-use std::fs;
 use serde::{Deserialize, Serialize};
+use std::fs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuerySummaries {
@@ -9,7 +9,12 @@ pub struct QuerySummaries {
     pub summaries: Vec<String>,
 }
 
-pub fn benchmark_reranking_zmq(c: &mut Criterion, query: String, texts: Vec<String>, socket: &zmq::Socket) {
+pub fn benchmark_reranking_zmq(
+    c: &mut Criterion,
+    query: String,
+    texts: Vec<String>,
+    socket: &zmq::Socket,
+) {
     c.bench_function("benchmark_reranking_zmq", |b| {
         b.iter(|| {
             let request = RerankRequest::new(None, query.clone(), texts.to_vec(), false);
@@ -22,10 +27,6 @@ pub fn benchmark_reranking_zmq(c: &mut Criterion, query: String, texts: Vec<Stri
     });
 }
 
-
-
-
-
 pub fn benches() {
     let mut criterion: Criterion<_> = Criterion::default()
         .sample_size(10)
@@ -34,12 +35,15 @@ pub fn benches() {
 
     let data_path = "tests/test_data/bert_paper_query_summaries.json";
     let input_str = fs::read_to_string(data_path).expect("Failed to read");
-    let query_summaries = serde_json::from_str::<QuerySummaries>(&input_str).expect("Failed to parse");
+    let query_summaries =
+        serde_json::from_str::<QuerySummaries>(&input_str).expect("Failed to parse");
     let query = query_summaries.query;
     let texts = query_summaries.summaries;
 
     let context = zmq::Context::new();
-    let socket = context.socket(zmq::DEALER).expect("Failed to create socket");
+    let socket = context
+        .socket(zmq::DEALER)
+        .expect("Failed to create socket");
     socket
         .connect("tcp://localhost:5557")
         .expect("Failed to connect");

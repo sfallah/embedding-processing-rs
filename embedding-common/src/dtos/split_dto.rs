@@ -1,5 +1,5 @@
 use crate::prelude::{
-    Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingUser, Rank, Split, SummaryDto,
+    Embedding, EmbeddingDataType, EmbeddingDto, EmbeddingFilterInfo, Rank, Split, SummaryDto,
 };
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
@@ -78,9 +78,9 @@ impl SplitDto {
             .map(|embedding_dto| embedding_dto.to_model(EmbeddingDataType::Split))
     }
 
-    pub fn to_embedding_user_model(&self, user_id: Uuid) -> Option<EmbeddingUser> {
-        self.embedding
-            .as_ref()
-            .map(|embedding_dto| EmbeddingUser::new(embedding_dto.embedding_id, user_id))
+    pub fn to_embedding_user_model(&self, user_id: Uuid) -> Option<EmbeddingFilterInfo> {
+        self.embedding.as_ref().map(|embedding_dto| {
+            EmbeddingFilterInfo::new(embedding_dto.embedding_id, self.doc_id, user_id)
+        })
     }
 }
