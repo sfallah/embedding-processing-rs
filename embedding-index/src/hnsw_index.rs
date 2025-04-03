@@ -250,18 +250,18 @@ impl HnswIndex {
         &self,
         db: &Arc<RocksDB>,
         user_uuids: &Vec<Uuid>,
+        doc_ids: &Vec<u64>,
         query: &Vec<f32>,
         k: usize,
     ) -> Result<IndexMap<u64, f32>> {
         let index = self.index.clone();
         let db = db.clone();
         let query = query.clone();
-        let user_uuids = user_uuids.clone();
         info!("Querying index with query: {:?}", query.len());
         let matches = index
             .filtered_search(&query, k, |key| {
                 let embed_id: u64 = key.into();
-                has_embedding_user(&db, embed_id, user_uuids.clone()).unwrap()
+                has_embedding_user(&db, embed_id, user_uuids, doc_ids)
             })
             .map_err(|e| anyhow!("Failed to query index: {:?}", e))?;
         let combined = matches.keys.into_iter().zip(matches.distances.into_iter());

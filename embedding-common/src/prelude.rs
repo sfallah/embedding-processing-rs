@@ -7,7 +7,7 @@ pub use crate::dtos::summary_dto::SummaryDto;
 pub use crate::models::document::Document;
 pub use crate::models::embedding::Embedding;
 pub use crate::models::embedding::EmbeddingDataType;
-pub use crate::models::embedding_user::EmbeddingUser;
+pub use crate::models::embedding_filter_info::EmbeddingFilterInfo;
 pub use crate::models::model::Model;
 pub use crate::models::split::Split;
 pub use crate::models::summary::Summary;

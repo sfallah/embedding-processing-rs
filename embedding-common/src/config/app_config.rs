@@ -1,8 +1,8 @@
 use crate::config::config_file::ConfigFromFile;
 use crate::config::endpoints::EndpointsConfig;
+use crate::config::model_info_config::ModelInfoConfig;
 use crate::config::*;
 use serde::Deserialize;
-use crate::config::model_info_config::ModelInfoConfig;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
@@ -22,5 +22,3 @@ pub struct AppConfig {
 }
 
 impl ConfigFromFile for AppConfig {}
-
-

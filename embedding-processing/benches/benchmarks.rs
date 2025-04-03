@@ -33,7 +33,14 @@ fn generate_random_matrix(rows: usize, cols: usize) -> Vec<Vec<f32>> {
 
 pub fn process_doc(c: &mut Criterion, doc: String) {
     c.bench_function("process_doc", |b| {
-        let proc_ctx = init_ctx(512, None, 384, 30600, EMBEDDING_ENDPOINT.to_string(), Some(RERANKING_ENDPOINT.to_string()));
+        let proc_ctx = init_ctx(
+            512,
+            None,
+            384,
+            30600,
+            EMBEDDING_ENDPOINT.to_string(),
+            Some(RERANKING_ENDPOINT.to_string()),
+        );
         b.iter(|| {
             process_document(
                 proc_ctx.clone(),

@@ -1,9 +1,9 @@
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
+use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 use embedding_common::config::ServerArgs;
 use embedding_common::utils::tracting::setup_tracing;
 use tracing::{debug, error, info};
-use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();

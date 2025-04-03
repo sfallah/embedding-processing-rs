@@ -18,7 +18,7 @@ pub(crate) fn save_summary_aux(
     for dto in dtos {
         let summary = dto.to_model();
         let embedding = dto.to_embedding_backend();
-        let embedding_user = dto.to_embedding_user_model(user_id);
+        let embedding_user = dto.to_embedding_filter_info(user_id);
         if let Some(embedding) = embedding {
             let embedding_record = to_embedding_record(&embedding)?;
             db_records.push(embedding_record);
@@ -46,7 +46,8 @@ pub(crate) fn delete_summaries_aux(
         db_records.push(summary_key);
         let embedding_key = DbRecordKey::new(ColumnFamilyType::Embeddings, *summary_id);
         db_records.push(embedding_key);
-        let embedding_user_key = DbRecordKey::new(ColumnFamilyType::EmbeddingUsers, *summary_id);
+        let embedding_user_key =
+            DbRecordKey::new(ColumnFamilyType::EmbeddingFilterInfo, *summary_id);
         db_records.push(embedding_user_key);
     }
     Ok(())

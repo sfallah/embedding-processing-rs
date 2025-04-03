@@ -87,7 +87,8 @@ pub struct DocumentQueryRequest {
     /// optional i32 to get k closest query result.
     pub top_k: Option<i32>,
     /// optional UUID of the user making the request.
-    pub user_ids: Vec<Uuid>,
+    pub workspace_ids: Vec<Uuid>,
+    pub doc_ids: Vec<u64>,
     /// optional
     pub rerank: Option<bool>,
     /// optional boolean for detailed response

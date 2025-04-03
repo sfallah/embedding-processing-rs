@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
 use crate::config::config_file::ConfigFromFile;
 use crate::config::ZmqConfig;
 use crate::prelude::Serde;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
@@ -51,4 +51,3 @@ fn default_ngl() -> usize {
 }
 
 impl Serde for ModelConfig {}
-
