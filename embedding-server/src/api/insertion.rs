@@ -10,7 +10,7 @@ use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::documents::process_document;
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{error};
 use zmq::Socket;
 
 pub fn process_document_insertion_request(
@@ -34,7 +34,6 @@ pub fn process_document_insertion_request(
         }
     }
 
-    debug!("insertion request: {:?}", request);
     let document_dto = process_document(
         processing_context,
         request.doc_url.to_string(),
@@ -43,7 +42,6 @@ pub fn process_document_insertion_request(
     .expect("Failed to process document");
 
     let user_id = request.user;
-    debug!("User ID: {}", user_id);
 
     save_doc(db, &document_dto, user_id).expect("Failed to write models to DB");
 
@@ -58,7 +56,6 @@ pub fn process_document_insertion_request(
         identity,
     );
 
-    info!("Document processed and response sent")
 }
 
 // Responses

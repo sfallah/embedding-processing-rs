@@ -1,17 +1,18 @@
-use embedding_common::config::config_file::ConfigFromFile;
-use embedding_common::prelude::Serde;
 use serde::{Deserialize, Serialize};
+use crate::config::config_file::ConfigFromFile;
+use crate::config::ZmqConfig;
+use crate::prelude::Serde;
 
 #[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
-pub struct ModelAppConfig {
+pub struct ModelBackendAppConfig {
     #[serde(rename = "model")]
     pub model_config: ModelConfig,
     #[serde(rename = "zmq")]
-    pub zmq_config: ModelZmqConfig,
+    pub zmq_config: ZmqConfig,
 }
 
-impl ConfigFromFile for ModelAppConfig {}
+impl ConfigFromFile for ModelBackendAppConfig {}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
@@ -24,6 +25,8 @@ pub struct ModelConfig {
     pub ngl: usize,
     #[serde(default)]
     pub verbose: bool,
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
 }
 
 impl ModelConfig {
@@ -33,6 +36,7 @@ impl ModelConfig {
             cpu: false,
             ngl: 1000,
             verbose,
+            max_tokens: None,
         }
     }
 }
@@ -48,16 +52,3 @@ fn default_ngl() -> usize {
 
 impl Serde for ModelConfig {}
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
-#[allow(unused)]
-pub struct ModelZmqConfig {
-    // Model Host
-    pub host: String,
-    // ROUTER-DEALER Proxy
-    // Model request port
-    // Receive Embedding and Health-check requests
-    pub frontend_port: usize,
-    pub backend_port: usize,
-    // Number of workers
-    pub num_workers: usize,
-}

@@ -1,35 +1,37 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use crate::prelude::Serde;
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[allow(unused)]
 #[serde(deny_unknown_fields)]
 pub struct ModelConfig {
     pub gguf_file: String,
     #[serde(default)]
     pub cpu: bool,
-    #[serde(default = "default_instances")]
-    pub instances: usize,
     #[serde(default = "default_ngl")]
     pub ngl: usize,
     #[serde(default)]
     pub verbose: bool,
+    #[serde(default)]
+    pub max_tokens: Option<u32>,
 }
 
 impl ModelConfig {
-    pub fn new(gguf_file: String, instances: usize, verbose: bool) -> Self {
+    pub fn new(gguf_file: String, verbose: bool) -> Self {
         ModelConfig {
             gguf_file,
             cpu: false,
-            instances,
             ngl: 1000,
             verbose,
+            max_tokens: None,
         }
     }
 }
 
-fn default_instances() -> usize {
-    1
-}
+#[allow(unused)]
 fn default_ngl() -> usize {
     1000
 }
+
+impl Serde for ModelConfig {}
+

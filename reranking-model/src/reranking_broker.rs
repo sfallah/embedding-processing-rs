@@ -2,7 +2,7 @@ use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::utils::tracting::setup_tracing;
-use reranking_model::config::ModelAppConfig;
+use reranking_model::model_backend_config::ModelAppConfig;
 use tracing::{debug, error, info};
 
 fn main() -> anyhow::Result<()> {

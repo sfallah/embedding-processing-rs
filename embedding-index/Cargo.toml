@@ -25,3 +25,4 @@ usearch = { version = "2.16.7", default-features = false, features = ["fp16lib"]
 tempdir = "0.3.7"
 simsimd = "6.2.1"
 half = "=2.4.1"
+rstest = {workspace = true}

@@ -58,15 +58,15 @@ mod tests {
     }
 
     #[test]
-    fn test_zmq_config() -> anyhow::Result<()> {
+    fn test_config() -> anyhow::Result<()> {
         let conf_file = "tests/test_config.toml".to_string();
         let app_config = AppConfig::from_file(conf_file)?;
-        let zmq_config = app_config.zmq_config;
-        println!("zmq_server config: {:?}", zmq_config);
-        assert_eq!(zmq_config.zmq_host, "127.0.0.1".to_string());
-        assert_eq!(zmq_config.zmq_frontend_port, 5556);
-        assert_eq!(zmq_config.zmq_backend_port, 5560);
-        assert_eq!(zmq_config.zmq_num_workers, 2);
+        let config = app_config.zmq_config;
+        println!("server config: {:?}", config);
+        assert_eq!(config.host, "127.0.0.1".to_string());
+        assert_eq!(config.frontend_port, 5556);
+        assert_eq!(config.backend_port, 5560);
+        assert_eq!(config.num_workers, 2);
         Ok(())
     }
     #[test]

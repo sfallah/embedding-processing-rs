@@ -13,8 +13,8 @@ pub fn process_health_check(
 ) {
     let response = HealthCheckResponse {
         status: "OK".to_string(),
-        host: format!("{}:{}", zmq_config.zmq_host, zmq_config.zmq_frontend_port),
-        worker_count: zmq_config.zmq_num_workers,
+        host: format!("{}:{}", zmq_config.host, zmq_config.frontend_port),
+        worker_count: zmq_config.num_workers,
     };
 
     send_success_response(socket, response, message_header, identity);

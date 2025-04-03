@@ -2,11 +2,11 @@ use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::utils::tracting::setup_tracing;
-use embedding_model::config::ModelAppConfig;
 use std::env;
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use tracing::error;
+use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 
 /// Given the name of another binary (as defined in Cargo.toml), find its path
 /// relative to the current executable.
@@ -36,7 +36,7 @@ fn spawn_process(binary_name: &str, config_file: &str) -> anyhow::Result<Child> 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
     setup_tracing(args.log_level.to_tracing_level());
-    let config = match ModelAppConfig::from_file(args.config_file.clone()) {
+    let config = match ModelBackendAppConfig::from_file(args.config_file.clone()) {
         Ok(config) => config,
         Err(e) => {
             error!("Failed to load config: {:?}", e);

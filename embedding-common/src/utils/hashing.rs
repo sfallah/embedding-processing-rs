@@ -27,6 +27,10 @@ impl DeterministicAHasher {
         }
     }
 
+    pub fn default_hasher() -> Self {
+        Self::new(None, None)
+    }
+
     /// Generates a 64-bit hash for the given item.
     ///
     /// # Arguments

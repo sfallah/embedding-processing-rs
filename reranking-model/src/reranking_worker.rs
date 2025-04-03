@@ -11,7 +11,7 @@ use llama_cpp::llama_backend::LlamaBackend;
 use llama_cpp::llama_batch::LlamaBatch;
 use llama_cpp::model::params::LlamaModelParams;
 use llama_cpp::model::{AddBos, LlamaModel};
-use reranking_model::config::ModelAppConfig;
+use reranking_model::model_backend_config::ModelAppConfig;
 use std::num::NonZero;
 use std::path::PathBuf;
 use tracing::{debug, error, info};
@@ -19,8 +19,6 @@ use zmq::Socket;
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
-    //let uuid = uuid::Uuid::new_v4();
-    //let worker_id = uuid.to_string();
 
     setup_tracing(args.log_level.to_tracing_level());
 
@@ -33,7 +31,14 @@ fn main() -> anyhow::Result<()> {
     };
     debug!("Config loaded: {:?}", config);
 
-    let mut backend = LlamaBackend::init()?;
+    let mut backend = match LlamaBackend::init() {
+        Ok(backend) => backend,
+        Err(e) => {
+            error!("Failed to initialize backend: {:?}", e);
+            return Err(e.into());
+        }
+    };
+
     if !config.model_config.verbose {
         backend.void_logs();
     }
@@ -47,8 +52,13 @@ fn main() -> anyhow::Result<()> {
 
     let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
 
-    let model = LlamaModel::load_from_file(&backend, model_path, &model_params)
-        .with_context(|| "unable to load model")?;
+    let model = match LlamaModel::load_from_file(&backend, model_path, &model_params) {
+        Ok(model) => model,
+        Err(e) => {
+            error!("Failed to load model: {:?}", e);
+            return Err(e.into());
+        }
+    };
 
     let n_ctx = config
         .model_config
@@ -60,8 +70,6 @@ fn main() -> anyhow::Result<()> {
     } else {
         n_ctx
     };
-
-    error!("model n_ctx_train: {}", n_ctx);
     let pooling_type = LlamaPoolingType::Rank;
 
     // initialize the context
@@ -73,9 +81,13 @@ fn main() -> anyhow::Result<()> {
         .with_n_ubatch(n_ctx)
         .with_embeddings(true);
 
-    let mut ctx = model
-        .new_context(&backend, ctx_params)
-        .with_context(|| "unable to create the llama_context")?;
+    let mut ctx = match model.new_context(&backend, ctx_params) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            error!("Failed to create context: {:?}", e);
+            return Err(e.into());
+        }
+    };
 
     let mut batch = LlamaBatch::new(n_ctx as usize, 1);
 
@@ -203,6 +215,7 @@ fn main() -> anyhow::Result<()> {
                     max_seq_id_batch,
                     &mut output,
                     true,
+                    //FIXME: this should be a parameter
                     "rank".to_string(),
                 )?;
                 max_seq_id_batch = 0;
@@ -219,6 +232,7 @@ fn main() -> anyhow::Result<()> {
             max_seq_id_batch,
             &mut output,
             true,
+            //FIXME: this should be a parameter
             "rank".to_string(),
         )?;
 
@@ -229,6 +243,7 @@ fn main() -> anyhow::Result<()> {
             .zip(scores.iter())
             .collect();
         scores_indexed.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+
         let ranks: Vec<Rank> = scores_indexed
             .into_iter()
             .enumerate()
@@ -283,7 +298,10 @@ fn batch_decode(
         let embeddings = ctx
             .embeddings_seq_ith(i)
             .with_context(|| "Failed to get sequence embeddings")?;
-        println!("embeddings: {:?}", embeddings.iter().take(20).collect::<Vec<_>>());
+        println!(
+            "embeddings: {:?}",
+            embeddings.iter().take(20).collect::<Vec<_>>()
+        );
         let normalized = if normalise {
             if pooling == "rank" {
                 normalize_embeddings(&embeddings, -1)

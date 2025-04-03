@@ -17,7 +17,7 @@ mod tests {
     use uuid::Uuid;
 
     fn read_config() -> anyhow::Result<AppConfig> {
-        let config_file = "tests/test_config/index_config_test.toml".to_string();
+        let config_file = "tests/test_index_config.toml".to_string();
         AppConfig::from_file(config_file)
     }
 
@@ -88,15 +88,9 @@ mod tests {
     }
 
     #[test]
-    fn test_read_config() -> anyhow::Result<()> {
-        let app_config = read_config()?;
-        println!("app_config: {:?}", app_config);
-        Ok(())
-    }
-    #[test]
     fn index_add_test() -> anyhow::Result<()> {
         let config = read_config()?;
-        let index = HnswIndex::async_create_index("test_index".to_string(), config.index_config)?;
+        let index = HnswIndex::create_index("test_index".to_string(), config.index_config)?;
 
         let embeddings = generate_random_vectors(2, 384);
         let embedding1 = embeddings.get(0).ok_or(anyhow!("No embeddings"))?;
@@ -138,7 +132,7 @@ mod tests {
         let index_path = index_tmp_dir.path().to_str().unwrap();
         app_config.index_config.index_dir = index_path.to_string();
 
-        let index = HnswIndex::async_create_index(
+        let index = HnswIndex::create_index(
             "summaries".to_string(),
             app_config.index_config.clone(),
         )?;
@@ -174,7 +168,7 @@ mod tests {
         index.save()?;
 
         let index2 =
-            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone())?;
+            HnswIndex::create_load_index("summaries".to_string(), app_config.index_config.clone())?;
         let size2 = index2.size()?;
         assert_eq!(size2, num_users * num_user_embeds);
         println!("Old Size: {:?}", size2);
@@ -192,7 +186,7 @@ mod tests {
         index2.save()?;
 
         let index3 =
-            HnswIndex::async_load_index("summaries".to_string(), app_config.index_config.clone())?;
+            HnswIndex::create_load_index("summaries".to_string(), app_config.index_config.clone())?;
         let size4 = index3.size()?;
         assert_eq!(size4, num_users * num_user_embeds * 2);
         println!("Reload Size: {:?}", size4);
@@ -228,7 +222,7 @@ mod tests {
 
         let app_config = read_config()?;
         let index =
-            HnswIndex::async_create_index("summaries".to_string(), app_config.index_config)?;
+            HnswIndex::create_index("summaries".to_string(), app_config.index_config)?;
 
         let mut user_ids = vec![];
         for _ in 0..4 {

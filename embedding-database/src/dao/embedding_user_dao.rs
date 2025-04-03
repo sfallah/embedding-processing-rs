@@ -26,7 +26,6 @@ pub fn has_embedding_user(
 ) -> anyhow::Result<bool> {
     let res = match get_embedding_user(&db.clone(), embed_id) {
         Ok(opt) => {
-            //info!("Embedding user: {:?}", opt);
             opt.map(|eu| user_uuids.contains(&eu.user_uuid))
                 .unwrap_or(false)
         }
