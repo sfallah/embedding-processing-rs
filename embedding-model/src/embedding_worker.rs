@@ -4,7 +4,6 @@ use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::prelude::{EmbeddingsRequest, EmbeddingsResponse, Serde};
 use embedding_common::utils::tracting::setup_tracing;
-use embedding_model::config::ModelAppConfig;
 use llama_cpp::context::params::LlamaContextParams;
 use llama_cpp::context::LlamaContext;
 use llama_cpp::ggml_time_us;
@@ -15,15 +14,13 @@ use llama_cpp::model::{AddBos, LlamaModel};
 use std::num::NonZero;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
+use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
-    //let uuid = uuid::Uuid::new_v4();
-    //let worker_id = uuid.to_string();
-
     setup_tracing(args.log_level.to_tracing_level());
 
-    let config = match ModelAppConfig::from_file(args.config_file) {
+    let config = match ModelBackendAppConfig::from_file(args.config_file) {
         Ok(config) => config,
         Err(e) => {
             error!("Failed to load config: {:?}", e);
@@ -32,7 +29,14 @@ fn main() -> anyhow::Result<()> {
     };
     debug!("Config loaded: {:?}", config);
 
-    let mut backend = LlamaBackend::init()?;
+    let mut backend = match LlamaBackend::init() {
+        Ok(backend) => backend,
+        Err(e) => {
+            error!("Failed to initialize backend: {:?}", e);
+            return Err(e.into());
+        }
+    };
+
     if !config.model_config.verbose {
         backend.void_logs();
     }
@@ -46,12 +50,16 @@ fn main() -> anyhow::Result<()> {
 
     let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
 
-    let model = LlamaModel::load_from_file(&backend, model_path, &model_params)
-        .with_context(|| "unable to load model")?;
+    let model =  match LlamaModel::load_from_file(&backend, model_path, &model_params) {
+        Ok(model) => model,
+        Err(e) => {
+            error!("Failed to load model: {:?}", e);
+            return Err(e.into());
+        }
+    };
 
     let n_ctx = model.n_ctx_train();
 
-    error!("model n_ctx_train: {}", n_ctx);
 
     // initialize the context
     let ctx_params = LlamaContextParams::default()

@@ -23,16 +23,16 @@ metal = ["llama-cpp/metal"]
 
 [[bin]]
 name = "model_cli"
-path = "src/model_cli.rs"
+path = "src/embedding_cli.rs"
 
 [[bin]]
 name = "model_broker"
-path = "src/model_broker.rs"
+path = "src/embedding_broker.rs"
 
 [[bin]]
 name = "model_worker"
-path = "src/model_worker.rs"
+path = "src/embedding_worker.rs"
 
 [[bin]]
 name = "model_client"
-path = "src/model_client.rs"
+path = "src/embedding_client.rs"

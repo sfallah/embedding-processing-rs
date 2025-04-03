@@ -20,7 +20,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     let app_config = AppConfig::from_file(args.config_file)?;
 
-    let model_config = app_config.model_config;
+    let embedding_model_info = app_config.embedding_model_info;
     let splitter_config = app_config.splitter_config;
     let db_config = app_config.database_config;
 
@@ -32,7 +32,7 @@ fn main() -> Result<(), anyhow::Error> {
 
     // Get available workers
     let max_cores = num_cpus::get();
-    let parallel_workers = zmq_config.zmq_num_workers.max(1).min(max_cores);
+    let parallel_workers = zmq_config.num_workers.max(1).min(max_cores);
 
     info!("Number of workers: {}", parallel_workers);
 
@@ -42,14 +42,19 @@ fn main() -> Result<(), anyhow::Error> {
     let rocksdb = RocksDB::open(&db_path)?;
     let db = Arc::new(rocksdb);
 
-    let model_config =
-        embedding_model::config::ModelConfig::new(model_config.gguf_file, model_config.verbose);
+    let default_hasher = DeterministicAHasher::default_hasher();
+    let model_id = Model::model_id(
+        &default_hasher,
+        embedding_model_info.path.clone(),
+        embedding_model_info.n_ctx,
+        embedding_model_info.n_embd,
+    );
 
     let model = Model::new(
-        &DeterministicAHasher::new(None, None),
-        model_config.gguf_file,
-        512,
-        384,
+        model_id,
+        embedding_model_info.path.clone(),
+        embedding_model_info.n_ctx,
+        embedding_model_info.n_embd,
     );
 
     put_model(&db, &model)?;
@@ -93,19 +98,13 @@ fn main() -> Result<(), anyhow::Error> {
         }
     };
 
-    let frontend_endpoint = format!(
-        "tcp://{}:{:?}",
-        &zmq_config.zmq_host, zmq_config.zmq_frontend_port
-    );
+    let frontend_endpoint = format!("tcp://{}:{:?}", &zmq_config.host, zmq_config.frontend_port);
     if let Err(e) = frontend.bind(&frontend_endpoint) {
         error!("Failed to bind frontend socket: {:?}", e);
         return Err(e.into());
     }
 
-    let backend_endpoint = format!(
-        "tcp://{}:{:?}",
-        &zmq_config.zmq_host, zmq_config.zmq_backend_port
-    );
+    let backend_endpoint = format!("tcp://{}:{:?}", &zmq_config.host, zmq_config.backend_port);
 
     if let Err(e) = backend.bind(&backend_endpoint) {
         error!("Failed to bind backend socket: {:?}", e);
@@ -131,12 +130,12 @@ fn main() -> Result<(), anyhow::Error> {
     let db = Arc::new(db);
 
     // Create an HNSW index and initialize it from the database
-    let split_index = Arc::new(HnswIndex::async_create_index(
+    let split_index = Arc::new(HnswIndex::create_index(
         "splits".to_string(),
         app_config.index_config.clone(),
     )?);
 
-    let summary_index = Arc::new(HnswIndex::async_create_index(
+    let summary_index = Arc::new(HnswIndex::create_index(
         "summaries".to_string(),
         app_config.index_config,
     )?);

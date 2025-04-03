@@ -11,8 +11,7 @@ pub struct Model {
     pub n_embd: i32,
 }
 impl Model {
-    pub fn new(hasher: &DeterministicAHasher, path: String, n_ctx: i32, n_embd: i32) -> Self {
-        let model_id = Self::hash(hasher, path.clone(), n_ctx, n_embd);
+    pub fn new(model_id: u64, path: String, n_ctx: i32, n_embd: i32) -> Self {
         Self {
             model_id,
             path,
@@ -21,7 +20,7 @@ impl Model {
         }
     }
 
-    pub fn hash(hasher: &DeterministicAHasher, path: String, n_ctx: i32, n_embd: i32) -> u64 {
+    pub fn model_id(hasher: &DeterministicAHasher, path: String, n_ctx: i32, n_embd: i32) -> u64 {
         let mut hasher = hasher.get_hasher();
         hasher.write(path.as_bytes());
         hasher.write_i32(n_ctx);

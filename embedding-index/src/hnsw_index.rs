@@ -2,7 +2,7 @@ use crate::utils::{create_dir, from_config, index_file};
 use anyhow::anyhow;
 use embedding_common::config::IndexConfig;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use usearch::{new_index, Index};
 use uuid::Uuid;
 
@@ -14,14 +14,14 @@ use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct HnswIndex {
-    pub index: Arc<Mutex<Index>>,
+    pub index: Arc<Index>,
     pub index_name: String,
     pub index_config: IndexConfig,
 }
 
 impl HnswIndex {
     #[tracing::instrument]
-    fn create_load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
+    pub fn create_load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
         let options = from_config(&index_config);
         let index = match new_index(&options) {
             Err(e) => {
@@ -53,7 +53,7 @@ impl HnswIndex {
             error!("Failed to reserve index: {:?}", e);
             return Err(anyhow!("Failed to reserve index: {:?}", e));
         }
-        let inner = Arc::new(Mutex::new(index));
+        let inner = Arc::new(index);
         let index_config = index_config.clone();
         Ok(Self {
             index: inner,
@@ -77,7 +77,7 @@ impl HnswIndex {
             error!("Failed to reserve index: {:?}", e);
             return Err(anyhow!("Failed to reserve index: {:?}", e));
         }
-        let inner = Arc::new(Mutex::new(index));
+        let inner = Arc::new(index);
         let index_config = index_config.clone();
         Ok(Self {
             index: inner,
@@ -86,24 +86,9 @@ impl HnswIndex {
         })
     }
 
-    #[tracing::instrument]
-    pub fn async_create_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
-        let index_config = index_config.clone();
-        let index_name = index_name.clone();
-        HnswIndex::create_index(index_name, index_config)
-    }
-
-    #[tracing::instrument]
-    pub fn async_load_index(index_name: String, index_config: IndexConfig) -> Result<Self> {
-        let index_config = index_config.clone();
-        let index_name = index_name.clone();
-        HnswIndex::create_load_index(index_name, index_config)
-    }
-
     pub fn get_by_label(&self, label: u64) -> Result<Vec<f32>> {
         let index = self.index.clone();
         let dimensions = self.index_config.dimensions;
-        let index = index.lock().expect("Failed to lock index");
         let mut embedding = Vec::with_capacity(dimensions);
         match index.export(label, &mut embedding) {
             Ok(_) => Ok(embedding.to_vec()),
@@ -114,7 +99,6 @@ impl HnswIndex {
     pub fn add(&self, embd: &Vec<f32>, label: u64) -> Result<()> {
         let index = self.index.clone();
         let embd = embd.clone();
-        let index = index.lock().expect("Failed to lock index");
         if index.capacity() <= index.size() + 1 {
             if let Err(e) = index.reserve(index.size() + 1) {
                 error!("Failed to reserve index: {:?}", e);
@@ -131,7 +115,6 @@ impl HnswIndex {
         let index = self.index.clone();
         let embeddings = embeddings.clone();
         let labels = labels.clone();
-        let index = index.lock().expect("Failed to lock index");
         let num = embeddings.len();
         if index.capacity() <= index.size() + num {
             let num = if num > 64 { num } else { 64 };
@@ -159,7 +142,6 @@ impl HnswIndex {
     pub fn upsert_batch_records(&self, records: Arc<Vec<IndexRecord>>) -> Result<()> {
         let index = self.index.clone();
         let records = records.clone();
-        let index = index.lock().expect("Failed to lock index");
 
         for record in records.iter() {
             if index.contains(record.label) {
@@ -196,7 +178,6 @@ impl HnswIndex {
     pub fn upsert(&self, embd: &Vec<f32>, label: u64) -> Result<bool> {
         let index = self.index.clone();
         let embd = embd.clone();
-        let index = index.lock().expect("Failed to lock index");
         let exists = index.contains(label);
         if exists {
             if let Err(e) = index.remove(label) {
@@ -221,7 +202,6 @@ impl HnswIndex {
         let index = self.index.clone();
         let embeddings = embeddings.clone();
         let labels = labels.clone();
-        let index = index.lock().expect("Failed to lock index");
         let mut removed_keys = Vec::new();
         for label in labels.iter() {
             if index.contains(*label) {
@@ -252,7 +232,6 @@ impl HnswIndex {
         let index = self.index.clone();
         let labels = labels.clone();
         let index_name = self.index_name.clone();
-        let index = index.lock().expect("Failed to lock index");
         let mut count = 0;
         for label in labels {
             if let Err(e) = index.remove(label) {
@@ -279,7 +258,6 @@ impl HnswIndex {
         let query = query.clone();
         let user_uuids = user_uuids.clone();
         info!("Querying index with query: {:?}", query.len());
-        let index = index.lock().expect("Failed to lock index");
         let matches = index
             .filtered_search(&query, k, |key| {
                 let embed_id: u64 = key.into();
@@ -293,7 +271,6 @@ impl HnswIndex {
     pub fn save(&self) -> Result<()> {
         let index = self.index.clone();
         let index_file = index_file(self.index_name.clone(), &self.index_config);
-        let index = index.lock().expect("Failed to lock index");
         let index_file_path = Path::new(index_file.as_str());
         if !index_file_path.exists() {
             let location = index_file_path.to_str().unwrap().to_string();
@@ -362,12 +339,10 @@ impl HnswIndex {
     }
 
     pub fn size(&self) -> Result<usize> {
-        let index = self.index.lock().expect("Failed to lock index");
-        Ok(index.size())
+        Ok(self.index.size())
     }
 
     pub fn capacity(&self) -> Result<usize> {
-        let index = self.index.lock().expect("Failed to lock index");
-        Ok(index.capacity())
+        Ok(self.index.capacity())
     }
 }

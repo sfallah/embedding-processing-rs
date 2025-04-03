@@ -2,13 +2,13 @@ use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
 use embedding_common::utils::tracting::setup_tracing;
-use embedding_model::config::ModelAppConfig;
 use tracing::{debug, error, info};
+use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
     setup_tracing(args.log_level.to_tracing_level());
-    let config = match ModelAppConfig::from_file(args.config_file) {
+    let config = match ModelBackendAppConfig::from_file(args.config_file) {
         Ok(config) => config,
         Err(e) => {
             error!("Failed to load config: {:?}", e);

@@ -19,3 +19,5 @@ mod index_config;
 mod model_config;
 mod splitter_config;
 mod zmq_config;
+pub mod model_backend_config;
+mod model_info_config;

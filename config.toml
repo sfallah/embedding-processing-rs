@@ -11,21 +11,19 @@ max_tokens = 400
 hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
 #patterns = [["\n\n"], ["\n"], [".", "!", "?"]]
 
-[model]
-gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
-instances = 2
-#cpu = false
-#ngl = 1000
-#verbose = true
+[embedding_model]
+path = "models/all-minilm-l6-v2-q2_k.gguf"
+n_ctx = 512
+n_embd = 384
 
 [database]
 #rocksdb_dir = "rocksdb_dir"
 
 [zmq]
-zmq_host = "127.0.0.1"
-zmq_frontend_port = 5556
-zmq_backend_port = 5560
-zmq_num_workers = 2
+host = "127.0.0.1"
+frontend_port = 5556
+backend_port = 5560
+num_workers = 2
 
 [endpoints]
 embedding_endpoint = "tcp://localhost:5559"
