@@ -1,7 +1,7 @@
 use anyhow::Context;
 use embedding_common::prelude::{EmbeddingsRequest, EmbeddingsResponse, Serde};
 use std::sync::Arc;
-use tracing::{error};
+use tracing::error;
 
 pub fn get_embeddings(
     zmq_ctx: Arc<zmq::Context>,
@@ -42,7 +42,20 @@ pub fn get_embeddings(
             return Err(anyhow::Error::msg(error_message));
         }
     };
-    let response: EmbeddingsResponse =
-        EmbeddingsResponse::unpack(&rsp).with_context(|| "Failed to unpack response")?;
+    let response = match EmbeddingsResponse::unpack::<EmbeddingsResponse>(&rsp) {
+        Ok(response) => {
+            if response.error.is_some() {
+                let error_message = format!("Embedding response error: {:?}", response.error);
+                error!("{}", error_message);
+                return Err(anyhow::Error::msg(error_message));
+            }
+            response
+        }
+        Err(e) => {
+            let error_message = format!("Failed to unpack Embedding response: {:?}", e);
+            error!("{}", error_message);
+            return Err(anyhow::Error::msg(error_message));
+        }
+    };
     Ok(response.embeddings)
 }
