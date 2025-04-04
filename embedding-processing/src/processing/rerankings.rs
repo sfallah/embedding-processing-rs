@@ -45,6 +45,11 @@ pub fn get_rerankings(
     };
     match RerankResponse::unpack::<RerankResponse>(&rsp) {
         Ok(response) => {
+            if response.error.is_some() {
+                let error_message = format!("RerankResponse error: {}", response.error.unwrap());
+                error!("{}", &error_message);
+                return Err(anyhow::anyhow!(error_message));
+            }
             if !request.return_text {
                 Ok(response.ranks)
             } else {
