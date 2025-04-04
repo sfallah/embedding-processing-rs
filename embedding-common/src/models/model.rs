@@ -7,23 +7,20 @@ use std::hash::Hasher;
 pub struct Model {
     pub model_id: u64,
     pub path: String,
-    pub n_ctx: i32,
     pub n_embd: i32,
 }
 impl Model {
-    pub fn new(model_id: u64, path: String, n_ctx: i32, n_embd: i32) -> Self {
+    pub fn new(model_id: u64, path: String, n_embd: i32) -> Self {
         Self {
             model_id,
             path,
-            n_ctx,
             n_embd,
         }
     }
 
-    pub fn model_id(hasher: &DeterministicAHasher, path: String, n_ctx: i32, n_embd: i32) -> u64 {
+    pub fn model_id(hasher: &DeterministicAHasher, path: &str, n_embd: i32) -> u64 {
         let mut hasher = hasher.get_hasher();
         hasher.write(path.as_bytes());
-        hasher.write_i32(n_ctx);
         hasher.write_i32(n_embd);
         hasher.finish()
     }

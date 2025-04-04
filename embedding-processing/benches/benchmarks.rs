@@ -80,7 +80,6 @@ pub fn embedding_benchmark(c: &mut Criterion, doc: String) {
                     let embedding = get_embeddings(
                         zmq_ctx.clone(),
                         "tcp://127.0.0.1:5559",
-                        384,
                         &[split.clone()],
                         idx as u64,
                     )
@@ -118,15 +117,11 @@ pub fn embedding_msgpack_benchmark(c: &mut Criterion, doc: String) {
                 .iter()
                 .enumerate()
                 .for_each(|(_idx, split)| {
-                    let request = EmbeddingsRequest::new(0, 0, 348, vec![split.clone()]);
+                    let request = EmbeddingsRequest::new(vec![split.clone()]);
                     let msg = request.pack().expect("Failed to pack");
                     black_box(msg);
-                    let response = EmbeddingsResponse::new(
-                        request.req_id,
-                        request.seq_id,
-                        request.n_embd,
-                        generate_random_matrix(1, request.n_embd),
-                    );
+                    let response =
+                        EmbeddingsResponse::new(400, generate_random_matrix(1, 384), None);
                     let response_packed = response.pack().expect("Failed to pack");
                     black_box(response_packed);
                 });
@@ -157,14 +152,9 @@ pub fn embedding_benchmark_batch(c: &mut Criterion, doc: String) {
         let zmq_ctx = Arc::new(zmq::Context::new());
         b.iter(|| {
             let id_rnd = rand::random::<u64>();
-            let embeddings = get_embeddings(
-                zmq_ctx.clone(),
-                "tcp://localhost:5559",
-                384,
-                &splits,
-                id_rnd,
-            )
-            .expect("Failed to get embeddings");
+            let embeddings =
+                get_embeddings(zmq_ctx.clone(), "tcp://localhost:5559", &splits, id_rnd)
+                    .expect("Failed to get embeddings");
             black_box(embeddings);
         });
     });

@@ -9,7 +9,6 @@ pub fn process_query(ctx: Arc<ProcessingContext>, query: String) -> anyhow::Resu
     let embedding = get_embeddings(
         ctx.zmq_context.clone(),
         &ctx.embedding_endpoint,
-        ctx.n_embd,
         &[query.clone()],
         query_id,
     )?;

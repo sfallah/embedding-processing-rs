@@ -5,7 +5,6 @@ use serde::Deserialize;
 #[allow(unused)]
 pub struct ModelInfoConfig {
     pub path: String,
-    pub n_ctx: i32,
     pub n_embd: i32,
 }
 

@@ -4,7 +4,7 @@ use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use crate::db::rocksdb_impl::RocksDB;
 use crate::prelude::*;
 use crate::services::embedding_service::{get_embeddings_map, to_embedding_record};
-use crate::services::embedding_user_service::to_embedding_user_record;
+use crate::services::embedding_filter_info::to_embedding_user_record;
 use crate::services::summary_service::{delete_summaries_aux, save_summary_aux};
 use anyhow::Result;
 use embedding_common::prelude::*;

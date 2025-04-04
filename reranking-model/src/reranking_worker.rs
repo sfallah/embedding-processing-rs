@@ -2,7 +2,9 @@ use anyhow::Context;
 use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::ServerArgs;
-use embedding_common::prelude::{Rank, RerankRequest, RerankResponse, Serde};
+use embedding_common::prelude::{
+    DeterministicAHasher, Model, Rank, RerankRequest, RerankResponse, Serde,
+};
 use embedding_common::utils::tracting::setup_tracing;
 use indexmap::IndexMap;
 use llama_cpp::context::params::{LlamaContextParams, LlamaPoolingType};
@@ -50,7 +52,7 @@ fn main() -> anyhow::Result<()> {
         LlamaModelParams::default()
     };
 
-    let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
+    let model_path: PathBuf = config.model_config.gguf_file.clone().try_into()?;
 
     let model = match LlamaModel::load_from_file(&backend, model_path, &model_params) {
         Ok(model) => model,
@@ -59,6 +61,10 @@ fn main() -> anyhow::Result<()> {
             return Err(e.into());
         }
     };
+
+    let n_embd = model.n_embd();
+    let default_hasher = DeterministicAHasher::default_hasher();
+    let model_id = Model::model_id(&default_hasher, &config.model_config.gguf_file, n_embd);
 
     let n_ctx = config
         .model_config
@@ -136,17 +142,16 @@ fn main() -> anyhow::Result<()> {
             Err(e) => {
                 let error_msg = format!("Failed to unpack Rerank request: {:?}", e);
                 error!("{}", e);
-                send_error(&socket, identity, &error_msg);
+                send_error(&socket, identity, model_id, &error_msg);
                 continue;
             }
         };
-        let req_id = request.req_id;
         let query = request.query;
 
         if query.is_empty() {
             let error_msg = "Query is empty";
             error!("{}", error_msg);
-            send_error(&socket, identity, &error_msg);
+            send_error(&socket, identity, model_id, &error_msg);
             continue;
         }
         let query_tokens = match model.str_to_token(&query, AddBos::Never) {
@@ -154,7 +159,7 @@ fn main() -> anyhow::Result<()> {
             Err(e) => {
                 let error_msg = format!("Failed to tokenize query: {:?}", e);
                 error!("{}", error_msg);
-                send_error(&socket, identity, &error_msg);
+                send_error(&socket, identity, model_id, &error_msg);
                 continue;
             }
         };
@@ -167,7 +172,7 @@ fn main() -> anyhow::Result<()> {
                 query_no_tokens, n_ctx
             );
             error!("{}", error_msg);
-            send_error(&socket, identity, &error_msg);
+            send_error(&socket, identity, model_id, &error_msg);
             continue;
         }
 
@@ -206,10 +211,12 @@ fn main() -> anyhow::Result<()> {
         let mut max_seq_id_batch = 0;
         let mut output = Vec::with_capacity(sequence_pairs_map.len());
 
+        let mut decode_failed = false;
+
         for tokens in sequence_pairs_map.values().into_iter() {
             // Flush the batch if the next prompt would exceed our batch size
             if (batch.n_tokens() as usize + tokens.len()) > n_ctx as usize {
-                batch_decode(
+                if let Err(e) = batch_decode(
                     &mut ctx,
                     &mut batch,
                     max_seq_id_batch,
@@ -217,16 +224,24 @@ fn main() -> anyhow::Result<()> {
                     true,
                     //FIXME: this should be a parameter
                     "rank".to_string(),
-                )?;
+                ) {
+                    let error_message = format!("Failed to decode batch: {:?}", e);
+                    error!("{}", error_message);
+                    send_error(&socket, identity, model_id, &error_message);
+                    decode_failed = true;
+                    break;
+                }
                 max_seq_id_batch = 0;
                 batch.clear();
             }
-
             batch.add_sequence(tokens, max_seq_id_batch, false)?;
             max_seq_id_batch += 1;
         }
+        if decode_failed {
+            continue;
+        }
         // Handle final batch
-        batch_decode(
+        if let Err(e) = batch_decode(
             &mut ctx,
             &mut batch,
             max_seq_id_batch,
@@ -234,7 +249,12 @@ fn main() -> anyhow::Result<()> {
             true,
             //FIXME: this should be a parameter
             "rank".to_string(),
-        )?;
+        ) {
+            let error_message = format!("Failed to decode batch: {:?}", e);
+            error!("{}", error_message);
+            send_error(&socket, identity, model_id, &error_message);
+            continue;
+        }
 
         let scores: Vec<f32> = output.iter().map(|embeddings| embeddings[0]).collect();
         let mut scores_indexed: Vec<(&usize, &f32)> = sequence_pairs_map
@@ -249,7 +269,7 @@ fn main() -> anyhow::Result<()> {
             .enumerate()
             .map(|(rank, (idx, score))| Rank::new(*idx, Some(rank), Some(*score), None))
             .collect();
-        let response = RerankResponse::new(ranks, req_id, None);
+        let response = RerankResponse::new(Some(model_id), ranks, None);
         let response_bytes = response.pack()?;
         if let Err(e) = socket.send_multipart(vec![identity, &response_bytes], 0) {
             error!("Failed to send response: {:?}", e);
@@ -260,8 +280,8 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn send_error(socket: &Socket, identity: &Vec<u8>, error_msg: &str) {
-    let response = RerankResponse::new(vec![], None, Some(error_msg.to_string()));
+fn send_error(socket: &Socket, identity: &Vec<u8>, model_id: u64, error_msg: &str) {
+    let response = RerankResponse::new(Some(model_id), vec![], Some(error_msg.to_string()));
     match response.pack() {
         Ok(response_bytes) => {
             if let Err(e) = socket.send_multipart(vec![identity, &response_bytes], 0) {

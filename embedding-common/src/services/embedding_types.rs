@@ -3,19 +3,11 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EmbeddingsRequest {
-    pub req_id: usize,
-    pub seq_id: usize,
-    pub n_embd: usize,
     pub texts: Vec<String>,
 }
 impl EmbeddingsRequest {
-    pub fn new(req_id: usize, seq_id: usize, n_embd: usize, texts: Vec<String>) -> Self {
-        EmbeddingsRequest {
-            req_id,
-            seq_id,
-            n_embd,
-            texts,
-        }
+    pub fn new(texts: Vec<String>) -> Self {
+        EmbeddingsRequest { texts }
     }
 }
 
@@ -26,18 +18,16 @@ unsafe impl Send for EmbeddingsRequest {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EmbeddingsResponse {
-    pub req_id: usize,
-    pub seq_id: usize,
-    pub n_embd: usize,
+    pub model_id: u64,
     pub embeddings: Vec<Vec<f32>>,
+    pub error: Option<String>,
 }
 impl EmbeddingsResponse {
-    pub fn new(req_id: usize, seq_id: usize, n_embd: usize, embeddings: Vec<Vec<f32>>) -> Self {
+    pub fn new(model_id: u64, embeddings: Vec<Vec<f32>>, error: Option<String>) -> Self {
         EmbeddingsResponse {
-            req_id,
-            seq_id,
-            n_embd,
+            model_id,
             embeddings,
+            error,
         }
     }
 }

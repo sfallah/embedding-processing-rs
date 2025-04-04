@@ -41,7 +41,7 @@ pub fn process_rerank(
                     rank.text = Some(request.texts[rank.index].clone());
                 }
             }
-            RerankResponse::new(ranks, None, None)
+            RerankResponse::new(None, ranks, None)
         }
         Err(e) => {
             let error_message = format!("Error processing rerankings: {:?}", e);
