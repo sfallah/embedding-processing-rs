@@ -1,35 +1,48 @@
+use anyhow::Context;
 use embedding_common::prelude::{EmbeddingsRequest, EmbeddingsResponse, Serde};
 use std::sync::Arc;
-use tracing::trace;
-use zmq::Context;
+use tracing::{error};
 
 pub fn get_embeddings(
-    zmq_ctx: Arc<Context>,
+    zmq_ctx: Arc<zmq::Context>,
     model_endpoint: &str,
-    n_embd: usize,
     texts: &[String],
     embed_id: u64,
 ) -> anyhow::Result<Vec<Vec<f32>>> {
-    let socket = zmq_ctx.socket(zmq::DEALER)?;
-    socket.connect(&model_endpoint).expect("Failed to connect");
-    socket.set_linger(0).expect("Failed to set linger");
-    socket
-        .set_sndtimeo(1000)
-        .expect("Failed to set send timeout");
-    socket
-        .set_rcvtimeo(30000)
-        .expect("Failed to set receive timeout");
-    // identity random uuid
-    //let identity = uuid::Uuid::new_v4();
+    let socket = zmq_ctx
+        .socket(zmq::DEALER)
+        .with_context(|| "Failed to create zmq socket")?;
+    if let Err(e) = socket.connect(&model_endpoint) {
+        let error_message = format!("Failed to connect to Embedding Model Endpoint: {:?}", e);
+        error!("{}", error_message);
+        return Err(anyhow::Error::msg(error_message));
+    };
+
+    socket.set_linger(0)?;
+    socket.set_sndtimeo(1000)?;
+    socket.set_rcvtimeo(30000)?;
     socket
         .set_identity(embed_id.to_string().as_bytes())
-        .expect("Failed to set identity");
-    trace!("Processing embedding...");
-    //FIXME: n_embd is hardcoded to 384
-    let request = EmbeddingsRequest::new(0, 0, n_embd, texts.to_vec());
-    let msg = request.pack().expect("Failed to pack");
-    socket.send(msg, 0).expect("Failed to send");
-    let rsp = socket.recv_bytes(0).expect("Failed to receive");
-    let response: EmbeddingsResponse = EmbeddingsResponse::unpack(&rsp).expect("Failed to unpack");
+        .with_context(|| "Failed to set identity")?;
+    let request = EmbeddingsRequest::new(texts.to_vec());
+    let msg = request
+        .pack()
+        .with_context(|| "Failed to pack EmbeddingsRequest")?;
+
+    if let Err(e) = socket.send(msg, 0) {
+        let error_message = format!("Failed to send Embedding request: {:?}", e);
+        error!("{}", error_message);
+        return Err(anyhow::Error::msg(error_message));
+    }
+    let rsp = match socket.recv_bytes(0) {
+        Ok(rsp) => rsp,
+        Err(e) => {
+            let error_message = format!("Failed to receive Embedding response: {:?}", e);
+            error!("{}", error_message);
+            return Err(anyhow::Error::msg(error_message));
+        }
+    };
+    let response: EmbeddingsResponse =
+        EmbeddingsResponse::unpack(&rsp).with_context(|| "Failed to unpack response")?;
     Ok(response.embeddings)
 }

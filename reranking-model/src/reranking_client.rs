@@ -35,7 +35,7 @@ fn main() -> anyhow::Result<()> {
 
     // measure time
     let start = std::time::Instant::now();
-    let request = RerankRequest::new(None, query, texts.to_vec(), false);
+    let request = RerankRequest::new(query, texts.to_vec(), false);
     let msg = request.pack().expect("Failed to pack");
     socket.send(msg, 0).expect("Failed to send");
     let rsp = socket.recv_bytes(0).expect("Failed to receive");

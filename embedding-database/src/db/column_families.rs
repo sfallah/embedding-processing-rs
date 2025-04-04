@@ -1,4 +1,7 @@
-#[derive(Clone, Copy, Debug, Hash, Eq, PartialEq)]
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+
+#[derive(EnumIter, Clone, Copy, Debug, Hash, Eq, PartialEq)]
 pub enum ColumnFamilyType {
     Default,
     Documents,
@@ -7,6 +10,12 @@ pub enum ColumnFamilyType {
     Embeddings,
     EmbeddingFilterInfo,
     Models,
+}
+
+impl ColumnFamilyType {
+    pub(crate) fn all_column_families() -> Vec<String> {
+        Self::iter().map(|cf| cf.name().to_string()).collect::<Vec<_>>()
+    }
 }
 
 impl ColumnFamilyType {

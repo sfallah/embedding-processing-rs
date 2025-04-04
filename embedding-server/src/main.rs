@@ -45,32 +45,19 @@ fn main() -> Result<(), anyhow::Error> {
     let default_hasher = DeterministicAHasher::default_hasher();
     let model_id = Model::model_id(
         &default_hasher,
-        embedding_model_info.path.clone(),
-        embedding_model_info.n_ctx,
+        &embedding_model_info.path,
         embedding_model_info.n_embd,
     );
 
     let model = Model::new(
         model_id,
         embedding_model_info.path.clone(),
-        embedding_model_info.n_ctx,
         embedding_model_info.n_embd,
     );
 
     put_model(&db, &model)?;
 
-    let splitter_max_tokens = if model.n_ctx - 2 <= splitter_config.max_tokens as i32 {
-        info!(
-            "Model context size ({}) does not match max tokens ({})",
-            model.n_ctx,
-            splitter_config.max_tokens - 2
-        );
-        let new_max_tokens = ((model.n_ctx - 2) as f32 * 0.8) as usize;
-        info!("Setting max tokens to {}", new_max_tokens);
-        new_max_tokens
-    } else {
-        splitter_config.max_tokens
-    };
+    let splitter_max_tokens = splitter_config.max_tokens;
 
     let processing_ctx = init_ctx(
         splitter_max_tokens,

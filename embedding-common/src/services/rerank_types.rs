@@ -3,16 +3,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RerankRequest {
-    pub req_id: Option<u64>,
     pub query: String,
     pub texts: Vec<String>,
     pub return_text: bool,
 }
 
 impl RerankRequest {
-    pub fn new(req_id: Option<u64>, query: String, texts: Vec<String>, return_text: bool) -> Self {
+    pub fn new(query: String, texts: Vec<String>, return_text: bool) -> Self {
         RerankRequest {
-            req_id,
             query,
             texts,
             return_text,
@@ -55,16 +53,16 @@ impl Serde for Rank {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RerankResponse {
+    pub model_id: Option<u64>,
     pub ranks: Vec<Rank>,
-    pub req_id: Option<u64>,
     pub error: Option<String>,
 }
 
 impl RerankResponse {
-    pub fn new(ranks: Vec<Rank>, req_id: Option<u64>, error: Option<String>) -> Self {
+    pub fn new(model_id: Option<u64>, ranks: Vec<Rank>, error: Option<String>) -> Self {
         RerankResponse {
+            model_id,
             ranks,
-            req_id,
             error,
         }
     }

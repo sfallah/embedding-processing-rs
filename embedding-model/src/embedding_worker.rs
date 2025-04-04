@@ -3,7 +3,9 @@ use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::model_backend_config::ModelBackendAppConfig;
 use embedding_common::config::ServerArgs;
-use embedding_common::prelude::{EmbeddingsRequest, EmbeddingsResponse, Serde};
+use embedding_common::prelude::{
+    DeterministicAHasher, EmbeddingsRequest, EmbeddingsResponse, Model, Serde,
+};
 use embedding_common::utils::tracting::setup_tracing;
 use llama_cpp::context::params::LlamaContextParams;
 use llama_cpp::context::LlamaContext;
@@ -15,6 +17,7 @@ use llama_cpp::model::{AddBos, LlamaModel};
 use std::num::NonZero;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
+use zmq::Socket;
 
 fn main() -> anyhow::Result<()> {
     let args = ServerArgs::parse();
@@ -48,7 +51,7 @@ fn main() -> anyhow::Result<()> {
         LlamaModelParams::default()
     };
 
-    let model_path: PathBuf = config.model_config.gguf_file.try_into()?;
+    let model_path: PathBuf = config.model_config.gguf_file.clone().try_into()?;
 
     let model = match LlamaModel::load_from_file(&backend, model_path, &model_params) {
         Ok(model) => model,
@@ -57,8 +60,20 @@ fn main() -> anyhow::Result<()> {
             return Err(e.into());
         }
     };
+    let n_embd = model.n_embd();
+    let default_hasher = DeterministicAHasher::default_hasher();
+    let model_id = Model::model_id(&default_hasher, &config.model_config.gguf_file, n_embd);
 
-    let n_ctx = model.n_ctx_train();
+    let n_ctx = config
+        .model_config
+        .max_tokens
+        .unwrap_or(model.n_ctx_train());
+
+    let n_ctx = if n_ctx > model.n_ctx_train() {
+        model.n_ctx_train()
+    } else {
+        n_ctx
+    };
 
     // initialize the context
     let ctx_params = LlamaContextParams::default()
@@ -68,13 +83,15 @@ fn main() -> anyhow::Result<()> {
         .with_n_ubatch(n_ctx)
         .with_embeddings(true);
 
-    let mut ctx = model
-        .new_context(&backend, ctx_params)
-        .with_context(|| "unable to create the llama_context")?;
+    let mut ctx = match model.new_context(&backend, ctx_params) {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            error!("Failed to create context: {:?}", e);
+            return Err(e.into());
+        }
+    };
 
-    let n_ctx = ctx.n_ctx() as usize;
-    let _n_ctx_train = model.n_ctx_train();
-    let mut batch = LlamaBatch::new(n_ctx, 1);
+    let mut batch = LlamaBatch::new(n_ctx as usize, 1);
 
     //  Prepare our context and socket
     let context = zmq::Context::new();
@@ -109,11 +126,13 @@ fn main() -> anyhow::Result<()> {
             }
         };
         //debug!("Worker {} received messages", worker_id);
-        let identity = messages[0].clone();
+        let identity = &messages[0].clone();
         let request = match EmbeddingsRequest::unpack::<EmbeddingsRequest>(&messages[1]) {
             Ok(request) => request,
             Err(e) => {
-                error!("Failed to parse request: {:?}", e);
+                let error_msg = format!("Failed to unpack Rerank request: {:?}", e);
+                error!("{}", e);
+                send_error(&socket, identity, model_id, &error_msg);
                 continue;
             }
         };
@@ -125,9 +144,9 @@ fn main() -> anyhow::Result<()> {
                 match res {
                     Ok(tokens) => {
                         if tokens.len() > 0 {
-                            if tokens.len() > n_ctx {
+                            if tokens.len() > n_ctx as usize {
                                 warn!("Token sequence exceeds context window, truncating");
-                                Some(tokens[..n_ctx].to_vec())
+                                Some(tokens[..n_ctx as usize].to_vec())
                             } else {
                                 Some(tokens)
                             }
@@ -148,27 +167,46 @@ fn main() -> anyhow::Result<()> {
 
         let _t_main_start = ggml_time_us();
 
+        let mut encoding_failed = false;
+
         for tokens in &tokens_lines_list {
             // Flush the batch if the next prompt would exceed our batch size
-            if (batch.n_tokens() as usize + tokens.len()) > n_ctx {
-                batch_decode(&mut ctx, &mut batch, max_seq_id_batch, &mut output, true)?;
+            if (batch.n_tokens() as usize + tokens.len()) > n_ctx as usize {
+                if let Err(e) =
+                    batch_decode(&mut ctx, &mut batch, max_seq_id_batch, &mut output, true)
+                {
+                    let error_message = format!("Failed to decode batch: {:?}", e);
+                    error!("{}", e);
+                    send_error(&socket, identity, model_id, &error_message);
+                    encoding_failed = true;
+                    break;
+                }
                 max_seq_id_batch = 0;
             }
 
-            batch.add_sequence(tokens, max_seq_id_batch, false)?;
+            if let Err(e) = batch.add_sequence(tokens, max_seq_id_batch, false) {
+                let error_message = format!("Failed to add sequence: {:?}", e);
+                error!("{}", e);
+                send_error(&socket, identity, model_id, &error_message);
+                encoding_failed = true;
+                break;
+            }
             max_seq_id_batch += 1;
         }
         // Handle final batch
-        batch_decode(&mut ctx, &mut batch, max_seq_id_batch, &mut output, true)?;
+        if encoding_failed {
+            continue;
+        }
 
-        let response = EmbeddingsResponse::new(
-            request.req_id,
-            request.seq_id,
-            request.n_embd,
-            output.to_vec(),
-        );
+        if let Err(e) = batch_decode(&mut ctx, &mut batch, max_seq_id_batch, &mut output, true) {
+            let error_message = format!("Failed to decode batch: {:?}", e);
+            error!("{}", e);
+            send_error(&socket, identity, model_id, &error_message);
+            continue;
+        }
+        let response = EmbeddingsResponse::new(model_id, output, None);
         let response_bytes = response.pack()?;
-        if let Err(e) = socket.send_multipart(vec![identity, response_bytes.into()], 0) {
+        if let Err(e) = socket.send_multipart(vec![identity, &response_bytes], 0) {
             error!("Failed to send response: {:?}", e);
             continue;
         }
@@ -176,6 +214,21 @@ fn main() -> anyhow::Result<()> {
     info!("Worker Shutting down");
     Ok(())
 }
+
+fn send_error(socket: &Socket, identity: &Vec<u8>, model_id: u64, error_msg: &str) {
+    let response = EmbeddingsResponse::new(model_id, vec![], Some(error_msg.to_string()));
+    match response.pack() {
+        Ok(response_bytes) => {
+            if let Err(e) = socket.send_multipart(vec![identity, &response_bytes], 0) {
+                error!("Failed to send error response: {:?}", e);
+            }
+        }
+        Err(e) => {
+            error!("Failed to pack error response: {:?}", e);
+        }
+    }
+}
+
 fn batch_decode(
     ctx: &mut LlamaContext,
     batch: &mut LlamaBatch,

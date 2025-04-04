@@ -41,7 +41,7 @@ impl RocksDB {
 
     fn open_column_families(
         path: &str,
-        cfs: Vec<&str>,
+        cfs: &Vec<String>,
     ) -> Result<OptimisticTransactionDB<MultiThreaded>> {
         let opts = Self::configure_options();
         let cf_descriptors: Vec<_> = cfs
@@ -60,21 +60,14 @@ impl RocksDB {
     /// Opens the RocksDB database hronously.
     #[instrument]
     pub fn open(path: &str) -> Result<Self> {
-        let cfs = vec![
-            "default",
-            "documents",
-            "splits",
-            "summaries",
-            "embeddings",
-            "embedding_users",
-            "models",
-        ];
+        let cfs = ColumnFamilyType::all_column_families();
+
         let path = path.to_string();
         let path_clone = path.clone();
 
         info!("Opening RocksDB at path: {}", path);
 
-        let db = Self::open_column_families(&path, cfs)?;
+        let db = Self::open_column_families(&path, &cfs)?;
 
         info!("Successfully opened RocksDB at path: {}", path_clone);
 
