@@ -78,7 +78,6 @@ fn filter_splits(splits: &Vec<SplitResultLite>, ln: usize) -> Vec<SplitResultLit
         .collect()
 }
 
-#[tracing::instrument]
 fn lexrank_sentences(
     embeddings: Vec<f32>,
     len: usize,

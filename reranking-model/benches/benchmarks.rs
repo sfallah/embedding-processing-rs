@@ -17,7 +17,7 @@ pub fn benchmark_reranking_zmq(
 ) {
     c.bench_function("benchmark_reranking_zmq", |b| {
         b.iter(|| {
-            let request = RerankRequest::new(None, query.clone(), texts.to_vec(), false);
+            let request = RerankRequest::new(query.clone(), texts.to_vec(), false);
             let msg = request.pack().expect("Failed to pack");
             socket.send(msg, 0).expect("Failed to send");
             let rsp = socket.recv_bytes(0).expect("Failed to receive");

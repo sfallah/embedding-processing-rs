@@ -14,7 +14,9 @@ pub enum ColumnFamilyType {
 
 impl ColumnFamilyType {
     pub(crate) fn all_column_families() -> Vec<String> {
-        Self::iter().map(|cf| cf.name().to_string()).collect::<Vec<_>>()
+        Self::iter()
+            .map(|cf| cf.name().to_string())
+            .collect::<Vec<_>>()
     }
 }
 

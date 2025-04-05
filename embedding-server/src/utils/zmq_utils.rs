@@ -22,9 +22,13 @@ pub fn send_exception_response(
     identity: &Vec<u8>,
 ) {
     message_header.set_error(Some(error_message.to_string()), None);
-    let buf = message_header
-        .pack()
-        .expect("Failed to pack message header");
+    let buf = match message_header.pack() {
+        Ok(buf) => buf,
+        Err(e) => {
+            error!("Failed to pack message header: {:?}", e);
+            return;
+        }
+    };
 
     if let Err(e) = socket.send_multipart(vec![identity, &buf], 0) {
         error!("Failed to send exception response: {:?}", e);
@@ -46,10 +50,20 @@ pub fn send_success_response<T: Serde + serde::Serialize>(
     message_header.set_status(ZmqMessageStatus::Success);
     message_header.set_response_ts();
 
-    let serialized_header = message_header
-        .pack()
-        .expect("Failed to pack message header");
-    let serialized_body = response.pack().expect("Failed to pack response body");
+    let serialized_header = match message_header.pack() {
+        Ok(buf) => buf,
+        Err(e) => {
+            error!("Failed to pack message header: {:?}", e);
+            return;
+        }
+    };
+    let serialized_body = match response.pack() {
+        Ok(buf) => buf,
+        Err(e) => {
+            error!("Failed to pack response: {:?}", e);
+            return;
+        }
+    };
 
     if let Err(e) = socket.send_multipart(vec![identity, &serialized_header, &serialized_body], 0) {
         error!("Failed to send response: {:?}", e);

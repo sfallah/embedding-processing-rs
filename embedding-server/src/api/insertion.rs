@@ -34,19 +34,35 @@ pub fn process_document_insertion_request(
         }
     }
 
-    let document_dto = process_document(
+    let document_dto = match process_document(
         processing_context,
         request.doc_url.to_string(),
         request.input.clone().into_bytes().to_vec(),
-    )
-    .expect("Failed to process document");
+    ) {
+        Ok(dto) => dto,
+        Err(e) => {
+            let error_message = format!("Error processing document: {:?}", e);
+            error!("{}", &error_message);
+            send_exception_response(worker_socket, &error_message, message_header, identity);
+            return;
+        }
+    };
 
     let user_id = request.user;
 
-    save_doc(db, &document_dto, user_id).expect("Failed to write models to DB");
+    if let Err(e) = save_doc(db, &document_dto, user_id) {
+        let error_message = format!("Error saving document to DB: {:?}", e);
+        error!("{}", &error_message);
+        send_exception_response(worker_socket, &error_message, message_header, identity);
+        return;
+    }
 
-    add_to_indices(split_index.clone(), summary_index.clone(), &document_dto)
-        .expect("Failed to add to indices");
+    if let Err(e) = add_to_indices(split_index.clone(), summary_index.clone(), &document_dto) {
+        let error_message = format!("Error adding document to indices: {:?}", e);
+        error!("{}", &error_message);
+        send_exception_response(worker_socket, &error_message, message_header, identity);
+        return;
+    }
 
     send_document_insertion_response(
         worker_socket,
