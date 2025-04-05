@@ -43,9 +43,15 @@ pub fn process_document_query_request(
         .search_mode
         .unwrap_or(SearchModeType::SplitAndSummary);
 
-    let query_embeddings = process_query(processing_context.clone(), request.input.clone())
-        .expect("Failed to process query");
-
+    let query_embeddings = match process_query(processing_context.clone(), request.input.clone()) {
+        Ok(embeddings) => embeddings,
+        Err(e) => {
+            let error_message = format!("Error processing query: {:?}", e);
+            error!("{}", &error_message);
+            send_exception_response(worker_socket, &error_message, message_header, identity);
+            return;
+        }
+    };
     // 1. Search for the query in the indexes
     // Search for summary indexes in summary index
     let top_k = request.top_k.unwrap_or(5) as usize;

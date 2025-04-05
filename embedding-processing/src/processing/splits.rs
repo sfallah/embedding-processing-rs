@@ -31,7 +31,12 @@ pub fn process_split(
         split_id,
     )?;
 
-    let split_embedding = embeddings.get(0).expect("Failed to get embedding");
+    let split_embedding = match embeddings.get(0) {
+        Some(embedding) => embedding,
+        None => {
+            return Err(anyhow::anyhow!("No embedding found for split"));
+        }
+    };
     let embedding = EmbeddingDto::new(split_id, split_embedding.to_vec(), ctx.model_id);
 
     let sentences_embeddings: Vec<_> = embeddings.into_iter().skip(1).flatten().collect();

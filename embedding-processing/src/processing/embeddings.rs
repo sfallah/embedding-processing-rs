@@ -19,8 +19,8 @@ pub fn get_embeddings(
     };
 
     socket.set_linger(0)?;
-    socket.set_sndtimeo(1000)?;
-    socket.set_rcvtimeo(30000)?;
+    socket.set_sndtimeo(500)?;
+    socket.set_rcvtimeo(5000)?;
     socket
         .set_identity(embed_id.to_string().as_bytes())
         .with_context(|| "Failed to set identity")?;
