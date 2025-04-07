@@ -19,7 +19,6 @@ embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }
 embedding-index = { path = "../embedding-index" }
 embedding-processing = { path = "../embedding-processing" }
-embedding-model = { path = "../embedding-model" }
 
 [[bin]]
 name = "embedding_server"

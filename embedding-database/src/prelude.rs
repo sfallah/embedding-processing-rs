@@ -1,11 +1,11 @@
 pub use crate::dao::model_dao::put_model;
+pub use crate::dao::embedding_filter_info_dao::include_in_search;
 pub use crate::db::column_families::ColumnFamilyType;
 pub use crate::db::rocksdb_impl::RocksDB;
 pub use crate::services::doc_service::delete_doc_full;
 pub use crate::services::doc_service::get_full_doc;
 pub use crate::services::doc_service::save_doc;
-pub use crate::services::embedding_filter_info::has_embedding_user;
-pub use crate::services::embedding_filter_info::to_embedding_user_record;
+pub use crate::services::embedding_filter_info::to_embedding_filter_info;
 pub use crate::services::embedding_service::get_all_embeddings;
 pub use crate::services::embedding_service::get_embedding_full;
 pub use crate::services::split_service::get_doc_splits_map;

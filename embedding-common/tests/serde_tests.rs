@@ -11,6 +11,7 @@ mod tests {
         let embed_id: u64 = rand::thread_rng().gen();
         let embedding_user = EmbeddingFilterInfo {
             embed_id,
+            doc_id: 0,
             user_uuid,
         };
         println!("embedding_user: {:?}", embedding_user);

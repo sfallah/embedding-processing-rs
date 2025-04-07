@@ -3,7 +3,7 @@ use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use crate::db::rocksdb_impl::RocksDB;
 use crate::prelude::*;
-use crate::services::embedding_filter_info::to_embedding_user_record;
+use crate::services::embedding_filter_info::to_embedding_filter_info;
 use crate::services::embedding_service::{get_embeddings_map, to_embedding_record};
 use crate::services::summary_service::{delete_summaries_aux, save_summary_aux};
 use anyhow::Result;
@@ -16,13 +16,13 @@ pub(crate) fn save_split(db: &Arc<RocksDB>, split_dto: &SplitDto, user_id: Uuid)
     let mut db_records = Vec::new();
     let split = split_dto.to_model();
     let embedding = split_dto.to_embedding_backend();
-    let embedding_user = split_dto.to_embedding_user_model(user_id);
+    let embedding_user = split_dto.to_embedding_filter_info(user_id);
     if let Some(embedding) = embedding {
         let embedding_record = to_embedding_record(&embedding)?;
         db_records.push(embedding_record);
     }
     if let Some(embedding_user) = embedding_user {
-        let embedding_user_record = to_embedding_user_record(&embedding_user)?;
+        let embedding_user_record = to_embedding_filter_info(&embedding_user)?;
         db_records.push(embedding_user_record);
     }
     db_records.push(DbRecordValue::new(

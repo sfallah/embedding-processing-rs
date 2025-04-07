@@ -13,7 +13,7 @@ pub struct DocumentInsertionRequest {
     /// model name for generating the embeddings.
     pub model: String,
     /// UUID of the user making the request.
-    pub user: Uuid,
+    pub workspace_id: Uuid,
     /// document url data string to be saved.
     pub doc_url: String,
     /// optional boolean for detailed response

@@ -78,7 +78,7 @@ impl SplitDto {
             .map(|embedding_dto| embedding_dto.to_model(EmbeddingDataType::Split))
     }
 
-    pub fn to_embedding_user_model(&self, user_id: Uuid) -> Option<EmbeddingFilterInfo> {
+    pub fn to_embedding_filter_info(&self, user_id: Uuid) -> Option<EmbeddingFilterInfo> {
         self.embedding.as_ref().map(|embedding_dto| {
             EmbeddingFilterInfo::new(embedding_dto.embedding_id, self.doc_id, user_id)
         })
