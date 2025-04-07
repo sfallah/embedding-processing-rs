@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::index_record::IndexRecord;
 use anyhow::Result;
-use embedding_database::prelude::{has_embedding_user, RocksDB};
+use embedding_database::prelude::{include_in_search, RocksDB};
 use indexmap::IndexMap;
 use tracing::{error, info};
 
@@ -249,7 +249,7 @@ impl HnswIndex {
     pub fn query_filter(
         &self,
         db: &Arc<RocksDB>,
-        user_uuids: &Vec<Uuid>,
+        workspace_ids: &Vec<Uuid>,
         doc_ids: &Vec<u64>,
         query: &Vec<f32>,
         k: usize,
@@ -261,7 +261,7 @@ impl HnswIndex {
         let matches = index
             .filtered_search(&query, k, |key| {
                 let embed_id: u64 = key.into();
-                has_embedding_user(&db, embed_id, user_uuids, doc_ids)
+                include_in_search(&db, embed_id, workspace_ids, doc_ids)
             })
             .map_err(|e| anyhow!("Failed to query index: {:?}", e))?;
         let combined = matches.keys.into_iter().zip(matches.distances.into_iter());

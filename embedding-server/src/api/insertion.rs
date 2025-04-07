@@ -48,7 +48,7 @@ pub fn process_document_insertion_request(
         }
     };
 
-    let user_id = request.user;
+    let user_id = request.workspace_id;
 
     if let Err(e) = save_doc(db, &document_dto, user_id) {
         let error_message = format!("Error saving document to DB: {:?}", e);

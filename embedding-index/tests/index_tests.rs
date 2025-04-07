@@ -4,7 +4,7 @@ mod tests {
     use embedding_common::config::config_file::ConfigFromFile;
     use embedding_common::config::AppConfig;
     use embedding_common::prelude::EmbeddingFilterInfo;
-    use embedding_database::prelude::{to_embedding_user_record, RocksDB};
+    use embedding_database::prelude::{to_embedding_filter_info, RocksDB};
     use embedding_index::hnsw_index::HnswIndex;
     use embedding_index::index_record::IndexRecord;
     use embedding_index::utils::{generate_random_vectors, index_file};
@@ -73,8 +73,9 @@ mod tests {
                     let embedding_user = EmbeddingFilterInfo {
                         user_uuid: *user_id,
                         embed_id: *embed_id,
+                        doc_id: 0,
                     };
-                    let db_record = to_embedding_user_record(&embedding_user)?;
+                    let db_record = to_embedding_filter_info(&embedding_user)?;
                     db_records.push(db_record);
 
                     let index_record = IndexRecord::new(*embed_id, embedding.clone());
@@ -200,7 +201,8 @@ mod tests {
     ) -> anyhow::Result<()> {
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.iter().zip(embeddings.iter()) {
-                let res = index.query_filter(&rocksdb, &vec![user_id.clone()], embedding, 4)?;
+                let res =
+                    index.query_filter(&rocksdb, &vec![user_id.clone()], &vec![], embedding, 4)?;
                 println!("embed_id: {}, res: {:?}", embed_id, res);
                 assert_eq!(res.len(), 4);
                 let first_label = res.keys()[0];
@@ -259,7 +261,7 @@ mod tests {
 
         for (user_id, embed_ids, embeddings) in records.iter() {
             for (embed_id, embedding) in embed_ids.into_iter().zip(embeddings.into_iter()) {
-                let res = index.query_filter(&rocksdb, &vec![user_id.clone()], embedding, 10)?;
+                let res = index.query_filter(&rocksdb, &vec![user_id.clone()], &vec![], embedding, 10)?;
                 assert_eq!(res.len(), 10);
                 let first_label = res.keys()[0];
                 let first_dist = *res.first().unwrap().1;

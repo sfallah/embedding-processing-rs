@@ -54,7 +54,6 @@ mod tests {
         let embeddings = get_embeddings(
             ctx.zmq_context.clone(),
             &ctx.embedding_endpoint,
-            ctx.n_embd,
             &vec![text, text2],
             0,
         );
@@ -100,7 +99,6 @@ mod tests {
         let embeddings = get_embeddings(
             ctx.zmq_context.clone(),
             &ctx.embedding_endpoint,
-            ctx.n_embd,
             &sentences,
             0,
         )

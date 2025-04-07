@@ -1,20 +1,8 @@
 use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::DbRecordValue;
-use crate::db::rocksdb_impl::RocksDB;
 use embedding_common::prelude::{EmbeddingFilterInfo, Serde};
-use std::sync::Arc;
-use uuid::Uuid;
 
-pub fn has_embedding_user(
-    db: &Arc<RocksDB>,
-    embed_id: u64,
-    user_uuids: &Vec<Uuid>,
-    doc_ids: &Vec<u64>,
-) -> bool {
-    crate::dao::embedding_filter_info_dao::include_in_search(db, embed_id, user_uuids, doc_ids)
-}
-
-pub fn to_embedding_user_record(
+pub fn to_embedding_filter_info(
     embedding_user: &EmbeddingFilterInfo,
 ) -> anyhow::Result<DbRecordValue> {
     Ok(DbRecordValue::new(

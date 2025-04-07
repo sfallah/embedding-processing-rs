@@ -2,7 +2,7 @@ use crate::dao::summary_dao::get_all_summaries;
 use crate::db::column_families::ColumnFamilyType;
 use crate::db::db_record::{DbRecordKey, DbRecordValue};
 use crate::db::rocksdb_impl::RocksDB;
-use crate::services::embedding_filter_info::to_embedding_user_record;
+use crate::services::embedding_filter_info::to_embedding_filter_info;
 use crate::services::embedding_service::{get_embeddings_map, to_embedding_record};
 use anyhow::Result;
 use embedding_common::prelude::*;
@@ -24,7 +24,7 @@ pub(crate) fn save_summary_aux(
             db_records.push(embedding_record);
         }
         if let Some(embedding_user) = embedding_user {
-            let embedding_user_record = to_embedding_user_record(&embedding_user)?;
+            let embedding_user_record = to_embedding_filter_info(&embedding_user)?;
             db_records.push(embedding_user_record);
         }
         let summary_record = DbRecordValue::new(
