@@ -55,7 +55,7 @@ impl SummaryDto {
             self.centrality,
         )
     }
-    pub fn to_embedding_backend(&self) -> Option<Embedding> {
+    pub fn to_embedding_model(&self) -> Option<Embedding> {
         self.embedding
             .as_ref()
             .map(|embedding_dto| embedding_dto.to_model(EmbeddingDataType::Summary))

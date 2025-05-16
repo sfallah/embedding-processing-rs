@@ -42,6 +42,7 @@ pub fn process_document_retrieval_request(
 
     // if there is no document_id, get the document_url and hash it to get the document_id
     if document_id == 0 {
+        //FIXME: send error response if document_url is None
         let document_url = request.document_url.unwrap_or("".to_string());
         document_id = hasher.hash(&document_url);
     }

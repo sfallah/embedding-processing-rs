@@ -17,7 +17,7 @@ pub(crate) fn save_summary_aux(
 ) -> Result<()> {
     for dto in dtos {
         let summary = dto.to_model();
-        let embedding = dto.to_embedding_backend();
+        let embedding = dto.to_embedding_model();
         let embedding_user = dto.to_embedding_filter_info(user_id);
         if let Some(embedding) = embedding {
             let embedding_record = to_embedding_record(&embedding)?;

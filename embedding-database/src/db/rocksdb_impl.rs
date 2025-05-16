@@ -57,8 +57,7 @@ impl RocksDB {
         Ok(db)
     }
 
-    /// Opens the RocksDB database hronously.
-    #[instrument]
+    /// Opens the RocksDB database synchronously.
     pub fn open(path: &str) -> Result<Self> {
         let cfs = ColumnFamilyType::all_column_families();
 

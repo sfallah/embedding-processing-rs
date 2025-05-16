@@ -831,6 +831,7 @@ dependencies = [
  "indexmap",
  "rand 0.9.0",
  "rmp-serde",
+ "rmpv",
  "serde",
  "serde_json",
  "serde_repr",
@@ -2474,6 +2475,16 @@ dependencies = [
  "byteorder",
  "rmp",
  "serde",
+]
+
+[[package]]
+name = "rmpv"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58450723cd9ee93273ce44a20b6ec4efe17f8ed2e3631474387bfdecf18bb2a9"
+dependencies = [
+ "num-traits",
+ "rmp",
 ]
 
 [[package]]
