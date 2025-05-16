@@ -15,7 +15,7 @@ use uuid::Uuid;
 pub(crate) fn save_split(db: &Arc<RocksDB>, split_dto: &SplitDto, user_id: Uuid) -> Result<()> {
     let mut db_records = Vec::new();
     let split = split_dto.to_model();
-    let embedding = split_dto.to_embedding_backend();
+    let embedding = split_dto.to_embedding_model();
     let embedding_user = split_dto.to_embedding_filter_info(user_id);
     if let Some(embedding) = embedding {
         let embedding_record = to_embedding_record(&embedding)?;
