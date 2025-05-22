@@ -1,5 +1,5 @@
 [index]
-dimensions = 384
+dimensions = 1024
 scalar_kind = "F16"
 connectivity = 16
 expansion_add = 200
@@ -7,14 +7,21 @@ expansion_search = 32
 metric_kind = "Cos"
 
 [splitter]
+#max_tokens = 512
 max_tokens = 400
-hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
+#hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
+#hf_model_id = "intfloat/multilingual-e5-large-instruct"
+hf_model_id = "BAAI/bge-m3"
 #patterns = [["\n\n"], ["\n"], [".", "!", "?"]]
 
 [embedding_model]
-path = "models/all-minilm-l6-v2-q2_k.gguf"
+#path = "sentence-transformers/all-MiniLM-L6-v2"
+#path = "models/multilingual-e5-large-instruct-q4_k_m.gguf"
+path = "models/bge-m3-q4_k_m.gguf"
+#n_ctx = 8192
 n_ctx = 512
-n_embd = 384
+n_embd = 1024
+#n_embd = 384
 
 [database]
 #rocksdb_dir = "rocksdb_dir"
