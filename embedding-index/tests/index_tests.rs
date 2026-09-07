@@ -8,8 +8,8 @@ mod tests {
     use embedding_index::hnsw_index::HnswIndex;
     use embedding_index::index_record::IndexRecord;
     use embedding_index::utils::{generate_random_vectors, index_file};
-    use rand::{thread_rng, Rng};
-    use simsimd::SpatialSimilarity;
+    use numkong::Euclidean;
+    use rand::RngExt;
     use std::f32;
     use std::sync::Arc;
     use tracing::Level;
@@ -34,7 +34,7 @@ mod tests {
 
         let mut embed_ids = vec![0u64; num_embeds];
         for embed_id in embed_ids.iter_mut() {
-            *embed_id = thread_rng().gen()
+            *embed_id = rand::rng().random()
         }
 
         let embeddings = generate_random_vectors(num_embeds, 384);
@@ -95,7 +95,7 @@ mod tests {
 
         let embeddings = generate_random_vectors(2, 384);
         let embedding1 = embeddings.get(0).ok_or(anyhow!("No embeddings"))?;
-        let embed_id = thread_rng().gen();
+        let embed_id = rand::rng().random();
         index.add(embedding1, embed_id)?;
         let embedding2 = embeddings.get(1).ok_or(anyhow!("No embeddings"))?;
         index.upsert(embedding2, embed_id)?;
@@ -232,7 +232,7 @@ mod tests {
 
         let mut embed_ids = vec![0u64; num_embeds];
         for embed_id in embed_ids.iter_mut() {
-            *embed_id = thread_rng().gen()
+            *embed_id = rand::rng().random()
         }
 
         let embeddings = generate_random_vectors(num_embeds, 384);
@@ -272,7 +272,7 @@ mod tests {
                     .iter()
                     .map(|f| half::f16::from_f32(*f).to_f32())
                     .collect();
-                let sim = f32::l2sq(orig_embd.as_slice(), embedding.as_slice());
+                let sim = f32::sqeuclidean(orig_embd.as_slice(), embedding.as_slice());
                 println!("sim: {:?}", sim);
                 assert_eq!(orig_embd, *embedding);
 

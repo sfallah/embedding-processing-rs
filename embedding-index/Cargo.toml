@@ -14,15 +14,10 @@ rand = "0.10.1"
 rayon = "1.10.0"
 embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }
-
-[target.'cfg(not(target_os = "macos"))'.dependencies]
-usearch = { version = "2.16.6", features = ["simsimd", "fp16lib", "openmp"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-usearch = { version = "2.16.7", default-features = false, features = ["fp16lib"] }
+usearch = "2.26.2"
 
 [dev-dependencies]
 tempdir = "0.3.7"
-simsimd = "6.2.1"
+numkong = "7.8"
 half = "=2.4.1"
 rstest = {workspace = true}

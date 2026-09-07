@@ -1,6 +1,6 @@
 use embedding_common::config::IndexConfig;
 use ndarray::{Array, Array1};
-use rand::Rng;
+use rand::RngExt;
 use rayon::prelude::*;
 use std::path::Path;
 use usearch::{IndexOptions, MetricKind, ScalarKind};
