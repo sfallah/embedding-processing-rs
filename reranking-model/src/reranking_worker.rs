@@ -235,10 +235,22 @@ fn main() -> anyhow::Result<()> {
                 max_seq_id_batch = 0;
                 batch.clear();
             }
-            batch.add_sequence(tokens, max_seq_id_batch, false)?;
+            if let Err(e) = batch.add_sequence(tokens, max_seq_id_batch, false) {
+                // Report the failure and go back to waiting for the next request. Propagating it
+                // would return from main and take the whole worker process down, so one malformed
+                // request would cost the pool a worker until the CLI restarts it.
+                let error_message = format!("Failed to add sequence: {:?}", e);
+                error!("{}", error_message);
+                send_error(&socket, identity, model_id, &error_message);
+                decode_failed = true;
+                break;
+            }
             max_seq_id_batch += 1;
         }
         if decode_failed {
+            // Sequences added before the failure are still in the batch; leaving them would put
+            // the next request's pairs on top of them.
+            batch.clear();
             continue;
         }
         // Handle final batch
