@@ -1,0 +1,18 @@
+[package]
+name = "embedding-store"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }
+rmp-serde = { workspace = true }
+uuid = { workspace = true }
+tracing = { workspace = true }
+memmap2 = "0.9.5"
+crc32fast = "1.4.2"
+half = "2.4.1"
+embedding-common = { path = "../embedding-common" }
+
+[dev-dependencies]
+tempfile = "3.14.0"
