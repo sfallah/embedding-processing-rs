@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rocksdb = {  version = "0.23.0", features = ["multi-threaded-cf"] }
+rocksdb = {  version = "0.24.0", features = ["multi-threaded-cf"] }
 byteorder = "1.5.0"
-strum = "0.27.1"
-strum_macros = "0.27.1"
+strum = "0.28.0"
+strum_macros = "0.28.0"
 tracing = {workspace = true}
 anyhow = { workspace = true }
 indexmap = { workspace = true }

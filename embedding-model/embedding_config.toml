@@ -3,7 +3,8 @@
 [model]
 #gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
 #gguf_file = "models/multilingual-e5-large-instruct-q4_k_m.gguf"
-gguf_file = "models/bge-m3-q4_k_m.gguf"
+#gguf_file = "models/bge-m3-q4_k_m.gguf"
+gguf_file = "models/embeddinggemma-300m-sentence-transformers-qat-q4_0.gguf"
 #cpu = false
 ngl = 1000
 verbose = true
@@ -13,4 +14,4 @@ verbose = true
 host = "127.0.0.1"
 frontend_port = 5559
 backend_port = 5590
-num_workers = 1
+num_workers = 2

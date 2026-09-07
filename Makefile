@@ -44,7 +44,7 @@ cli: build
 	cargo run --package embedding-cli --bin embedding-cli -- index --file-path=$(FILE_PATH)
 
 run_metal:
-	cargo run -r -F metal --bin embedding-server -- --config-file config.toml
+	cargo run -r -F metal --bin embedding_server -- --config-file config.toml
 
 run_cuda:
 	cargo run -r -F cuda --bin embedding-server -- --config-file config.toml

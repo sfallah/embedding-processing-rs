@@ -81,6 +81,7 @@ fn main() -> anyhow::Result<()> {
         .with_n_ctx(Some(NonZero::new(n_ctx).unwrap()))
         .with_n_batch(n_ctx)
         .with_n_ubatch(n_ctx)
+        .with_kv_unified(true)
         .with_embeddings(true);
 
     let mut ctx = match model.new_context(&backend, ctx_params) {
@@ -91,7 +92,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let mut batch = LlamaBatch::new(n_ctx as usize, 1);
+    let mut batch = LlamaBatch::new(n_ctx as usize, 0, 1);
 
     //  Prepare our context and socket
     let context = zmq::Context::new();
@@ -195,6 +196,8 @@ fn main() -> anyhow::Result<()> {
         }
         // Handle final batch
         if encoding_failed {
+            batch.clear();
+            error!("Failed to create batch: {:?}", batch);
             continue;
         }
 
