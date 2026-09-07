@@ -283,7 +283,16 @@ fn main() -> anyhow::Result<()> {
             .map(|(rank, (idx, score))| Rank::new(*idx, Some(rank), Some(*score), None))
             .collect();
         let response = RerankResponse::new(Some(model_id), ranks, None);
-        let response_bytes = response.pack()?;
+        let response_bytes = match response.pack() {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                // send_error already handles a pack failure of its own; the worker keeps serving.
+                let error_message = format!("Failed to pack response: {:?}", e);
+                error!("{}", error_message);
+                send_error(&socket, identity, model_id, &error_message);
+                continue;
+            }
+        };
         if let Err(e) = socket.send_multipart(vec![identity, &response_bytes], 0) {
             error!("Failed to send response: {:?}", e);
             continue;
