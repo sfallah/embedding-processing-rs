@@ -10,6 +10,8 @@ rmp-serde = { workspace = true }
 uuid = { workspace = true }
 tracing = { workspace = true }
 memmap2 = "0.9.5"
+indexmap = { workspace = true }
+usearch = "2.26.2"
 crc32fast = "1.4.2"
 half = "2.4.1"
 embedding-common = { path = "../embedding-common" }

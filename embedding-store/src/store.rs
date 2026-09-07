@@ -589,6 +589,61 @@ impl Store {
     // Reading
     // -----------------------------------------------------------------------
 
+    /// Hand the bytes at `loc` to `f`, without copying them when the segment is sealed.
+    ///
+    /// A sealed segment is an immutable mapping, so its bytes are borrowed straight from it; the
+    /// active segment is a file being appended to and has to be read into a buffer first.
+    pub(crate) fn with_bytes<R>(&self, loc: Loc, f: impl FnOnce(&[u8]) -> R) -> Result<R> {
+        if loc.segment == self.active.id {
+            let buf = self.active.read_at(loc.offset, loc.len)?;
+            Ok(f(&buf))
+        } else {
+            let segment = self
+                .sealed
+                .get(&loc.segment)
+                .ok_or_else(|| anyhow!("segment {} is not open", loc.segment))?;
+            Ok(f(segment.slice(loc.offset, loc.len)?))
+        }
+    }
+
+    /// Hand one entity's stored vector to `f` as the bytes in the log, with their dtype.
+    ///
+    /// Every record of a searchable kind ends with its vector, and every vector in a shard is the
+    /// same width, so this reads `n_embd * bytes_per_element` bytes off the end of the record
+    /// rather than the whole record: the text is the bulk of a record and a distance computation
+    /// has no use for it. The frame was checksummed when it was written and again on replay, so
+    /// the CRC is not re-checked here.
+    pub fn with_vector<R>(
+        &self,
+        kind: EntityKind,
+        id: u64,
+        f: impl FnOnce(&[u8], VectorDtype) -> R,
+    ) -> Result<Option<R>> {
+        let loc = match kind {
+            EntityKind::Split => self.maps.splits.get(&id).map(|e| e.loc),
+            EntityKind::Summary => self.maps.summaries.get(&id).map(|e| e.loc),
+        };
+        let Some(loc) = loc else {
+            return Ok(None);
+        };
+        let vector_len = self.opts.dtype.vector_bytes(self.opts.n_embd) as u32;
+        if loc.len < crate::record::RECORD_HEADER_LEN as u32 + vector_len {
+            return Err(anyhow!(
+                "record for {} is {} bytes, too short to hold a {} byte vector",
+                id,
+                loc.len,
+                vector_len
+            ));
+        }
+        let tail = Loc {
+            segment: loc.segment,
+            offset: loc.offset + (loc.len - vector_len) as u64,
+            len: vector_len,
+        };
+        let dtype = self.opts.dtype;
+        self.with_bytes(tail, |bytes| f(bytes, dtype)).map(Some)
+    }
+
     pub(crate) fn read_record(&self, loc: Loc) -> Result<Vec<u8>> {
         if loc.segment == self.active.id {
             self.active.read_at(loc.offset, loc.len)
@@ -664,6 +719,20 @@ impl Store {
         };
         let summaries = self.get_summaries(&meta.summary_ids, with_embeddings)?;
         Ok(Some(split_dto(meta, summaries, embedding, None)))
+    }
+
+    /// One split with an empty summary list.
+    ///
+    /// The query path attaches the summaries the query actually hit rather than the split's whole
+    /// list, so reading that list would be work thrown away.
+    pub fn get_split_without_summaries(
+        &self,
+        split_id: u64,
+        with_embeddings: bool,
+    ) -> Result<Option<SplitDto>> {
+        Ok(self
+            .read_split(split_id, with_embeddings)?
+            .map(|(meta, embedding)| split_dto(meta, Vec::new(), embedding, None)))
     }
 
     /// Splits in the order asked for, each with its own summary list.

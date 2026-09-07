@@ -21,7 +21,9 @@ pub mod meta_snapshot;
 pub mod record;
 pub mod replay;
 pub mod segment;
+pub mod shard;
 pub mod store;
+pub mod vector_index;
 
 /// Make a rename durable. Writing a temp file and renaming it only guarantees "old or new" once
 /// the directory entry itself has reached the device.
@@ -39,5 +41,7 @@ pub mod prelude {
     pub use crate::manifest::{Manifest, SegmentInfo};
     pub use crate::maps::{DocEntry, Loc, Maps, SplitEntry, SummaryEntry};
     pub use crate::record::{RecordKind, VectorDtype};
+    pub use crate::shard::{Shard, ShardOptions, ShardStats};
     pub use crate::store::{EntityKind, Replaced, Store, StoreOptions};
+    pub use crate::vector_index::VectorIndex;
 }

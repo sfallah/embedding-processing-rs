@@ -950,11 +950,13 @@ dependencies = [
  "crc32fast",
  "embedding-common",
  "half",
+ "indexmap",
  "memmap2",
  "rmp-serde",
  "serde",
  "tempfile",
  "tracing",
+ "usearch",
  "uuid",
 ]
 
