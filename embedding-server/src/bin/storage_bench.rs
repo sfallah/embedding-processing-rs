@@ -64,6 +64,11 @@ struct Args {
     #[arg(long, default_value_t = 5)]
     top_k: usize,
 
+    /// Discarded queries per mode before measuring, so the first mode measured is not the only
+    /// one paying a cold page cache.
+    #[arg(long, default_value_t = 50)]
+    warmup: usize,
+
     /// Keep an existing directory instead of deleting it first.
     #[arg(long)]
     keep: bool,
@@ -518,6 +523,13 @@ fn main() -> anyhow::Result<()> {
     let mut qrng = Rng::new(args.seed ^ 0xDEAD_BEEF);
 
     for mode in [SearchModeType::SplitOnly, SearchModeType::SplitAndSummary] {
+        // Warm the page cache before measuring. Without this the first mode measured pays the
+        // cold RocksDB cache and reads slower than the mode after it, whatever the mode is.
+        for _ in 0..args.warmup {
+            let q = qrng.unit_vector(dim);
+            run_query(&db, &split_index, &summary_index, &filter_ws, &no_docs, &q, args.top_k, mode, false)?;
+        }
+
         let mut latencies = Vec::with_capacity(args.queries);
         let mut hits = 0usize;
         for _ in 0..args.queries {
