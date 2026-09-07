@@ -310,31 +310,39 @@ fn batch_decode(
         s_batch
     );
 
-    // Clear previous kv_cache values
-    ctx.clear_kv_cache();
+    // The batch is cleared on every path, not just the successful one. A failed decode that left
+    // its tokens in the batch would have the next request's pairs added on top of them, and
+    // `embeddings_seq_ith(i)` would then score the previous request's pairs -- wrong ranks,
+    // silently, with no error anywhere.
+    let result = (|| -> anyhow::Result<()> {
+        // Clear previous kv_cache values
+        ctx.clear_kv_cache();
 
-    ctx.decode(batch).with_context(|| "llama_decode() failed")?;
+        ctx.decode(batch).with_context(|| "llama_decode() failed")?;
 
-    for i in 0..s_batch {
-        let embeddings = ctx
-            .embeddings_seq_ith(i)
-            .with_context(|| "Failed to get sequence embeddings")?;
-        println!(
-            "embeddings: {:?}",
-            embeddings.iter().take(20).collect::<Vec<_>>()
-        );
-        let normalized = if normalise {
-            if pooling == "rank" {
-                normalize_embeddings(&embeddings, -1)
+        for i in 0..s_batch {
+            let embeddings = ctx
+                .embeddings_seq_ith(i)
+                .with_context(|| "Failed to get sequence embeddings")?;
+            println!(
+                "embeddings: {:?}",
+                embeddings.iter().take(20).collect::<Vec<_>>()
+            );
+            let normalized = if normalise {
+                if pooling == "rank" {
+                    normalize_embeddings(&embeddings, -1)
+                } else {
+                    normalize_embeddings(&embeddings, 2)
+                }
             } else {
-                normalize_embeddings(&embeddings, 2)
-            }
-        } else {
-            embeddings.to_vec()
-        };
-        output.push(normalized);
-    }
+                embeddings.to_vec()
+            };
+            output.push(normalized);
+        }
+        Ok(())
+    })();
     batch.clear();
+    result?;
 
     Ok(())
 }

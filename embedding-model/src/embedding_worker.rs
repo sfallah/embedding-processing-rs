@@ -239,25 +239,31 @@ fn batch_decode(
     output: &mut Vec<Vec<f32>>,
     normalise: bool,
 ) -> anyhow::Result<()> {
-    ctx.clear_kv_cache();
-    ctx.decode(batch).with_context(|| "llama_decode() failed")?;
+    // The batch is cleared on every path, not just the successful one. A failed decode that left
+    // its tokens in the batch would have the next request's sequences added on top of them, and
+    // `embeddings_seq_ith(i)` would then return embeddings belonging to the previous request --
+    // wrong vectors, silently, with no error anywhere.
+    let result = (|| -> anyhow::Result<()> {
+        ctx.clear_kv_cache();
+        ctx.decode(batch).with_context(|| "llama_decode() failed")?;
 
-    for i in 0..s_batch {
-        let embedding = ctx
-            .embeddings_seq_ith(i)
-            .with_context(|| "Failed to get embeddings")?;
-        let output_embeddings = if normalise {
-            normalize(embedding)
-        } else {
-            embedding.to_vec()
-        };
+        for i in 0..s_batch {
+            let embedding = ctx
+                .embeddings_seq_ith(i)
+                .with_context(|| "Failed to get embeddings")?;
+            let output_embeddings = if normalise {
+                normalize(embedding)
+            } else {
+                embedding.to_vec()
+            };
 
-        output.push(output_embeddings);
-    }
+            output.push(output_embeddings);
+        }
+        Ok(())
+    })();
 
     batch.clear();
-
-    Ok(())
+    result
 }
 
 fn normalize(input: &[f32]) -> Vec<f32> {
