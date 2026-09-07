@@ -16,7 +16,7 @@ use llama_cpp::model::{AddBos, LlamaModel};
 use reranking_model::model_backend_config::ModelAppConfig;
 use std::num::NonZero;
 use std::path::PathBuf;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use zmq::Socket;
 
 fn main() -> anyhow::Result<()> {
@@ -270,12 +270,33 @@ fn main() -> anyhow::Result<()> {
         }
 
         let scores: Vec<f32> = output.iter().map(|embeddings| embeddings[0]).collect();
+        let nan_count = scores.iter().filter(|s| s.is_nan()).count();
+        if nan_count > 0 {
+            warn!(
+                "reranker produced {} NaN score(s) out of {}; they are ranked last",
+                nan_count,
+                scores.len()
+            );
+        }
         let mut scores_indexed: Vec<(&usize, &f32)> = sequence_pairs_map
             .keys()
             .into_iter()
             .zip(scores.iter())
             .collect();
-        scores_indexed.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
+        // Descending by score, NaN last. partial_cmp returns None when either side is NaN, and
+        // unwrapping that panicked -- a single NaN from the model took the worker process down.
+        scores_indexed.sort_by(|a, b| {
+            let (x, y) = (*a.1, *b.1);
+            y.partial_cmp(&x).unwrap_or_else(|| {
+                if x.is_nan() && y.is_nan() {
+                    std::cmp::Ordering::Equal
+                } else if x.is_nan() {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Less
+                }
+            })
+        });
 
         let ranks: Vec<Rank> = scores_indexed
             .into_iter()
