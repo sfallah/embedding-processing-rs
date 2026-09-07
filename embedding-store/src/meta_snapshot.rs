@@ -163,6 +163,7 @@ pub fn store(dir: &Path, maps: &Maps, snapshot_seq: u64) -> Result<()> {
         f.sync_all()?;
     }
     fs::rename(&tmp, &final_path).with_context(|| format!("renaming {}", tmp.display()))?;
+    crate::fsync_dir(dir)?;
     Ok(())
 }
 

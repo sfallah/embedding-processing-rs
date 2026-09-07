@@ -272,10 +272,35 @@ fn reinserting_a_url_drops_the_old_splits() {
     let small = build_doc(8, 2, 2, DocList::Union, 77);
     let replaced = store.insert(&small).unwrap();
     assert!(replaced.existed);
-    assert_eq!(replaced.split_ids.len(), 5);
     assert_eq!(store.split_count(), 2);
     assert_eq!(store.summary_count(), 4);
     assert!(store.get_split(orphan_candidate, false).unwrap().is_none());
+
+    // Ids are deterministic, so the first two splits kept their ids and were overwritten in
+    // place. Only the three that really went away are reported, or a caller removing these from
+    // its index would delete vectors this same insert just wrote.
+    let kept: Vec<u64> = small.splits.iter().map(|s| s.split_id).collect();
+    assert_eq!(replaced.split_ids.len(), 3);
+    for id in &replaced.split_ids {
+        assert!(!kept.contains(id), "split {} was re-added, not removed", id);
+        assert!(store.get_split(*id, false).unwrap().is_none());
+    }
+    let kept_summaries: Vec<u64> = small
+        .splits
+        .iter()
+        .flat_map(|s| s.summaries.iter().map(|x| x.summary_id))
+        .collect();
+    assert_eq!(replaced.summary_ids.len(), 6);
+    for id in &replaced.summary_ids {
+        assert!(!kept_summaries.contains(id), "summary {} was re-added", id);
+    }
+    // And everything the new document names is readable.
+    for id in kept.iter().chain(kept_summaries.iter()) {
+        assert!(
+            store.get_split(*id, false).unwrap().is_some()
+                || store.get_summary(*id, false).unwrap().is_some()
+        );
+    }
 }
 
 #[test]
@@ -509,4 +534,127 @@ fn a_shard_refuses_a_different_model() {
 
     let wrong_width = StoreOptions::new(MODEL_ID, N_EMBD * 2);
     assert!(Store::open(dir.path(), wrong_width).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Regressions for defects found in review
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_snapshot_that_outruns_the_log_is_discarded() {
+    // `snapshot_meta` now fsyncs the log before publishing a `snapshot_seq`. This covers the
+    // other half: a snapshot that somehow describes records the segment no longer holds — a lost
+    // tail — must not be trusted, because replay would skip those records as already covered,
+    // find no torn tail, and let the next append land on locations the maps still point at.
+    let dir = TempDir::new().unwrap();
+    {
+        let mut store = Store::open(dir.path(), opts()).unwrap();
+        for doc_id in 1..=5u64 {
+            store.insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id)).unwrap();
+        }
+        store.snapshot_meta().unwrap();
+    }
+
+    let segment = dir.path().join("records-000000.seg");
+    let len = std::fs::metadata(&segment).unwrap().len();
+    let file = std::fs::OpenOptions::new().write(true).open(&segment).unwrap();
+    file.set_len(len - 200).unwrap();
+    drop(file);
+
+    let mut store = Store::open(dir.path(), opts()).unwrap();
+    assert!(store.doc_count() < 5, "the lost tail must not still be reported");
+    // Whatever survived is readable, and appending continues from a sound boundary.
+    let ids: Vec<u64> = store.maps().docs.keys().copied().collect();
+    for doc_id in ids {
+        assert!(store.get_doc(doc_id, true).unwrap().is_some());
+    }
+    store.insert(&build_doc(99, 1, 1, DocList::Union, 99)).unwrap();
+    let live = store.maps().clone();
+    drop(store);
+    let store = Store::open(dir.path(), opts()).unwrap();
+    assert_eq!(store.maps(), &live);
+}
+
+#[test]
+fn dead_bytes_in_the_active_segment_reach_the_compaction_trigger() {
+    // Dead records only become worth compacting once their segment is sealed, but they must not be
+    // forgotten in the meantime: a replace-heavy workload that never leaves the active segment
+    // would otherwise grow the log without ever tripping the ratio.
+    let dir = TempDir::new().unwrap();
+    let mut store = Store::open(dir.path(), opts()).unwrap();
+
+    for doc_id in 1..=6u64 {
+        store.insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id)).unwrap();
+    }
+    for doc_id in 1..=6u64 {
+        store.insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id + 100)).unwrap();
+    }
+    assert_eq!(
+        store.manifest().tombstone_bytes,
+        0,
+        "nothing is sealed yet, so nothing is compactable yet"
+    );
+
+    store.seal_active().unwrap();
+    assert!(
+        store.manifest().tombstone_bytes > 0,
+        "sealing must hand the active segment's dead bytes to the compaction accounting"
+    );
+    assert!(store.compact_if_needed(0.1).unwrap(), "compaction should trigger");
+
+    assert_eq!(store.doc_count(), 6);
+    for doc_id in 1..=6u64 {
+        let doc = store.get_doc(doc_id, true).unwrap().unwrap();
+        assert_eq!(doc.splits.len(), 3);
+    }
+    assert_eq!(store.manifest().tombstone_bytes, 0);
+}
+
+#[test]
+fn corruption_in_the_middle_of_the_log_is_reported_not_truncated() {
+    // Only a record that runs to the end of the file can be a torn write. A bad checksum with
+    // complete records after it is damage, and silently discarding everything from there would
+    // throw away good documents.
+    let dir = TempDir::new().unwrap();
+    {
+        let mut store = Store::open(dir.path(), opts()).unwrap();
+        for doc_id in 1..=4u64 {
+            store.insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id)).unwrap();
+        }
+        store.fsync().unwrap();
+    }
+
+    // Flip a bit inside the payload of the first record, far from the end of the segment.
+    let segment = dir.path().join("records-000000.seg");
+    let mut bytes = std::fs::read(&segment).unwrap();
+    assert!(bytes.len() > 400);
+    bytes[40] ^= 0xFF;
+    std::fs::write(&segment, &bytes).unwrap();
+
+    let message = match Store::open(dir.path(), opts()) {
+        Ok(_) => panic!("corruption in the middle of the log was accepted"),
+        Err(e) => format!("{}", e),
+    };
+    assert!(
+        message.contains("corrupt"),
+        "expected a corruption error, got: {}",
+        message
+    );
+}
+
+#[test]
+fn a_shard_refuses_a_different_vector_dtype() {
+    use embedding_store::record::VectorDtype;
+
+    let dir = TempDir::new().unwrap();
+    {
+        let mut store = Store::open(dir.path(), opts()).unwrap();
+        store.insert(&build_doc(1, 1, 1, DocList::Union, 1)).unwrap();
+    }
+    let mut other = opts();
+    other.dtype = VectorDtype::F32;
+    assert!(
+        Store::open(dir.path(), other).is_err(),
+        "an f16 shard must not be reopened as f32: the index rebuild would be handed a mix"
+    );
 }

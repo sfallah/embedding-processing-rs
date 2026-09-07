@@ -89,6 +89,7 @@ impl Manifest {
             f.sync_all()?;
         }
         fs::rename(&tmp, &path).with_context(|| format!("renaming {}", tmp.display()))?;
+        crate::fsync_dir(dir)?;
         Ok(())
     }
 

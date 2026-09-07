@@ -26,6 +26,27 @@ pub fn compact(store: &mut Store) -> Result<()> {
         return Ok(());
     }
 
+    // Claim the id before any file exists under it. A failure part way leaves a partial segment,
+    // which is removed here and would be removed at the next open anyway; without claiming the id
+    // first, a retry would find that file in the way and fail for good.
+    let new_id = store.manifest.next_segment_id;
+    store.manifest.next_segment_id += 1;
+    match compact_into(store, new_id, &sealed_ids) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let partial = segment_path(&store.dir, new_id);
+            if partial.exists() {
+                if let Err(rm) = fs::remove_file(&partial) {
+                    tracing::warn!("could not remove partial segment {}: {}", partial.display(), rm);
+                }
+            }
+            Err(e)
+        }
+    }
+}
+
+fn compact_into(store: &mut Store, new_id: u32, sealed_ids: &HashSet<u32>) -> Result<()> {
+
     // Documents whose records live in a sealed segment, in a deterministic order.
     let mut doc_ids: Vec<u64> = store
         .maps
@@ -36,7 +57,6 @@ pub fn compact(store: &mut Store) -> Result<()> {
         .collect();
     doc_ids.sort_unstable();
 
-    let new_id = store.manifest.next_segment_id;
     let mut writer = ActiveSegment::open(&store.dir, new_id)?;
     if writer.len != 0 {
         return Err(anyhow!(
@@ -84,7 +104,7 @@ pub fn compact(store: &mut Store) -> Result<()> {
     if bytes_written == 0 {
         // Nothing live in the sealed segments: drop them outright.
         fs::remove_file(segment_path(&store.dir, new_id)).ok();
-        return drop_sealed(store, Vec::new(), None);
+        return drop_sealed(store);
     }
 
     let info = SegmentInfo {
@@ -101,7 +121,6 @@ pub fn compact(store: &mut Store) -> Result<()> {
     store.manifest.snapshot_seq = 0;
 
     let old_ids: Vec<u32> = store.manifest.sealed.iter().map(|s| s.id).collect();
-    store.manifest.next_segment_id += 1;
     store.manifest.sealed = vec![info];
     store.manifest.tombstone_bytes = 0;
     store.manifest.store(&store.dir)?;
@@ -164,22 +183,12 @@ fn copy_record(
     })
 }
 
-/// Drop every sealed segment without writing a replacement.
-fn drop_sealed(
-    store: &mut Store,
-    keep: Vec<SegmentInfo>,
-    keep_segment: Option<u32>,
-) -> Result<()> {
-    let old_ids: Vec<u32> = store
-        .manifest
-        .sealed
-        .iter()
-        .map(|s| s.id)
-        .filter(|id| Some(*id) != keep_segment)
-        .collect();
+/// Drop every sealed segment without writing a replacement, because nothing in them is live.
+fn drop_sealed(store: &mut Store) -> Result<()> {
+    let old_ids: Vec<u32> = store.manifest.sealed.iter().map(|s| s.id).collect();
     meta_snapshot::remove(&store.dir)?;
     store.manifest.snapshot_seq = 0;
-    store.manifest.sealed = keep;
+    store.manifest.sealed = Vec::new();
     store.manifest.tombstone_bytes = 0;
     store.manifest.store(&store.dir)?;
     store.sealed.clear();

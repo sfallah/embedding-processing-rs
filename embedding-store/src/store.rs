@@ -48,11 +48,27 @@ impl StoreOptions {
 }
 
 /// What an insert displaced, so the caller can keep the indexes in step.
+///
+/// `split_ids` and `summary_ids` are the entities the replaced document owned that the new one
+/// does **not**, so a caller can remove exactly these from its indexes with no risk of deleting a
+/// vector the same insert has just written. Ids the new document reuses — which is the common case,
+/// since ids are a deterministic hash of the document and its sequence numbers — are simply
+/// overwritten and never appear here.
 #[derive(Debug, Clone, Default)]
 pub struct Replaced {
     pub existed: bool,
     pub split_ids: Vec<u64>,
     pub summary_ids: Vec<u64>,
+}
+
+/// What one document's records ended up as, before any of it reaches the maps.
+struct Appended {
+    replaces: bool,
+    /// (summary_id, doc_id, split_id, location)
+    summaries: Vec<(u64, u64, u64, Loc)>,
+    /// (split_id, doc_id, location)
+    splits: Vec<(u64, u64, Loc)>,
+    doc_entry: DocEntry,
 }
 
 pub struct Store {
@@ -62,6 +78,9 @@ pub struct Store {
     pub(crate) sealed: BTreeMap<u32, SealedSegment>,
     pub(crate) active: ActiveSegment,
     pub(crate) maps: Maps,
+    /// Dead bytes in the segment still being appended to. They only become worth compacting once
+    /// that segment is sealed, at which point they move into `manifest.tombstone_bytes`.
+    pub(crate) pending_tombstone_bytes: u64,
 }
 
 impl Store {
@@ -73,7 +92,7 @@ impl Store {
         let dir = dir.as_ref().to_path_buf();
         fs::create_dir_all(&dir).with_context(|| format!("creating {}", dir.display()))?;
 
-        let manifest = match Manifest::load(&dir)? {
+        let mut manifest = match Manifest::load(&dir)? {
             Some(m) => {
                 if m.model_id != opts.model_id {
                     return Err(anyhow!(
@@ -89,6 +108,14 @@ impl Store {
                         dir.display(),
                         m.n_embd,
                         opts.n_embd
+                    ));
+                }
+                if m.dtype != opts.dtype as u8 {
+                    return Err(anyhow!(
+                        "shard {} stores vectors as dtype {}, not {}",
+                        dir.display(),
+                        m.dtype,
+                        opts.dtype as u8
                     ));
                 }
                 m
@@ -109,22 +136,44 @@ impl Store {
         }
         let mut active = ActiveSegment::open(&dir, manifest.active)?;
 
-        // The snapshot only counts if it is the one this manifest describes.
+        // The snapshot only counts if it is the one this manifest describes, and if every
+        // location in it still fits inside the segments on disk. A snapshot that outruns the log
+        // was published before a tail that never reached the device; trusting it would let replay
+        // skip those records as already covered, find no torn tail to truncate, and let the next
+        // append land on locations the maps still point at.
+        let mut rejected_snapshot = None;
         let (mut maps, snapshot_seq) = match meta_snapshot::load(&dir) {
-            Ok(Some((maps, seq))) if seq == manifest.snapshot_seq => (maps, seq),
-            Ok(Some((_, seq))) => {
-                warn!(
-                    "ignoring meta snapshot at seq {} (manifest says {}); replaying the log",
+            Ok(Some((_maps, seq))) if seq != manifest.snapshot_seq => {
+                rejected_snapshot = Some(format!(
+                    "it is at seq {} but the manifest says {}",
                     seq, manifest.snapshot_seq
-                );
+                ));
                 (Maps::default(), 0)
             }
+            Ok(Some((maps, _seq))) if !locations_fit(&maps, &sealed, &active) => {
+                rejected_snapshot = Some("it points past the end of the log".to_string());
+                (Maps::default(), 0)
+            }
+            Ok(Some((maps, seq))) => (maps, seq),
             Ok(None) => (Maps::default(), 0),
             Err(e) => {
-                warn!("meta snapshot unusable ({}); replaying the log", e);
+                rejected_snapshot = Some(e.to_string());
                 (Maps::default(), 0)
             }
         };
+
+        if let Some(reason) = rejected_snapshot {
+            // Delete it and say so in the manifest. Leaving it in place would let the next open
+            // trust it again once the segment has grown back past the locations it names.
+            warn!(
+                "discarding the meta snapshot for {} ({}); replaying the log in full",
+                dir.display(),
+                reason
+            );
+            meta_snapshot::remove(&dir)?;
+            manifest.snapshot_seq = 0;
+            manifest.store(&dir)?;
+        }
 
         let mut max_seq = snapshot_seq;
         for info in &manifest.sealed {
@@ -162,6 +211,7 @@ impl Store {
             sealed,
             active,
             maps,
+            pending_tombstone_bytes: 0,
         };
         store.manifest.next_seq = store.manifest.next_seq.max(max_seq + 1);
         info!(
@@ -216,29 +266,87 @@ impl Store {
     /// Nothing is written until every split and summary has been checked, so a rejected document
     /// leaves no partial state. A replacement writes a `DeleteDoc` first, which is what makes
     /// re-inserting a url whose content changed drop the old splits instead of orphaning them.
+    ///
+    /// The append phase is all-or-nothing: nothing touches the maps until every record is on the
+    /// log, and a failure part way rewinds the segment, so the maps can never hold entities that
+    /// a replay would not reproduce.
     pub fn insert(&mut self, doc: &DocumentDto) -> Result<Replaced> {
         let summaries = self.validate(doc)?;
 
+        let rewind_len = self.active.len;
+        let rewind_seq = self.manifest.next_seq;
+        let appended = match self.append_document(doc, &summaries) {
+            Ok(appended) => appended,
+            Err(e) => {
+                // Put the segment back where it was; the partially written records are unreachable
+                // and would otherwise be replayed as a torn insert on the next open.
+                if let Err(rewind_err) = self.active.truncate_to(rewind_len) {
+                    return Err(e.context(format!(
+                        "and the segment could not be rewound to {}: {}",
+                        rewind_len, rewind_err
+                    )));
+                }
+                self.manifest.next_seq = rewind_seq;
+                return Err(e);
+            }
+        };
+
         let doc_id = doc.document_id;
         let mut replaced = Replaced::default();
-        if self.maps.docs.contains_key(&doc_id) {
-            let seq = self.next_seq();
-            let meta = rmp_serde::to_vec_named(&DeleteMeta { doc_id })?;
-            let bytes = encode(seq, RecordKind::DeleteDoc, VectorDtype::None, &meta, &[]);
-            self.active.append(&bytes, seq)?;
+        if appended.replaces {
             let active_id = self.active.id;
             let removed = self
                 .maps
                 .remove_doc(doc_id, active_id)
-                .expect("document was present a moment ago");
+                .expect("document was present when the insert started");
             self.manifest.tombstone_bytes += removed.sealed_bytes;
+            self.pending_tombstone_bytes += removed.active_bytes;
             replaced.existed = true;
             replaced.split_ids = removed.split_ids;
             replaced.summary_ids = removed.summary_ids;
         }
 
+        for (summary_id, doc_id, split_id, loc) in appended.summaries {
+            self.maps.summaries.insert(
+                summary_id,
+                SummaryEntry {
+                    doc_id,
+                    split_id,
+                    loc,
+                },
+            );
+        }
+        for (split_id, doc_id, loc) in appended.splits {
+            self.maps.splits.insert(split_id, SplitEntry { doc_id, loc });
+        }
+        self.maps.docs.insert(doc_id, appended.doc_entry);
+
+        // Ids the new document reuses were overwritten in place, not removed: reporting them as
+        // removed would make a caller drop vectors this very insert has just written.
+        let live_splits: HashSet<u64> = doc.splits.iter().map(|s| s.split_id).collect();
+        let live_summaries: HashSet<u64> = summaries.iter().map(|s| s.summary_id).collect();
+        replaced.split_ids.retain(|id| !live_splits.contains(id));
+        replaced.summary_ids.retain(|id| !live_summaries.contains(id));
+
+        self.active.flush()?;
+        self.seal_if_needed()?;
+        Ok(replaced)
+    }
+
+    /// Write every record of a document to the log without touching the maps.
+    fn append_document(&mut self, doc: &DocumentDto, summaries: &[SummaryDto]) -> Result<Appended> {
+        let doc_id = doc.document_id;
+        let replaces = self.maps.docs.contains_key(&doc_id);
+        if replaces {
+            let seq = self.next_seq();
+            let meta = rmp_serde::to_vec_named(&DeleteMeta { doc_id })?;
+            let bytes = encode(seq, RecordKind::DeleteDoc, VectorDtype::None, &meta, &[]);
+            self.active.append(&bytes, seq)?;
+        }
+
         // Summaries first, then splits, then the document: a torn insert replays as nothing.
-        for summary in &summaries {
+        let mut summary_locs = Vec::with_capacity(summaries.len());
+        for summary in summaries {
             let meta = rmp_serde::to_vec_named(&SummaryMeta {
                 summary_id: summary.summary_id,
                 doc_id: summary.document_id,
@@ -254,20 +362,14 @@ impl Store {
                     .unwrap_or(self.opts.model_id),
             })?;
             let vector = encode_vector(
-                &summary.embedding.as_ref().expect("checked above").embedding,
+                &summary.embedding.as_ref().expect("checked by validate").embedding,
                 self.opts.dtype,
             );
             let loc = self.append(RecordKind::Summary, &meta, &vector)?;
-            self.maps.summaries.insert(
-                summary.summary_id,
-                SummaryEntry {
-                    doc_id: summary.document_id,
-                    split_id: summary.split_id,
-                    loc,
-                },
-            );
+            summary_locs.push((summary.summary_id, summary.document_id, summary.split_id, loc));
         }
 
+        let mut split_locs = Vec::with_capacity(doc.splits.len());
         for split in &doc.splits {
             let meta = rmp_serde::to_vec_named(&SplitMeta {
                 split_id: split.split_id,
@@ -283,17 +385,11 @@ impl Store {
                     .unwrap_or(self.opts.model_id),
             })?;
             let vector = encode_vector(
-                &split.embedding.as_ref().expect("checked above").embedding,
+                &split.embedding.as_ref().expect("checked by validate").embedding,
                 self.opts.dtype,
             );
             let loc = self.append(RecordKind::Split, &meta, &vector)?;
-            self.maps.splits.insert(
-                split.split_id,
-                SplitEntry {
-                    doc_id: split.doc_id,
-                    loc,
-                },
-            );
+            split_locs.push((split.split_id, split.doc_id, loc));
         }
 
         let doc_summary_ids: Option<Vec<u64>> = doc
@@ -318,9 +414,11 @@ impl Store {
             .filter(|id| !in_doc_list.contains(id) && seen.insert(*id))
             .collect();
 
-        self.maps.docs.insert(
-            doc_id,
-            DocEntry {
+        Ok(Appended {
+            replaces,
+            summaries: summary_locs,
+            splits: split_locs,
+            doc_entry: DocEntry {
                 url: doc.document_url.clone(),
                 split_ids: doc.splits.iter().map(|s| s.split_id).collect(),
                 summary_ids: doc_summary_ids,
@@ -328,11 +426,7 @@ impl Store {
                 seq,
                 loc,
             },
-        );
-
-        self.active.flush()?;
-        self.seal_if_needed()?;
-        Ok(replaced)
+        })
     }
 
     /// Remove a document and everything it owns.
@@ -350,6 +444,7 @@ impl Store {
             .remove_doc(doc_id, active_id)
             .expect("document was present a moment ago");
         self.manifest.tombstone_bytes += removed.sealed_bytes;
+        self.pending_tombstone_bytes += removed.active_bytes;
         self.active.flush()?;
         self.seal_if_needed()?;
         Ok(Some(removed))
@@ -445,8 +540,9 @@ impl Store {
         let new_active = ActiveSegment::open(&self.dir, new_id)?;
         let old = std::mem::replace(&mut self.active, new_active);
 
+        let sealed_id = old.id;
         let info = SegmentInfo {
-            id: old.id,
+            id: sealed_id,
             bytes: old.len,
             first_seq: old.first_seq.unwrap_or(0),
             last_seq: old.last_seq,
@@ -455,8 +551,12 @@ impl Store {
         self.sealed.insert(info.id, sealed);
         self.manifest.sealed.push(info);
         self.manifest.active = new_id;
+        // Records that died while this segment was active are now dead bytes in a sealed segment,
+        // which is exactly what the compaction ratio measures.
+        self.manifest.tombstone_bytes += self.pending_tombstone_bytes;
+        self.pending_tombstone_bytes = 0;
         self.manifest.store(&self.dir)?;
-        info!("sealed segment {}, new active {}", new_id - 1, new_id);
+        info!("sealed segment {}, new active {}", sealed_id, new_id);
         Ok(())
     }
 
@@ -470,8 +570,14 @@ impl Store {
     }
 
     /// Write `meta.snap` and record in the manifest how far it is caught up.
+    ///
+    /// The log is fsynced first. Publishing a `snapshot_seq` that covers records still sitting in
+    /// the page cache would, after a power loss, leave the maps pointing into a segment that is
+    /// shorter than they believe: replay would skip those records as already covered, find no torn
+    /// tail to truncate, and the next append would land on top of locations the snapshot still
+    /// names.
     pub fn snapshot_meta(&mut self) -> Result<u64> {
-        self.active.flush()?;
+        self.active.sync()?;
         let snapshot_seq = self.manifest.next_seq.saturating_sub(1);
         meta_snapshot::store(&self.dir, &self.maps, snapshot_seq)?;
         self.manifest.snapshot_seq = snapshot_seq;
@@ -591,6 +697,10 @@ impl Store {
     }
 
     /// The document id a url maps to in this shard, if it is present.
+    ///
+    /// This is a linear scan and is meant for diagnostics and for the migration tool. The server
+    /// path never needs it: `doc_id` is a deterministic hash of the url, so a caller that has the
+    /// same hasher looks the document up by id directly.
     pub fn doc_id_for_url(&self, url: &str) -> Option<u64> {
         self.maps
             .docs
@@ -599,11 +709,11 @@ impl Store {
             .map(|(id, _)| *id)
     }
 
-    /// Hand every live vector of one kind to `f`, as the bytes stored in the log. Used to rebuild
-    /// a usearch index without going through `f32`.
+    /// Hand every live vector of one kind to `f`, as the bytes stored in the log together with
+    /// their dtype. Used to rebuild a usearch index without going through `f32`.
     pub fn for_each_live_vector<F>(&self, kind: EntityKind, mut f: F) -> Result<()>
     where
-        F: FnMut(u64, &[u8]) -> Result<()>,
+        F: FnMut(u64, &[u8], VectorDtype) -> Result<()>,
     {
         let locs: Vec<(u64, Loc)> = match kind {
             EntityKind::Split => self.maps.splits.iter().map(|(id, e)| (*id, e.loc)).collect(),
@@ -617,7 +727,7 @@ impl Store {
         for (id, loc) in locs {
             let bytes = self.read_record(loc)?;
             let view = decode(&bytes).map_err(|e| anyhow!("record {}: {}", id, e))?;
-            f(id, view.vector)?;
+            f(id, view.vector, view.dtype)?;
         }
         Ok(())
     }
@@ -643,6 +753,28 @@ impl Store {
         crate::compact::compact(self)
     }
 
+}
+
+/// Does every location in the maps sit inside a segment that is actually that long?
+fn locations_fit(
+    maps: &Maps,
+    sealed: &BTreeMap<u32, SealedSegment>,
+    active: &ActiveSegment,
+) -> bool {
+    let fits = |loc: &Loc| -> bool {
+        let end = loc.offset + loc.len as u64;
+        if loc.segment == active.id {
+            end <= active.len
+        } else {
+            match sealed.get(&loc.segment) {
+                Some(segment) => end <= segment.len(),
+                None => false,
+            }
+        }
+    };
+    maps.docs.values().all(|e| fits(&e.loc))
+        && maps.splits.values().all(|e| fits(&e.loc))
+        && maps.summaries.values().all(|e| fits(&e.loc))
 }
 
 /// Delete `records-*.seg` files the manifest does not reference. A crash during compaction, after

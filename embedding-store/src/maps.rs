@@ -80,7 +80,7 @@ impl Maps {
         let mut removed_summaries = Vec::new();
         let mut sealed_bytes = 0u64;
         let mut active_bytes = 0u64;
-        let mut account = |loc: &Loc, sealed: &mut u64, active: &mut u64| {
+        let account = |loc: &Loc, sealed: &mut u64, active: &mut u64| {
             if loc.segment == active_segment {
                 *active += loc.len as u64;
             } else {
@@ -103,7 +103,6 @@ impl Maps {
                 removed_summaries.push(summary_id);
             }
         }
-        drop(account);
 
         Some(RemovedDoc {
             entry,

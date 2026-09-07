@@ -23,6 +23,18 @@ pub mod replay;
 pub mod segment;
 pub mod store;
 
+/// Make a rename durable. Writing a temp file and renaming it only guarantees "old or new" once
+/// the directory entry itself has reached the device.
+pub(crate) fn fsync_dir(dir: &std::path::Path) -> anyhow::Result<()> {
+    let f = std::fs::File::open(dir)?;
+    // Directory fsync is not supported everywhere; a failure here is not fatal to correctness of
+    // the current process, only to the crash guarantee, so it is logged rather than propagated.
+    if let Err(e) = f.sync_all() {
+        tracing::debug!("could not fsync directory {}: {}", dir.display(), e);
+    }
+    Ok(())
+}
+
 pub mod prelude {
     pub use crate::manifest::{Manifest, SegmentInfo};
     pub use crate::maps::{DocEntry, Loc, Maps, SplitEntry, SummaryEntry};

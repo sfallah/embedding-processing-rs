@@ -68,7 +68,7 @@ pub fn scan_segment(
         let view = match decode(&bytes[offset..]) {
             Ok(view) => view,
             Err(e) => {
-                if allow_torn_tail && is_torn(&e) {
+                if allow_torn_tail && is_torn_tail(&e, &bytes[offset..]) {
                     scan.torn_at = Some(offset as u64);
                     break;
                 }
@@ -114,15 +114,24 @@ pub fn scan_segment(
     Ok(scan)
 }
 
-fn is_torn(e: &DecodeError) -> bool {
-    matches!(
-        e,
-        DecodeError::Truncated { .. }
-            | DecodeError::BadCrc { .. }
-            | DecodeError::BadLength(_)
-            | DecodeError::BadKind(_)
-            | DecodeError::BadDtype(_)
-    )
+/// Is this bad record a torn write rather than corruption?
+///
+/// A record that runs past the end of the file can only be a torn write. A record that is fully
+/// present but fails its checksum is only treated as one when nothing follows it: if there is a
+/// complete record after it, the damage is in the middle of the log and discarding everything
+/// from there on would silently destroy good documents, so it is reported instead.
+fn is_torn_tail(e: &DecodeError, rest: &[u8]) -> bool {
+    match e {
+        DecodeError::Truncated { .. } => true,
+        DecodeError::BadCrc { .. }
+        | DecodeError::BadLength(_)
+        | DecodeError::BadKind(_)
+        | DecodeError::BadDtype(_) => match crate::record::peek_len(rest) {
+            // The frame claims a length that reaches the end of the file: nothing follows.
+            Some(len) => len as usize >= rest.len(),
+            None => true,
+        },
+    }
 }
 
 fn apply(
