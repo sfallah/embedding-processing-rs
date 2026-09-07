@@ -1,5 +1,5 @@
 [index]
-dimensions = 1024
+dimensions = 768
 scalar_kind = "F16"
 connectivity = 16
 expansion_add = 200
@@ -10,18 +10,20 @@ metric_kind = "Cos"
 #max_tokens = 512
 max_tokens = 400
 #hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
+hf_model_id = "google/embeddinggemma-300m"
 #hf_model_id = "intfloat/multilingual-e5-large-instruct"
-hf_model_id = "BAAI/bge-m3"
+#hf_model_id = "BAAI/bge-m3"
 #patterns = [["\n\n"], ["\n"], [".", "!", "?"]]
 
 [embedding_model]
 #path = "sentence-transformers/all-MiniLM-L6-v2"
+path = "models/embeddinggemma-300m-sentence-transformers-qat-q4_0.gguf"
 #path = "models/multilingual-e5-large-instruct-q4_k_m.gguf"
-path = "models/bge-m3-q4_k_m.gguf"
+#path = "models/bge-m3-q4_k_m.gguf"
 #n_ctx = 8192
 n_ctx = 512
-n_embd = 1024
-#n_embd = 384
+#n_embd = 1024
+n_embd = 768
 
 [database]
 #rocksdb_dir = "rocksdb_dir"

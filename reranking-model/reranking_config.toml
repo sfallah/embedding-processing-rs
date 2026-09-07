@@ -1,11 +1,11 @@
 
 
 [model]
-#gguf_file = "models/bge-reranker-v2-m3-q4_k_m.gguf"
+gguf_file = "models/bge-reranker-v2-m3-q4_k_m.gguf"
 #gguf_file = "models/bge-reranker-v2-m3-f16.gguf"
 #gguf_file = "models/jina-reranker-v1-tiny-en-q4_k_m.gguf"
 #gguf_file = "models/Jina-Bert-Implementation-33M-F16.gguf"
-gguf_file = "models/bge-reranker-base-q4_k_m.gguf"
+#gguf_file = "models/bge-reranker-base-q4_k_m.gguf"
 #gguf_file = "models/Xlm-Roberta-Base-278M-F16.gguf"
 #cpu = false
 ngl = 1000

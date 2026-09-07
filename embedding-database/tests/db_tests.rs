@@ -26,6 +26,33 @@ mod tests {
     }
 
     #[test]
+    fn test_upsert() -> Result<()> {
+        // Arrange
+        let temp_dir = TempDir::new("test_rocksdb_upsert")?;
+        let db_path = temp_dir.path().to_str().unwrap();
+        let rocksdb = RocksDB::open(db_path)?;
+        let key: u64 = Faker.fake();
+        let value: String = Sentence(1..3).fake();
+
+        // Act
+        rocksdb.put(ColumnFamilyType::Default, &key, value.as_bytes())?;
+
+        // Assert
+        let retrieved_value = rocksdb.get(ColumnFamilyType::Default, &key)?;
+        assert_eq!(retrieved_value, Some(value.into_bytes()));
+
+        // Act again with a different value
+        let new_value: String = Sentence(2..4).fake();
+        rocksdb.put(ColumnFamilyType::Default, &key, new_value.as_bytes())?;
+
+        // Assert again
+        let updated_value = rocksdb.get(ColumnFamilyType::Default, &key)?;
+        assert_eq!(updated_value, Some(new_value.into_bytes()));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get() -> Result<()> {
         // Arrange
         let temp_dir = TempDir::new("test_rocksdb_get")?;
@@ -105,6 +132,23 @@ mod tests {
         let value: String = Sentence(3..5).fake();
 
         rocksdb.put(ColumnFamilyType::Default, &key, value.as_bytes())?;
+
+        // Act
+        rocksdb.delete(ColumnFamilyType::Default, &key)?;
+
+        // Assert
+        let retrieved_value = rocksdb.get(ColumnFamilyType::Default, &key)?;
+        assert!(retrieved_value.is_none());
+
+        Ok(())
+    }
+    #[test]
+    fn text_delete_non_existent() -> Result<()> {
+        // Arrange
+        let temp_dir = TempDir::new("test_rocksdb_delete_non_existent")?;
+        let db_path = temp_dir.path().to_str().unwrap();
+        let rocksdb = RocksDB::open(db_path)?;
+        let key: u64 = Faker.fake();
 
         // Act
         rocksdb.delete(ColumnFamilyType::Default, &key)?;
