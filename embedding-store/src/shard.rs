@@ -132,17 +132,47 @@ pub struct Shard {
     from_snapshot: bool,
 }
 
+/// How a shard's indexes are held in memory.
+///
+/// A shard nobody is writing to does not need its graphs resident: usearch can answer searches
+/// from the mapped file. `Viewed` is what the pool demotes a cold shard to instead of dropping it,
+/// so its record maps stay and a later read costs nothing (decision D3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexResidency {
+    /// Graphs in memory, writable.
+    Loaded,
+    /// Graphs mapped from the saved files, read-only. Falls back to `Loaded` when there is no
+    /// saved index to map, because a rebuilt graph has nowhere to be mapped from.
+    Viewed,
+}
+
 impl Shard {
     pub fn open(dir: impl AsRef<Path>, opts: ShardOptions) -> Result<Self> {
+        Self::open_with(dir, opts, IndexResidency::Loaded)
+    }
+
+    /// Open, preferring `residency`. `Viewed` is only honoured when the saved index files are
+    /// usable; otherwise the indexes are rebuilt and the shard comes back `Loaded`.
+    pub fn open_with(
+        dir: impl AsRef<Path>,
+        opts: ShardOptions,
+        residency: IndexResidency,
+    ) -> Result<Self> {
         let dir = dir.as_ref().to_path_buf();
         let store = Store::open(&dir, opts.store_options())?;
         let splits = VectorIndex::create(&dir, "splits", &opts.index)?;
         let summaries = VectorIndex::create(&dir, "summaries", &opts.index)?;
 
+        let read_back = |index: &VectorIndex| match residency {
+            IndexResidency::Loaded => index.load(),
+            IndexResidency::Viewed => index.view(),
+        };
+
         let from_snapshot = match snapshot_is_usable(&dir, &store, &splits, &summaries) {
-            Ok(()) => match (splits.load(), summaries.load()) {
+            Ok(()) => match (read_back(&splits), read_back(&summaries)) {
                 (Ok(()), Ok(())) => {
-                    if splits.size() < store.split_count() || summaries.size() < store.summary_count()
+                    if splits.size() < store.split_count()
+                        || summaries.size() < store.summary_count()
                     {
                         warn!(
                             "shard {}: saved indexes hold {}/{} vectors for {}/{} live records, rebuilding",
@@ -222,6 +252,38 @@ impl Shard {
         self.from_snapshot
     }
 
+    pub fn residency(&self) -> IndexResidency {
+        let inner = self.read();
+        if inner.splits.is_viewed() || inner.summaries.is_viewed() {
+            IndexResidency::Viewed
+        } else {
+            IndexResidency::Loaded
+        }
+    }
+
+    /// Make the indexes writable again by reading in what is currently mapped. Cheap — about 2 ms
+    /// per 8 MB — and a no-op on a shard that is already `Loaded`, which is why the write path can
+    /// simply call it.
+    pub fn promote(&self) -> Result<()> {
+        self.write().promote()
+    }
+
+    /// Snapshot, then hand the graphs back to the page cache. The record maps stay resident, so a
+    /// read still costs nothing; only the graphs go.
+    ///
+    /// The snapshot is what makes this safe: there has to be a file to map, and it has to describe
+    /// this exact log.
+    pub fn demote(&self) -> Result<()> {
+        self.snapshot()?;
+        let inner = self.write();
+        if inner.splits.is_viewed() && inner.summaries.is_viewed() {
+            return Ok(());
+        }
+        inner.splits.view()?;
+        inner.summaries.view()?;
+        Ok(())
+    }
+
     // -----------------------------------------------------------------------
     // The lock
     // -----------------------------------------------------------------------
@@ -256,6 +318,10 @@ impl Shard {
     /// the document is not searchable until then.
     pub fn insert(&self, doc: &DocumentDto) -> Result<Replaced> {
         let mut inner = self.write();
+        // usearch refuses `add` on a mapped index, so a cold shard is read in before it is written
+        // to. Nothing has been appended to the log at this point, so a failure here changes
+        // nothing.
+        inner.promote()?;
         let replaced = inner.store.insert(doc)?;
 
         for split_id in &replaced.split_ids {
@@ -301,6 +367,12 @@ impl Shard {
     /// Remove a document, its splits and its summaries from the log and from both indexes.
     pub fn delete(&self, doc_id: u64) -> Result<bool> {
         let mut inner = self.write();
+        // Nothing to do for a document this shard does not hold, and in particular no reason to
+        // read the graphs in.
+        if !inner.store.contains_doc(doc_id) {
+            return Ok(false);
+        }
+        inner.promote()?;
         let Some(removed) = inner.store.delete(doc_id)? else {
             return Ok(false);
         };
@@ -328,8 +400,13 @@ impl Shard {
         top_k: usize,
         doc_filter: Option<&HashSet<u64>>,
     ) -> Result<IndexMap<u64, f32>> {
-        self.read()
-            .search(EntityKind::Split, query, top_k, doc_filter, self.opts.brute_force_max)
+        self.read().search(
+            EntityKind::Split,
+            query,
+            top_k,
+            doc_filter,
+            self.opts.brute_force_max,
+        )
     }
 
     /// The `top_k` nearest summaries, ascending by distance. Filtering as in `search_splits`.
@@ -339,8 +416,13 @@ impl Shard {
         top_k: usize,
         doc_filter: Option<&HashSet<u64>>,
     ) -> Result<IndexMap<u64, f32>> {
-        self.read()
-            .search(EntityKind::Summary, query, top_k, doc_filter, self.opts.brute_force_max)
+        self.read().search(
+            EntityKind::Summary,
+            query,
+            top_k,
+            doc_filter,
+            self.opts.brute_force_max,
+        )
     }
 
     // -----------------------------------------------------------------------
@@ -385,7 +467,9 @@ impl Shard {
         let mut out = Vec::with_capacity(ids.len());
         for id in ids {
             let split = match hit_summaries {
-                Some(_) => inner.store.get_split_without_summaries(*id, with_embeddings)?,
+                Some(_) => inner
+                    .store
+                    .get_split_without_summaries(*id, with_embeddings)?,
                 None => inner.store.get_split(*id, with_embeddings)?,
             };
             let Some(mut split) = split else {
@@ -417,10 +501,7 @@ impl Shard {
             None => None,
         };
         Ok(Some(DocumentDto::new(
-            doc_id,
-            &entry.url,
-            splits,
-            summaries,
+            doc_id, &entry.url, splits, summaries,
         )))
     }
 
@@ -506,11 +587,18 @@ impl Shard {
     /// follows, the index files on disk would describe a position the manifest no longer names
     /// and the next open would rebuild for no reason.
     pub fn compact_if_needed(&self, ratio: f64) -> Result<bool> {
-        let compacted = self.write().store.compact_if_needed(ratio)?;
-        if compacted {
-            self.snapshot()?;
+        {
+            let mut inner = self.write();
+            if !inner.store.needs_compaction(ratio) {
+                return Ok(false);
+            }
+            // Compaction ends in a snapshot, which writes the index files; a mapped index cannot
+            // be the one it is written from, so it is read in first.
+            inner.promote()?;
+            inner.store.compact_if_needed(ratio)?;
         }
-        Ok(compacted)
+        self.snapshot()?;
+        Ok(true)
     }
 
     pub fn stats(&self) -> ShardStats {
@@ -548,6 +636,16 @@ impl Shard {
 }
 
 impl ShardInner {
+    /// Read in whichever graphs are only mapped. A no-op when both are already resident.
+    fn promote(&self) -> Result<()> {
+        for index in [&self.splits, &self.summaries] {
+            if index.is_viewed() {
+                index.load()?;
+            }
+        }
+        Ok(())
+    }
+
     fn index(&self, kind: EntityKind) -> &VectorIndex {
         match kind {
             EntityKind::Split => &self.splits,
@@ -604,7 +702,8 @@ impl ShardInner {
             .map(|entry| match kind {
                 EntityKind::Split => entry.split_ids.len(),
                 EntityKind::Summary => {
-                    entry.summary_ids.as_ref().map_or(0, |ids| ids.len()) + entry.extra_summary_ids.len()
+                    entry.summary_ids.as_ref().map_or(0, |ids| ids.len())
+                        + entry.extra_summary_ids.len()
                 }
             })
             .sum()

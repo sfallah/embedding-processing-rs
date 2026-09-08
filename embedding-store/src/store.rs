@@ -180,7 +180,9 @@ impl Store {
             if info.last_seq <= snapshot_seq {
                 continue;
             }
-            let segment = sealed.get(&info.id).expect("sealed segment was just opened");
+            let segment = sealed
+                .get(&info.id)
+                .expect("sealed segment was just opened");
             let scan = scan_segment(segment.bytes(), info.id, snapshot_seq, &mut maps, false)?;
             max_seq = max_seq.max(scan.last_seq);
             debug!(
@@ -317,7 +319,9 @@ impl Store {
             );
         }
         for (split_id, doc_id, loc) in appended.splits {
-            self.maps.splits.insert(split_id, SplitEntry { doc_id, loc });
+            self.maps
+                .splits
+                .insert(split_id, SplitEntry { doc_id, loc });
         }
         self.maps.docs.insert(doc_id, appended.doc_entry);
 
@@ -326,7 +330,9 @@ impl Store {
         let live_splits: HashSet<u64> = doc.splits.iter().map(|s| s.split_id).collect();
         let live_summaries: HashSet<u64> = summaries.iter().map(|s| s.summary_id).collect();
         replaced.split_ids.retain(|id| !live_splits.contains(id));
-        replaced.summary_ids.retain(|id| !live_summaries.contains(id));
+        replaced
+            .summary_ids
+            .retain(|id| !live_summaries.contains(id));
 
         self.active.flush()?;
         self.seal_if_needed()?;
@@ -362,11 +368,20 @@ impl Store {
                     .unwrap_or(self.opts.model_id),
             })?;
             let vector = encode_vector(
-                &summary.embedding.as_ref().expect("checked by validate").embedding,
+                &summary
+                    .embedding
+                    .as_ref()
+                    .expect("checked by validate")
+                    .embedding,
                 self.opts.dtype,
             );
             let loc = self.append(RecordKind::Summary, &meta, &vector)?;
-            summary_locs.push((summary.summary_id, summary.document_id, summary.split_id, loc));
+            summary_locs.push((
+                summary.summary_id,
+                summary.document_id,
+                summary.split_id,
+                loc,
+            ));
         }
 
         let mut split_locs = Vec::with_capacity(doc.splits.len());
@@ -385,7 +400,11 @@ impl Store {
                     .unwrap_or(self.opts.model_id),
             })?;
             let vector = encode_vector(
-                &split.embedding.as_ref().expect("checked by validate").embedding,
+                &split
+                    .embedding
+                    .as_ref()
+                    .expect("checked by validate")
+                    .embedding,
                 self.opts.dtype,
             );
             let loc = self.append(RecordKind::Split, &meta, &vector)?;
@@ -457,30 +476,31 @@ impl Store {
         let mut distinct: Vec<SummaryDto> = Vec::new();
         let mut seen = HashSet::new();
 
-        let check_embedding = |what: &str, id: u64, embedding: &Option<EmbeddingDto>| -> Result<()> {
-            let Some(e) = embedding else {
-                return Err(anyhow!("{} {} has no embedding", what, id));
+        let check_embedding =
+            |what: &str, id: u64, embedding: &Option<EmbeddingDto>| -> Result<()> {
+                let Some(e) = embedding else {
+                    return Err(anyhow!("{} {} has no embedding", what, id));
+                };
+                if e.embedding.len() != self.opts.n_embd {
+                    return Err(anyhow!(
+                        "{} {} has {} dimensions, shard holds {}",
+                        what,
+                        id,
+                        e.embedding.len(),
+                        self.opts.n_embd
+                    ));
+                }
+                if e.model_id != self.opts.model_id {
+                    return Err(anyhow!(
+                        "{} {} comes from model {:#x}, shard holds {:#x}",
+                        what,
+                        id,
+                        e.model_id,
+                        self.opts.model_id
+                    ));
+                }
+                Ok(())
             };
-            if e.embedding.len() != self.opts.n_embd {
-                return Err(anyhow!(
-                    "{} {} has {} dimensions, shard holds {}",
-                    what,
-                    id,
-                    e.embedding.len(),
-                    self.opts.n_embd
-                ));
-            }
-            if e.model_id != self.opts.model_id {
-                return Err(anyhow!(
-                    "{} {} comes from model {:#x}, shard holds {:#x}",
-                    what,
-                    id,
-                    e.model_id,
-                    self.opts.model_id
-                ));
-            }
-            Ok(())
-        };
 
         for summary in doc.summaries.iter().flatten() {
             check_embedding("summary", summary.summary_id, &summary.embedding)?;
@@ -656,7 +676,11 @@ impl Store {
         }
     }
 
-    fn read_split(&self, split_id: u64, with_embedding: bool) -> Result<Option<(SplitMeta, Option<EmbeddingDto>)>> {
+    fn read_split(
+        &self,
+        split_id: u64,
+        with_embedding: bool,
+    ) -> Result<Option<(SplitMeta, Option<EmbeddingDto>)>> {
         let Some(entry) = self.maps.splits.get(&split_id) else {
             return Ok(None);
         };
@@ -675,7 +699,11 @@ impl Store {
         Ok(Some((meta, embedding)))
     }
 
-    fn read_summary(&self, summary_id: u64, with_embedding: bool) -> Result<Option<(SummaryMeta, Option<EmbeddingDto>)>> {
+    fn read_summary(
+        &self,
+        summary_id: u64,
+        with_embedding: bool,
+    ) -> Result<Option<(SummaryMeta, Option<EmbeddingDto>)>> {
         let Some(entry) = self.maps.summaries.get(&summary_id) else {
             return Ok(None);
         };
@@ -695,7 +723,11 @@ impl Store {
     }
 
     /// One summary, or `None` when the id is unknown.
-    pub fn get_summary(&self, summary_id: u64, with_embeddings: bool) -> Result<Option<SummaryDto>> {
+    pub fn get_summary(
+        &self,
+        summary_id: u64,
+        with_embeddings: bool,
+    ) -> Result<Option<SummaryDto>> {
         Ok(self
             .read_summary(summary_id, with_embeddings)?
             .map(|(meta, embedding)| summary_dto(meta, embedding)))
@@ -758,10 +790,7 @@ impl Store {
             None => None,
         };
         Ok(Some(DocumentDto::new(
-            doc_id,
-            &entry.url,
-            splits,
-            summaries,
+            doc_id, &entry.url, splits, summaries,
         )))
     }
 
@@ -785,7 +814,12 @@ impl Store {
         F: FnMut(u64, &[u8], VectorDtype) -> Result<()>,
     {
         let locs: Vec<(u64, Loc)> = match kind {
-            EntityKind::Split => self.maps.splits.iter().map(|(id, e)| (*id, e.loc)).collect(),
+            EntityKind::Split => self
+                .maps
+                .splits
+                .iter()
+                .map(|(id, e)| (*id, e.loc))
+                .collect(),
             EntityKind::Summary => self
                 .maps
                 .summaries
@@ -805,13 +839,19 @@ impl Store {
     // Compaction
     // -----------------------------------------------------------------------
 
+    /// Whether dead records take up more than `ratio` of the sealed segments.
+    ///
+    /// Separate from the rewrite so a caller can find out before doing anything expensive: a
+    /// shard whose indexes are only mapped has to read them in first, and that is not worth doing
+    /// unless there is really something to compact.
+    pub fn needs_compaction(&self, ratio: f64) -> bool {
+        let sealed_bytes = self.manifest.sealed_bytes();
+        sealed_bytes > 0 && (self.manifest.tombstone_bytes as f64) / (sealed_bytes as f64) > ratio
+    }
+
     /// Rewrite the sealed segments when dead records take up more than `ratio` of them.
     pub fn compact_if_needed(&mut self, ratio: f64) -> Result<bool> {
-        let sealed_bytes = self.manifest.sealed_bytes();
-        if sealed_bytes == 0 {
-            return Ok(false);
-        }
-        if (self.manifest.tombstone_bytes as f64) / (sealed_bytes as f64) <= ratio {
+        if !self.needs_compaction(ratio) {
             return Ok(false);
         }
         self.compact()?;
@@ -821,7 +861,6 @@ impl Store {
     pub fn compact(&mut self) -> Result<()> {
         crate::compact::compact(self)
     }
-
 }
 
 /// Does every location in the maps sit inside a segment that is actually that long?

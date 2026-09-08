@@ -2,9 +2,14 @@
 //!
 //! A workspace's shard lives at `<dir>/<uuid>/`. [`ShardPool::get`] opens it on first use (or
 //! creates it empty) and hands back an `Arc`; when the loaded shards' index residency exceeds the
-//! budget, the least recently used ones that no caller is holding are snapshotted and dropped.
-//! The next `get` reopens them from that snapshot, which is why eviction costs a reload rather
-//! than a rebuild.
+//! budget, the least recently used ones that no caller is holding are snapshotted and demoted —
+//! their graphs are handed back to the page cache and mapped instead (decision D3). A demoted
+//! shard still answers reads at full speed and keeps its record maps; the first write to it reads
+//! the graphs back in.
+//!
+//! What that costs: a demoted shard is still open, so its record maps stay resident. The budget
+//! counts index residency only, so a pool that has seen very many workspaces holds every one of
+//! their maps. Measuring that is the 500k row's job.
 //!
 //! What the budget does and does not cover:
 //!
@@ -25,7 +30,7 @@
 //!   removes the entry, so no `get` can open a second `Shard` on a directory whose first one is
 //!   still alive. Two `Shard`s on one log would each own the active segment.
 
-use crate::shard::{Shard, ShardOptions};
+use crate::shard::{IndexResidency, Shard, ShardOptions};
 use anyhow::{Context, Result};
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -62,8 +67,10 @@ struct Entry {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PoolStats {
-    /// Shards currently in memory.
+    /// Shards currently open, in either residency.
     pub loaded: usize,
+    /// How many of those hold their graphs mapped rather than resident.
+    pub viewed: usize,
     /// What their indexes hold resident.
     pub memory_bytes: usize,
     pub budget_bytes: usize,
@@ -89,7 +96,7 @@ impl ShardPool {
     }
 
     /// Memory budget in mebibytes, as `[storage] memory_budget_mb` gives it. A budget smaller
-    /// than one shard's indexes does not shrink anything; it only makes the pool reload on every
+    /// than one shard's indexes does not shrink anything; it only makes the pool demote on every
     /// request, so size it above the working set.
     pub fn with_memory_budget_mb(self, mb: usize) -> Self {
         self.with_memory_budget_bytes(mb.saturating_mul(1 << 20))
@@ -115,6 +122,10 @@ impl ShardPool {
     /// The shard for `workspace`, opened from disk or created empty, then evicts other shards as
     /// needed to get back under budget. The returned `Arc` pins it for as long as it is held.
     pub fn get(&self, workspace: Uuid) -> Result<Arc<Shard>> {
+        self.get_with(workspace, IndexResidency::Loaded)
+    }
+
+    fn get_with(&self, workspace: Uuid, residency: IndexResidency) -> Result<Arc<Shard>> {
         if let Some(shard) = self.peek(workspace) {
             return Ok(shard);
         }
@@ -134,7 +145,7 @@ impl ShardPool {
         };
         let opening = gate.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
 
-        let opened = self.open_and_insert(workspace);
+        let opened = self.open_and_insert(workspace, residency);
 
         // Both must happen whether or not the open worked: on failure the gate has to go so the
         // next caller can retry, and a waiter that already holds it keeps it alive until then.
@@ -156,6 +167,9 @@ impl ShardPool {
     /// The shard for `workspace` only when it already has a directory. Reads use this so a
     /// request naming a workspace that was never written does not leave an empty shard behind;
     /// only an insert should bring one into existence.
+    ///
+    /// A shard opened this way maps its graphs rather than reading them in: a query has no reason
+    /// to make a workspace's whole index resident, and the first write promotes it anyway.
     pub fn get_existing(&self, workspace: Uuid) -> Result<Option<Arc<Shard>>> {
         if let Some(shard) = self.peek(workspace) {
             return Ok(Some(shard));
@@ -163,7 +177,7 @@ impl ShardPool {
         if !self.shard_dir(workspace).is_dir() {
             return Ok(None);
         }
-        self.get(workspace).map(Some)
+        self.get_with(workspace, IndexResidency::Viewed).map(Some)
     }
 
     /// The shard for `workspace` only if it is already loaded. Bumps its recency.
@@ -185,13 +199,44 @@ impl ShardPool {
             .collect()
     }
 
-    /// Snapshots `workspace`'s shard and unloads it, unless a caller still holds it. Returns
-    /// whether it was unloaded.
+    /// Snapshots `workspace`'s shard and demotes it to mapped graphs, unless a caller still holds
+    /// it. Returns whether it was demoted.
     pub fn evict(&self, workspace: Uuid) -> Result<bool> {
         let Some(shard) = self.claim_for_eviction(workspace) else {
             return Ok(false);
         };
-        self.snapshot_and_remove(workspace, shard)
+        self.demote(workspace, shard)
+    }
+
+    /// Close `workspace`'s shard altogether, maps included, unless a caller still holds it.
+    ///
+    /// Demotion is what the budget does; this is for a caller that wants the memory back, and it
+    /// costs a full reopen next time rather than a promote.
+    pub fn close(&self, workspace: Uuid) -> Result<bool> {
+        let Some(shard) = self.claim_for_eviction(workspace) else {
+            return Ok(false);
+        };
+        if let Err(e) = shard.snapshot() {
+            warn!(
+                "workspace {}: not closing, its snapshot failed: {:#}",
+                workspace, e
+            );
+            return Err(e);
+        }
+        let mut inner = self.lock();
+        let Some(entry) = inner.shards.get(&workspace) else {
+            return Ok(false);
+        };
+        // The map's reference plus ours; anything more means a caller took it while we were
+        // writing and it stays. The entry never leaves the map while the shard is alive, so no
+        // `get` can open a second `Shard` on the same directory.
+        if Arc::strong_count(&entry.shard) > 2 {
+            debug!("workspace {}: not closing, it is in use", workspace);
+            return Ok(false);
+        }
+        inner.shards.remove(&workspace);
+        debug!("workspace {}: closed", workspace);
+        Ok(true)
     }
 
     /// Evicts least-recently-used, unheld shards until the loaded set fits the budget. [`get`]
@@ -224,7 +269,7 @@ impl ShardPool {
             let Some((workspace, shard)) = victim else {
                 return Ok(evicted);
             };
-            if self.snapshot_and_remove(workspace, shard)? {
+            if self.demote(workspace, shard)? {
                 evicted += 1;
             } else {
                 skip.insert(workspace);
@@ -271,6 +316,11 @@ impl ShardPool {
         inner.refresh_bytes();
         PoolStats {
             loaded: inner.shards.len(),
+            viewed: inner
+                .shards
+                .values()
+                .filter(|e| e.shard.residency() == IndexResidency::Viewed)
+                .count(),
             memory_bytes: inner.total_bytes(),
             budget_bytes: self.budget_bytes,
         }
@@ -322,7 +372,7 @@ impl ShardPool {
 
     /// Opens the shard without the pool lock, then publishes it. Called with the workspace's gate
     /// held, so it cannot race another open of the same directory.
-    fn open_and_insert(&self, workspace: Uuid) -> Result<Arc<Shard>> {
+    fn open_and_insert(&self, workspace: Uuid, residency: IndexResidency) -> Result<Arc<Shard>> {
         // Whoever held the gate before us may have done the work already.
         if let Some(shard) = self.peek(workspace) {
             return Ok(shard);
@@ -330,19 +380,20 @@ impl ShardPool {
 
         let dir = self.shard_dir(workspace);
         let shard = Arc::new(
-            Shard::open(&dir, self.opts.clone())
+            Shard::open_with(&dir, self.opts.clone(), residency)
                 .with_context(|| format!("opening shard for workspace {}", workspace))?,
         );
         // Nothing else can reach the shard yet, so this measurement never waits.
         let bytes = shard.stats().index_memory_bytes;
         info!(
-            "workspace {}: shard loaded ({}, {} bytes resident)",
+            "workspace {}: shard opened ({}, {:?}, {} bytes resident)",
             workspace,
             if shard.loaded_from_snapshot() {
                 "from snapshot"
             } else {
                 "rebuilt"
             },
+            shard.residency(),
             bytes
         );
 
@@ -376,31 +427,35 @@ impl ShardPool {
         (Arc::strong_count(&entry.shard) == 1).then(|| entry.shard.clone())
     }
 
-    /// Snapshots a claimed shard and then unloads it, provided nobody started using it in the
-    /// meantime. The entry stays in the map for the whole snapshot: dropping it first would let a
-    /// concurrent `get` open a second `Shard` on the same directory.
-    fn snapshot_and_remove(&self, workspace: Uuid, shard: Arc<Shard>) -> Result<bool> {
-        if let Err(e) = shard.snapshot() {
-            // Keep it loaded rather than lose the writes the snapshot did not capture.
+    /// Snapshot a claimed shard and hand its graphs back to the page cache.
+    ///
+    /// The shard stays in the map throughout, which is what stops a concurrent `get` from opening
+    /// a second `Shard` on the same directory, and is also the point: a demoted shard is still
+    /// open, so a read costs nothing and only the first write pays to read the graphs back in.
+    fn demote(&self, workspace: Uuid, shard: Arc<Shard>) -> Result<bool> {
+        if shard.residency() == IndexResidency::Viewed {
+            // Already as small as demotion makes it; saying so keeps the budget loop from
+            // choosing it again and again.
+            return Ok(false);
+        }
+        if let Err(e) = shard.demote() {
+            // Leave it loaded rather than lose the writes the snapshot did not capture: without a
+            // saved file that describes this log there is nothing safe to map.
             warn!(
-                "workspace {}: not evicting, its snapshot failed: {:#}",
+                "workspace {}: not demoting, its snapshot failed: {:#}",
                 workspace, e
             );
             return Err(e);
         }
-
+        debug!("workspace {}: demoted to mapped indexes", workspace);
+        // Refresh what the budget thinks it costs now, so the loop sees the reduction it just
+        // bought rather than evicting another shard for no reason.
         let mut inner = self.lock();
-        let Some(entry) = inner.shards.get(&workspace) else {
-            return Ok(false);
-        };
-        // The map's reference plus ours. Anything more means a caller took it while we were
-        // writing, and it stays.
-        if Arc::strong_count(&entry.shard) > 2 {
-            debug!("workspace {}: not evicting, it is in use", workspace);
-            return Ok(false);
+        if let Some(entry) = inner.shards.get_mut(&workspace) {
+            if let Some(stats) = entry.shard.try_stats() {
+                entry.bytes = stats.index_memory_bytes;
+            }
         }
-        inner.shards.remove(&workspace);
-        debug!("workspace {}: evicted", workspace);
         Ok(true)
     }
 

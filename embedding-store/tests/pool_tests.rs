@@ -91,6 +91,16 @@ fn build_doc(doc_id: u64, n_splits: usize) -> DocumentDto {
     )
 }
 
+/// The embedding of one of a document's splits, for querying it back.
+fn doc_split_embedding(doc: &DocumentDto, seq: usize) -> Vec<f32> {
+    doc.splits[seq]
+        .embedding
+        .as_ref()
+        .unwrap()
+        .embedding
+        .clone()
+}
+
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -145,24 +155,45 @@ fn eviction_snapshots_so_the_reload_is_not_a_rebuild() {
         !shard.loaded_from_snapshot(),
         "a fresh shard has nothing to load"
     );
+    let hit = &doc_split_embedding(&build_doc(3, 3), 1);
     drop(shard);
 
+    // Eviction demotes: the shard stays open with its graphs mapped instead of resident.
     assert!(pool.evict(ws).unwrap());
-    assert!(!pool.is_loaded(ws));
-    assert_eq!(pool.stats().loaded, 0);
+    assert!(pool.is_loaded(ws));
+    let stats = pool.stats();
+    assert_eq!(stats.loaded, 1);
+    assert_eq!(stats.viewed, 1);
 
-    let reloaded = pool.get(ws).unwrap();
-    assert!(
-        reloaded.loaded_from_snapshot(),
-        "eviction has to snapshot, or every reload pays for a rebuild"
-    );
-    assert_eq!(reloaded.stats().docs, 5);
-    assert_eq!(reloaded.stats().split_index_size, 15);
-    let doc = reloaded
+    // A mapped shard answers reads exactly as it did before, with no reopen.
+    let demoted = pool.peek(ws).unwrap();
+    assert_eq!(demoted.residency(), IndexResidency::Viewed);
+    assert_eq!(demoted.stats().docs, 5);
+    assert_eq!(demoted.stats().split_index_size, 15);
+    let hits = demoted.search_splits(hit, 1, None).unwrap();
+    assert_eq!(hits.len(), 1);
+    let doc = demoted
         .get_doc(3, false)
         .unwrap()
         .expect("document survived");
     assert_eq!(doc.splits.len(), 3);
+
+    // A write reads the graphs back in rather than failing on an immutable index.
+    demoted.insert(&build_doc(6, 3)).unwrap();
+    assert_eq!(demoted.residency(), IndexResidency::Loaded);
+    assert_eq!(demoted.stats().docs, 6);
+    assert_eq!(demoted.stats().split_index_size, 18);
+    drop(demoted);
+
+    // Closing gives back the maps too, and the reopen still loads rather than rebuilds.
+    assert!(pool.close(ws).unwrap());
+    assert!(!pool.is_loaded(ws));
+    let reopened = pool.get(ws).unwrap();
+    assert!(
+        reopened.loaded_from_snapshot(),
+        "eviction has to snapshot, or every reopen pays for a rebuild"
+    );
+    assert_eq!(reopened.stats().docs, 6);
 }
 
 #[test]
@@ -175,13 +206,17 @@ fn a_held_shard_is_never_evicted() {
     held.insert(&build_doc(1, 3)).unwrap();
 
     assert!(!pool.evict(ws).unwrap(), "a caller still holds it");
+    assert!(!pool.close(ws).unwrap(), "nor can it be closed");
     assert_eq!(pool.enforce_budget().unwrap(), 0);
-    assert!(pool.is_loaded(ws));
+    assert_eq!(held.residency(), IndexResidency::Loaded);
 
     // The budget only takes effect once the last holder is done with it.
     drop(held);
     assert_eq!(pool.enforce_budget().unwrap(), 1);
-    assert!(!pool.is_loaded(ws));
+    assert_eq!(pool.stats().viewed, 1);
+
+    // And a shard that is already mapped is not evicted again on the next pass.
+    assert_eq!(pool.enforce_budget().unwrap(), 0);
 }
 
 #[test]
@@ -219,8 +254,16 @@ fn the_budget_evicts_the_least_recently_used_shard() {
     drop(held_b);
 
     assert_eq!(pool.enforce_budget().unwrap(), 1);
-    assert!(pool.is_loaded(a), "the most recently used shard stays");
-    assert!(!pool.is_loaded(b), "the least recently used shard goes");
+    assert_eq!(
+        pool.peek(a).unwrap().residency(),
+        IndexResidency::Loaded,
+        "the most recently used shard keeps its graphs"
+    );
+    assert_eq!(
+        pool.peek(b).unwrap().residency(),
+        IndexResidency::Viewed,
+        "the least recently used shard gives them back"
+    );
 }
 
 #[test]
@@ -255,7 +298,7 @@ fn list_workspaces_reads_the_directory_not_the_loaded_set() {
     expected.sort();
 
     // A shard that is on disk but not in memory still belongs to the workspace list.
-    assert!(pool.evict(expected[0]).unwrap());
+    assert!(pool.close(expected[0]).unwrap());
     std::fs::create_dir_all(pool.dir().join("not-a-workspace")).unwrap();
     std::fs::write(pool.dir().join("stray.txt"), b"ignored").unwrap();
 

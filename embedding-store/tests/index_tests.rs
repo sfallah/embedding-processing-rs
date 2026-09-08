@@ -203,3 +203,37 @@ fn a_reloaded_shard_takes_more_writes_and_reloads_again() {
         assert_eq!(*hits.keys().next().unwrap(), split.split_id);
     }
 }
+
+#[test]
+fn a_mapped_index_costs_a_fraction_of_a_resident_one() {
+    // The reason a cold shard is demoted rather than dropped: usearch answers searches from the
+    // mapped file, and what it holds resident to do so is a rounding error against the graph.
+    let dir = TempDir::new().unwrap();
+    let config = index_config();
+    let index = VectorIndex::create(dir.path(), "splits", &config).unwrap();
+    for id in 1..=4000u64 {
+        index.upsert(id, &vector(id)).unwrap();
+    }
+    index.save_atomically().unwrap();
+
+    let loaded = VectorIndex::create(dir.path(), "splits", &config).unwrap();
+    loaded.load().unwrap();
+    assert!(!loaded.is_viewed());
+    let resident = loaded.memory_bytes();
+
+    let viewed = VectorIndex::create(dir.path(), "splits", &config).unwrap();
+    viewed.view().unwrap();
+    assert!(viewed.is_viewed());
+    let mapped = viewed.memory_bytes();
+
+    assert_eq!(viewed.size(), 4000, "a mapped index knows what it holds");
+    let hits = viewed.search(&vector(7), 1).unwrap();
+    assert_eq!(hits[0].0, 7, "and answers searches from the mapping");
+
+    assert!(
+        mapped * 4 < resident,
+        "mapping should cost far less than loading: {} against {}",
+        mapped,
+        resident
+    );
+}

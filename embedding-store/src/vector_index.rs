@@ -10,6 +10,7 @@ use anyhow::{anyhow, Context, Result};
 use embedding_common::config::IndexConfig;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use usearch::{f16, Index, IndexOptions, MetricKind, ScalarKind};
 
 /// The usearch options a shard's indexes are built with. Every shard of one deployment uses the
@@ -53,6 +54,9 @@ pub struct VectorIndex {
     path: PathBuf,
     metric: MetricKind,
     dimensions: usize,
+    /// True while the graph is mapped from the file rather than held in memory. usearch refuses
+    /// `add` on such an index, so a writer has to `load` it first.
+    viewed: AtomicBool,
 }
 
 impl VectorIndex {
@@ -67,6 +71,7 @@ impl VectorIndex {
             path: dir.join(format!("{}.usearch", name)),
             metric: options.metric,
             dimensions: options.dimensions,
+            viewed: AtomicBool::new(false),
         })
     }
 
@@ -110,13 +115,37 @@ impl VectorIndex {
 
     /// Read the saved index back. The graph, not the vectors alone, so the result is mutable.
     pub fn load(&self) -> Result<()> {
-        let path = self
-            .path
-            .to_str()
-            .ok_or_else(|| anyhow!("{} is not valid utf-8", self.path.display()))?;
+        let path = self.path_str()?;
         self.index
             .load(path)
-            .map_err(|e| anyhow!("could not load {}: {}", self.path.display(), e))
+            .map_err(|e| anyhow!("could not load {}: {}", self.path.display(), e))?;
+        self.viewed.store(false, Ordering::Release);
+        Ok(())
+    }
+
+    /// Map the saved index instead of reading it in. Searches answer from the mapping, so a shard
+    /// nobody is writing to costs its file's page cache rather than its graph: about 43 KB
+    /// resident for an 8 MB index, against the megabytes `load` would hold.
+    ///
+    /// The index is immutable while viewed; `load` promotes it back.
+    pub fn view(&self) -> Result<()> {
+        let path = self.path_str()?;
+        self.index
+            .view(path)
+            .map_err(|e| anyhow!("could not view {}: {}", self.path.display(), e))?;
+        self.viewed.store(true, Ordering::Release);
+        Ok(())
+    }
+
+    /// Whether the graph is mapped rather than resident. A viewed index refuses `add`.
+    pub fn is_viewed(&self) -> bool {
+        self.viewed.load(Ordering::Acquire)
+    }
+
+    fn path_str(&self) -> Result<&str> {
+        self.path
+            .to_str()
+            .ok_or_else(|| anyhow!("{} is not valid utf-8", self.path.display()))
     }
 
     /// Room for `additional` more vectors. usearch grows in place, but only when asked.

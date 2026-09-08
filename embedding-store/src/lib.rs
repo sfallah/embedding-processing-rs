@@ -43,7 +43,7 @@ pub mod prelude {
     pub use crate::maps::{DocEntry, Loc, Maps, SplitEntry, SummaryEntry};
     pub use crate::pool::{PoolStats, ShardPool};
     pub use crate::record::{RecordKind, VectorDtype};
-    pub use crate::shard::{Shard, ShardOptions, ShardStats};
+    pub use crate::shard::{IndexResidency, Shard, ShardOptions, ShardStats};
     pub use crate::store::{EntityKind, Replaced, Store, StoreOptions};
     pub use crate::vector_index::VectorIndex;
 }

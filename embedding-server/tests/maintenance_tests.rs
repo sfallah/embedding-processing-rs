@@ -149,12 +149,29 @@ fn the_pass_holds_the_loaded_set_to_the_budget() {
     for ws in &workspaces {
         pool.get(*ws).unwrap().insert(&build_doc(1, 2)).unwrap();
     }
+    let loaded_bytes = pool.stats().memory_bytes;
 
     maintenance_pass(&pool, &policy(), true);
-    assert_eq!(pool.stats().loaded, 0, "a zero budget keeps nothing loaded");
+    let stats = pool.stats();
+    assert_eq!(stats.loaded, 3, "the shards stay open");
+    assert_eq!(
+        stats.viewed, 3,
+        "but hand their graphs back to the page cache"
+    );
+    assert!(
+        stats.memory_bytes < loaded_bytes,
+        "demotion should cost less than loading: {} against {}",
+        stats.memory_bytes,
+        loaded_bytes
+    );
 
-    // Everything evicted was snapshotted on the way out rather than dropped.
+    // A pass over shards that are already mapped has nothing left to give back.
+    maintenance_pass(&pool, &policy(), true);
+    assert_eq!(pool.stats().viewed, 3);
+
+    // Each was snapshotted before its graphs went, so closing and reopening still loads.
     for ws in &workspaces {
+        assert!(pool.close(*ws).unwrap());
         assert!(pool.get(*ws).unwrap().loaded_from_snapshot());
     }
 }
