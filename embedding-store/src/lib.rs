@@ -18,6 +18,7 @@ pub mod compact;
 pub mod manifest;
 pub mod maps;
 pub mod meta_snapshot;
+pub mod pool;
 pub mod record;
 pub mod replay;
 pub mod segment;
@@ -40,6 +41,7 @@ pub(crate) fn fsync_dir(dir: &std::path::Path) -> anyhow::Result<()> {
 pub mod prelude {
     pub use crate::manifest::{Manifest, SegmentInfo};
     pub use crate::maps::{DocEntry, Loc, Maps, SplitEntry, SummaryEntry};
+    pub use crate::pool::{PoolStats, ShardPool};
     pub use crate::record::{RecordKind, VectorDtype};
     pub use crate::shard::{Shard, ShardOptions, ShardStats};
     pub use crate::store::{EntityKind, Replaced, Store, StoreOptions};

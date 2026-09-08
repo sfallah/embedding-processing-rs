@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 use tracing::{info, warn};
 
 /// Records which log position the index files on disk were written at.
@@ -514,7 +514,23 @@ impl Shard {
     }
 
     pub fn stats(&self) -> ShardStats {
-        let inner = self.read();
+        Self::stats_of(&self.read())
+    }
+
+    /// [`stats`](Self::stats) when the shard is free, `None` when it is busy.
+    ///
+    /// The pool measures every loaded shard to enforce its memory budget. A blocking read there
+    /// would put one shard's multi-second snapshot in front of every other workspace's requests,
+    /// so the pool takes a stale figure over a wait.
+    pub fn try_stats(&self) -> Option<ShardStats> {
+        match self.inner.try_read() {
+            Ok(inner) => Some(Self::stats_of(&inner)),
+            Err(TryLockError::Poisoned(poisoned)) => Some(Self::stats_of(&poisoned.into_inner())),
+            Err(TryLockError::WouldBlock) => None,
+        }
+    }
+
+    fn stats_of(inner: &ShardInner) -> ShardStats {
         let manifest = inner.store.manifest();
         ShardStats {
             docs: inner.store.doc_count(),
