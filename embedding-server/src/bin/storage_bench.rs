@@ -1,8 +1,12 @@
-//! Baseline storage harness for the lean-storage refactoring (`PLAN-lean-storage.md`, step 1).
+//! Storage harness for the lean-storage refactoring (`PLAN-lean-storage.md`, steps 1 and 3).
 //!
-//! Drives the storage layer directly: RocksDB plus the two usearch indexes, no ZMQ and no model
-//! backend. Text comes from the MS MARCO CSV, vectors are deterministic pseudo-random unit
-//! vectors, so what is measured is storage and index latency, never retrieval relevance.
+//! Drives a storage layer directly, with no ZMQ and no model backend: `--backend rocksdb` is the
+//! old one (RocksDB plus two global usearch indexes), `--backend shard` is the new one (a
+//! `ShardPool` of per-workspace shards). Both are fed the same corpus, the same document shape and
+//! the same vectors, and both are measured the same way, which is the only reason the two rows in
+//! `BENCH.md` can be compared. Text comes from the MS MARCO CSV, vectors are deterministic
+//! pseudo-random unit vectors, so what is measured is storage and index latency, never retrieval
+//! relevance.
 //!
 //! No tracing subscriber is installed, so the library's `info!` calls are dropped rather than
 //! polluting the measurement.
@@ -17,7 +21,9 @@ use embedding_database::prelude::{
 use embedding_index::hnsw_index::HnswIndex;
 use embedding_index::{add_to_indices, initialize_index_from_db};
 use embedding_server::schema::search_mode::SearchModeType;
+use embedding_store::prelude::{Shard, ShardOptions, ShardPool};
 use indexmap::IndexMap;
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -25,9 +31,31 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+#[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
+enum Backend {
+    /// RocksDB plus two global usearch indexes: the layer being replaced.
+    Rocksdb,
+    /// A `ShardPool` of per-workspace shards: the layer replacing it.
+    Shard,
+}
+
+impl std::fmt::Display for Backend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Backend::Rocksdb => write!(f, "rocksdb"),
+            Backend::Shard => write!(f, "shard"),
+        }
+    }
+}
+
 #[derive(Parser, Debug, Clone)]
-#[command(about = "Baseline (RocksDB + usearch) storage benchmark")]
+#[command(about = "Storage benchmark: RocksDB baseline against per-workspace shards")]
 struct Args {
+    /// Which storage layer to measure. Deliberately has no default: a benchmark row is worthless
+    /// if it is not obvious which build produced it.
+    #[arg(long, value_enum)]
+    backend: Backend,
+
     /// Config file the index parameters and embedding dimension come from.
     #[arg(long, default_value = "config.toml")]
     config_file: String,
@@ -39,9 +67,10 @@ struct Args {
     )]
     corpus: String,
 
-    /// Directory for this run's RocksDB. Never the production `rocksdb_dir`.
-    #[arg(long, default_value = "bench_storage/rocksdb")]
-    dir: String,
+    /// Directory for this run's data. Never the production `rocksdb_dir`.
+    /// Defaults to `bench_storage/<backend>`.
+    #[arg(long)]
+    dir: Option<String>,
 
     /// Stop once this many splits have been inserted. 0 means one pass over the corpus.
     /// Above the corpus size the corpus is cycled with perturbed document urls, so ids differ.
@@ -73,7 +102,7 @@ struct Args {
     #[arg(long)]
     keep: bool,
 
-    /// Skip the restart measurement (reopen plus full index rebuild).
+    /// Skip the restart measurements.
     #[arg(long)]
     skip_restart: bool,
 
@@ -339,6 +368,69 @@ fn run_query(
     Ok(docs)
 }
 
+/// The same query, against one shard: what `api/query.rs` does for a single workspace, minus the
+/// rerank round trips. The workspace filter is the shard itself, so there is nothing to filter.
+fn run_query_shard(
+    shard: &Shard,
+    doc_ids: &[u64],
+    query: &[f32],
+    top_k: usize,
+    mode: SearchModeType,
+    with_embeddings: bool,
+) -> anyhow::Result<Vec<DocumentDto>> {
+    let doc_filter: Option<HashSet<u64>> =
+        (!doc_ids.is_empty()).then(|| doc_ids.iter().copied().collect());
+
+    let mut split_summary_map: IndexMap<u64, Vec<SummaryDto>> = IndexMap::new();
+    if mode == SearchModeType::SummaryOnly || mode == SearchModeType::SplitAndSummary {
+        let hits = shard.search_summaries(query, top_k, doc_filter.as_ref())?;
+        let ids: Vec<u64> = hits.keys().copied().collect();
+        for summary_dto in shard.load_summaries(&ids, Some(&hits), with_embeddings)? {
+            split_summary_map
+                .entry(summary_dto.split_id)
+                .or_default()
+                .push(summary_dto);
+        }
+    }
+
+    let mut split_query_res = IndexMap::new();
+    if mode == SearchModeType::SplitOnly || mode == SearchModeType::SplitAndSummary {
+        split_query_res = shard.search_splits(query, top_k, doc_filter.as_ref())?;
+    }
+
+    let mut splits_min_distances: IndexMap<u64, f32> =
+        IndexMap::from_iter(split_summary_map.iter().map(|(k, v)| {
+            let min = v
+                .iter()
+                .filter_map(|x| x.query_distance)
+                .fold(f32::INFINITY, f32::min);
+            (*k, min)
+        }));
+    splits_min_distances.extend(split_query_res.iter().map(|(k, v)| (*k, *v)));
+    splits_min_distances.sort_by(|_, v1, _, v2| v1.partial_cmp(v2).unwrap());
+
+    let final_split_ids: Vec<u64> = splits_min_distances.keys().copied().collect();
+    let splits = shard.load_splits(
+        &final_split_ids,
+        Some(&split_query_res),
+        Some(&split_summary_map),
+        with_embeddings,
+    )?;
+
+    let mut doc_split_map: IndexMap<u64, Vec<SplitDto>> = IndexMap::new();
+    for split in splits {
+        doc_split_map.entry(split.doc_id).or_default().push(split);
+    }
+
+    let mut docs = Vec::new();
+    for (doc_id, doc_splits) in doc_split_map.into_iter() {
+        if let Some(doc) = shard.load_doc(doc_id, doc_splits, with_embeddings)? {
+            docs.push(doc);
+        }
+    }
+    Ok(docs)
+}
+
 // ---------------------------------------------------------------------------
 // Measurement helpers
 // ---------------------------------------------------------------------------
@@ -387,8 +479,21 @@ fn open_indexes(index_config: &IndexConfig) -> anyhow::Result<(Arc<HnswIndex>, A
 
 // ---------------------------------------------------------------------------
 
-fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+/// Everything the two backends share: the config, the corpus, the destination directory and the
+/// workspace ids, so a row differs only in the storage layer under it.
+struct Setup {
+    index_config: IndexConfig,
+    dim: usize,
+    hasher: DeterministicAHasher,
+    model_id: u64,
+    storage: embedding_common::config::StorageConfig,
+    dir: PathBuf,
+    passages: Vec<String>,
+    target_splits: usize,
+    workspace_ids: Vec<Uuid>,
+}
+
+fn setup(args: &Args) -> anyhow::Result<Setup> {
     let app_config = AppConfig::from_file(args.config_file.clone())?;
     let index_config = app_config.index_config.clone();
     let dim = index_config.dimensions;
@@ -404,17 +509,21 @@ fn main() -> anyhow::Result<()> {
     let hasher = DeterministicAHasher::default_hasher();
     let model_id = Model::model_id(&hasher, &app_config.embedding_model_info.path, n_embd);
 
-    let db_dir = PathBuf::from(&args.dir);
-    if db_dir.ends_with("rocksdb_dir") {
+    let dir = PathBuf::from(
+        args.dir
+            .clone()
+            .unwrap_or_else(|| format!("bench_storage/{}", args.backend)),
+    );
+    if dir.ends_with("rocksdb_dir") {
         return Err(anyhow::anyhow!(
             "refusing to use the production directory {:?}",
-            db_dir
+            dir
         ));
     }
-    if db_dir.exists() && !args.keep {
-        fs::remove_dir_all(&db_dir)?;
+    if dir.exists() && !args.keep {
+        fs::remove_dir_all(&dir)?;
     }
-    fs::create_dir_all(&db_dir)?;
+    fs::create_dir_all(&dir)?;
 
     let passages = load_passages(&args.corpus)?;
     let target_splits = if args.target_splits == 0 {
@@ -433,24 +542,60 @@ fn main() -> anyhow::Result<()> {
         })
         .collect();
 
-    println!("# storage_bench (RocksDB baseline)");
+    println!("# storage_bench (backend: {})", args.backend);
     println!("corpus            : {}", args.corpus);
     println!("passages          : {}", passages.len());
     println!("target splits     : {}", target_splits);
     println!("passages/document : {}", args.passages_per_doc);
     println!("workspaces        : {}", workspace_ids.len());
     println!("dimensions        : {}", dim);
-    println!("index             : {} conn={} ea={} es={} {:?}",
+    println!(
+        "index             : {} conn={} ea={} es={} {:?}",
         index_config.metric_kind,
         index_config.connectivity,
         index_config.expansion_add,
         index_config.expansion_search,
         index_config.scalar_kind
     );
-    println!("db dir            : {}", db_dir.display());
+    println!("data dir          : {}", dir.display());
     println!();
 
-    let db = Arc::new(RocksDB::open(db_dir.to_str().unwrap())?);
+    Ok(Setup {
+        index_config,
+        dim,
+        hasher,
+        model_id,
+        storage: app_config.storage_config,
+        dir,
+        passages,
+        target_splits,
+        workspace_ids,
+    })
+}
+
+fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+    let setup = setup(&args)?;
+    match args.backend {
+        Backend::Rocksdb => run_rocksdb(&args, &setup),
+        Backend::Shard => run_shard(&args, &setup),
+    }
+}
+
+fn run_rocksdb(args: &Args, setup: &Setup) -> anyhow::Result<()> {
+    let Setup {
+        index_config,
+        dim,
+        hasher,
+        model_id,
+        passages,
+        target_splits,
+        workspace_ids,
+        ..
+    } = setup;
+    let (dim, model_id, target_splits) = (*dim, *model_id, *target_splits);
+
+    let db = Arc::new(RocksDB::open(setup.dir.to_str().unwrap())?);
     let (split_index, summary_index) = open_indexes(&index_config)?;
 
     // ---- insert -----------------------------------------------------------
@@ -507,8 +652,11 @@ fn main() -> anyhow::Result<()> {
     println!("documents         : {}", inserted_docs);
     println!("splits            : {}", inserted_splits);
     println!("summaries         : {}", inserted_summaries);
-    println!("vectors in index  : splits {} summaries {}",
-        split_index.size()?, summary_index.size()?);
+    println!(
+        "vectors in index  : splits {} summaries {}",
+        split_index.size()?,
+        summary_index.size()?
+    );
     println!(
         "insert            : {:.1}s, {:.0} docs/s, {:.0} splits/s",
         insert_elapsed.as_secs_f64(),
@@ -527,7 +675,17 @@ fn main() -> anyhow::Result<()> {
         // cold RocksDB cache and reads slower than the mode after it, whatever the mode is.
         for _ in 0..args.warmup {
             let q = qrng.unit_vector(dim);
-            run_query(&db, &split_index, &summary_index, &filter_ws, &no_docs, &q, args.top_k, mode, false)?;
+            run_query(
+                &db,
+                &split_index,
+                &summary_index,
+                &filter_ws,
+                &no_docs,
+                &q,
+                args.top_k,
+                mode,
+                false,
+            )?;
         }
 
         let mut latencies = Vec::with_capacity(args.queries);
@@ -563,9 +721,12 @@ fn main() -> anyhow::Result<()> {
 
     // ---- footprint --------------------------------------------------------
     let rss = rss_kb().unwrap_or(0);
-    let disk = dir_size(&db_dir);
+    let disk = dir_size(&setup.dir);
     println!("RSS after load    : {:.0} MB", rss as f64 / 1024.0);
-    println!("disk (rocksdb)    : {:.0} MB", disk as f64 / (1024.0 * 1024.0));
+    println!(
+        "disk (rocksdb)    : {:.0} MB",
+        disk as f64 / (1024.0 * 1024.0)
+    );
     println!("  note: the usearch indexes are in memory only, never persisted by the server path");
     println!();
 
@@ -576,7 +737,7 @@ fn main() -> anyhow::Result<()> {
         drop(db);
 
         let t = Instant::now();
-        let db = Arc::new(RocksDB::open(db_dir.to_str().unwrap())?);
+        let db = Arc::new(RocksDB::open(setup.dir.to_str().unwrap())?);
         let (split_index, summary_index) = open_indexes(&index_config)?;
         initialize_index_from_db(&db, &split_index, &summary_index)?;
         let restart = t.elapsed();
@@ -586,7 +747,255 @@ fn main() -> anyhow::Result<()> {
             split_index.size()?,
             summary_index.size()?
         );
-        println!("RSS after restart : {:.0} MB", rss_kb().unwrap_or(0) as f64 / 1024.0);
+        println!(
+            "RSS after restart : {:.0} MB",
+            rss_kb().unwrap_or(0) as f64 / 1024.0
+        );
+    }
+
+    Ok(())
+}
+
+/// Delete the files a shard can rebuild, so the next open has to replay the log and rebuild both
+/// graphs. `meta.snap` goes as well as `indexes.state`: with the maps gone too this is the full
+/// replay, the shard's equivalent of `initialize_index_from_db`.
+fn remove_derived_files(dir: &Path) -> anyhow::Result<()> {
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
+        if !path.is_dir() {
+            continue;
+        }
+        for name in [
+            "indexes.state",
+            "meta.snap",
+            "splits.usearch",
+            "summaries.usearch",
+        ] {
+            let file = path.join(name);
+            if file.exists() {
+                fs::remove_file(&file)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Open the pool and load every workspace, as a cold server does on its first requests. Returns
+/// how long it took to be able to answer one query.
+fn open_and_warm(
+    args: &Args,
+    setup: &Setup,
+    options: &ShardOptions,
+    query: &[f32],
+) -> anyhow::Result<(Duration, Arc<ShardPool>, usize, usize)> {
+    let t = Instant::now();
+    let pool = Arc::new(
+        ShardPool::new(&setup.dir, options.clone())?
+            .with_memory_budget_mb(setup.storage.memory_budget_mb),
+    );
+    let (mut splits, mut summaries) = (0usize, 0usize);
+    for workspace in &setup.workspace_ids {
+        let shard = pool.get(*workspace)?;
+        let stats = shard.stats();
+        splits += stats.split_index_size;
+        summaries += stats.summary_index_size;
+    }
+    let first = pool.get(setup.workspace_ids[0])?;
+    run_query_shard(
+        &first,
+        &[],
+        query,
+        args.top_k,
+        SearchModeType::SplitAndSummary,
+        false,
+    )?;
+    Ok((t.elapsed(), pool, splits, summaries))
+}
+
+fn run_shard(args: &Args, setup: &Setup) -> anyhow::Result<()> {
+    let Setup {
+        index_config,
+        hasher,
+        passages,
+        workspace_ids,
+        storage,
+        ..
+    } = setup;
+    let (dim, model_id, target_splits) = (setup.dim, setup.model_id, setup.target_splits);
+
+    let mut shard_options = ShardOptions::new(model_id, index_config.clone());
+    shard_options.segment_max_bytes = storage.segment_max_bytes();
+    println!("memory budget     : {} MB", storage.memory_budget_mb);
+    println!("segment max       : {} MB", storage.segment_max_mb);
+    println!();
+
+    let pool = Arc::new(
+        ShardPool::new(&setup.dir, shard_options.clone())?
+            .with_memory_budget_mb(storage.memory_budget_mb),
+    );
+
+    // ---- insert -----------------------------------------------------------
+    let mut rng = Rng::new(args.seed);
+    let mut inserted_splits = 0usize;
+    let mut inserted_docs = 0usize;
+    let mut inserted_summaries = 0usize;
+    let mut doc_seq = 0usize;
+    let mut cursor = 0usize;
+    let mut cycle = 0usize;
+
+    let insert_start = Instant::now();
+    while inserted_splits < target_splits {
+        let mut chunk = Vec::with_capacity(args.passages_per_doc);
+        while chunk.len() < args.passages_per_doc && inserted_splits + chunk.len() < target_splits {
+            if cursor >= passages.len() {
+                cursor = 0;
+                cycle += 1;
+            }
+            chunk.push(passages[cursor].clone());
+            cursor += 1;
+        }
+        if chunk.is_empty() {
+            break;
+        }
+
+        let url = format!("bench://c{}/doc/{}", cycle, doc_seq);
+        let workspace = workspace_ids[doc_seq % workspace_ids.len()];
+        let dto = build_document(hasher, &mut rng, &url, &chunk, dim, model_id);
+
+        // Through the pool for every document, because that is how the server reaches a shard:
+        // one `get` per request, budget enforcement included.
+        pool.get(workspace)?.insert(&dto)?;
+
+        inserted_splits += dto.splits.len();
+        inserted_summaries += dto.splits.iter().map(|s| s.summaries.len()).sum::<usize>();
+        inserted_docs += 1;
+        doc_seq += 1;
+
+        if inserted_docs % 2000 == 0 {
+            println!(
+                "  .. {} docs, {} splits, {:.0} splits/s",
+                inserted_docs,
+                inserted_splits,
+                inserted_splits as f64 / insert_start.elapsed().as_secs_f64()
+            );
+        }
+    }
+    let insert_elapsed = insert_start.elapsed();
+
+    let (indexed_splits, indexed_summaries) =
+        pool.loaded().iter().fold((0, 0), |(s, m), (_, sh)| {
+            let stats = sh.stats();
+            (s + stats.split_index_size, m + stats.summary_index_size)
+        });
+
+    println!();
+    println!("documents         : {}", inserted_docs);
+    println!("splits            : {}", inserted_splits);
+    println!("summaries         : {}", inserted_summaries);
+    println!(
+        "vectors in index  : splits {} summaries {} (over {} loaded shard(s))",
+        indexed_splits,
+        indexed_summaries,
+        pool.stats().loaded
+    );
+    println!(
+        "insert            : {:.1}s, {:.0} docs/s, {:.0} splits/s",
+        insert_elapsed.as_secs_f64(),
+        inserted_docs as f64 / insert_elapsed.as_secs_f64(),
+        inserted_splits as f64 / insert_elapsed.as_secs_f64()
+    );
+    println!();
+
+    // ---- query ------------------------------------------------------------
+    let mut qrng = Rng::new(args.seed ^ 0xDEAD_BEEF);
+    let shard = pool.get(workspace_ids[0])?;
+
+    for mode in [SearchModeType::SplitOnly, SearchModeType::SplitAndSummary] {
+        for _ in 0..args.warmup {
+            let q = qrng.unit_vector(dim);
+            run_query_shard(&shard, &[], &q, args.top_k, mode, false)?;
+        }
+
+        let mut latencies = Vec::with_capacity(args.queries);
+        let mut hits = 0usize;
+        for _ in 0..args.queries {
+            let q = qrng.unit_vector(dim);
+            let t = Instant::now();
+            let docs = run_query_shard(&shard, &[], &q, args.top_k, mode, false)?;
+            latencies.push(t.elapsed());
+            hits += docs.len();
+        }
+        latencies.sort();
+        println!(
+            "query {:<16}: p50 {:.2} ms, p99 {:.2} ms, mean {:.2} ms, {:.1} docs/query",
+            mode.to_string(),
+            ms(percentile(&latencies, 50.0)),
+            ms(percentile(&latencies, 99.0)),
+            ms(latencies.iter().sum::<Duration>() / latencies.len() as u32),
+            hits as f64 / args.queries as f64
+        );
+    }
+    drop(shard);
+    println!();
+
+    // ---- snapshot and footprint -------------------------------------------
+    let log_only = dir_size(&setup.dir);
+    let t = Instant::now();
+    let snapshotted = pool.snapshot_all()?;
+    let snapshot_elapsed = t.elapsed();
+    let with_derived = dir_size(&setup.dir);
+
+    println!(
+        "snapshot          : {:.2}s for {} shard(s)",
+        snapshot_elapsed.as_secs_f64(),
+        snapshotted
+    );
+    println!(
+        "RSS after load    : {:.0} MB",
+        rss_kb().unwrap_or(0) as f64 / 1024.0
+    );
+    println!(
+        "disk (log)        : {:.0} MB",
+        log_only as f64 / (1024.0 * 1024.0)
+    );
+    println!(
+        "disk (+ derived)  : {:.0} MB  <- the price of the fast restart below",
+        with_derived as f64 / (1024.0 * 1024.0)
+    );
+    println!();
+
+    // ---- restart ----------------------------------------------------------
+    if !args.skip_restart {
+        let probe = qrng.unit_vector(dim);
+        drop(pool);
+
+        let (elapsed, pool, splits, summaries) =
+            open_and_warm(args, setup, &shard_options, &probe)?;
+        println!(
+            "restart (snapshot): {:.2}s to the first query, splits {} summaries {}",
+            elapsed.as_secs_f64(),
+            splits,
+            summaries
+        );
+        println!(
+            "RSS after restart : {:.0} MB",
+            rss_kb().unwrap_or(0) as f64 / 1024.0
+        );
+        drop(pool);
+
+        remove_derived_files(&setup.dir)?;
+        let (elapsed, _pool, splits, summaries) =
+            open_and_warm(args, setup, &shard_options, &probe)?;
+        println!(
+            "restart (replay)  : {:.2}s to the first query, splits {} summaries {}",
+            elapsed.as_secs_f64(),
+            splits,
+            summaries
+        );
+        println!(
+            "RSS after replay  : {:.0} MB",
+            rss_kb().unwrap_or(0) as f64 / 1024.0
+        );
     }
 
     Ok(())

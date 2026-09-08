@@ -94,6 +94,20 @@ impl VectorIndex {
         self.metric
     }
 
+    // Read off the live index rather than the options it was built from, so a load that quietly
+    // took the library's defaults shows up here. `Index::restore` does exactly that on 2.26.2.
+    pub fn connectivity(&self) -> usize {
+        self.index.connectivity()
+    }
+
+    pub fn expansion_add(&self) -> usize {
+        self.index.expansion_add()
+    }
+
+    pub fn expansion_search(&self) -> usize {
+        self.index.expansion_search()
+    }
+
     /// Read the saved index back. The graph, not the vectors alone, so the result is mutable.
     pub fn load(&self) -> Result<()> {
         let path = self
@@ -111,9 +125,14 @@ impl VectorIndex {
         if self.index.capacity() > wanted {
             return Ok(());
         }
-        self.index
-            .reserve(wanted)
-            .map_err(|e| anyhow!("could not reserve {} slots in the {} index: {}", wanted, self.name, e))
+        self.index.reserve(wanted).map_err(|e| {
+            anyhow!(
+                "could not reserve {} slots in the {} index: {}",
+                wanted,
+                self.name,
+                e
+            )
+        })
     }
 
     /// Add a vector held as `f32`, replacing whatever the key held before.
@@ -170,10 +189,14 @@ impl VectorIndex {
 
     /// Drop a key. Removing one that is not there is not an error, so no lookup precedes it.
     pub fn remove(&self, key: u64) -> Result<()> {
-        self.index
-            .remove(key)
-            .map(|_| ())
-            .map_err(|e| anyhow!("could not remove {} from the {} index: {}", key, self.name, e))
+        self.index.remove(key).map(|_| ()).map_err(|e| {
+            anyhow!(
+                "could not remove {} from the {} index: {}",
+                key,
+                self.name,
+                e
+            )
+        })
     }
 
     pub fn search(&self, query: &[f32], k: usize) -> Result<Vec<(u64, f32)>> {
@@ -182,11 +205,7 @@ impl VectorIndex {
             .index
             .search(query, k)
             .map_err(|e| anyhow!("could not search the {} index: {}", self.name, e))?;
-        Ok(matches
-            .keys
-            .into_iter()
-            .zip(matches.distances)
-            .collect())
+        Ok(matches.keys.into_iter().zip(matches.distances).collect())
     }
 
     pub fn filtered_search<F>(&self, query: &[f32], k: usize, filter: F) -> Result<Vec<(u64, f32)>>
@@ -198,11 +217,7 @@ impl VectorIndex {
             .index
             .filtered_search(query, k, filter)
             .map_err(|e| anyhow!("could not search the {} index: {}", self.name, e))?;
-        Ok(matches
-            .keys
-            .into_iter()
-            .zip(matches.distances)
-            .collect())
+        Ok(matches.keys.into_iter().zip(matches.distances).collect())
     }
 
     fn check_query(&self, query: &[f32]) -> Result<()> {

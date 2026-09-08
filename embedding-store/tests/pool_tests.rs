@@ -264,6 +264,40 @@ fn list_workspaces_reads_the_directory_not_the_loaded_set() {
 }
 
 #[test]
+fn a_search_never_crosses_into_another_workspace() {
+    // What the old `query_filter` needed a per-vector predicate and a RocksDB read for: a
+    // workspace is a shard, so isolation is structural rather than a filter that could be wrong.
+    let dir = TempDir::new().unwrap();
+    let pool = pool(&dir);
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+
+    let shard_a = pool.get(a).unwrap();
+    let doc_a = build_doc(1, 3);
+    shard_a.insert(&doc_a).unwrap();
+
+    let shard_b = pool.get(b).unwrap();
+    let doc_b = build_doc(2, 3);
+    shard_b.insert(&doc_b).unwrap();
+
+    let a_ids: Vec<u64> = doc_a.splits.iter().map(|s| s.split_id).collect();
+    let b_ids: Vec<u64> = doc_b.splits.iter().map(|s| s.split_id).collect();
+
+    // Searching one workspace with the other's vector returns only its own splits.
+    let target = &doc_b.splits[0];
+    let query = &target.embedding.as_ref().unwrap().embedding;
+    let hits = shard_a.search_splits(query, 10, None).unwrap();
+    assert!(!hits.is_empty());
+    for id in hits.keys() {
+        assert!(a_ids.contains(id), "{} is not workspace a's", id);
+        assert!(!b_ids.contains(id));
+    }
+
+    // And the workspace that owns it finds it first.
+    let hits = shard_b.search_splits(query, 1, None).unwrap();
+    assert_eq!(*hits.keys().next().unwrap(), target.split_id);
+}
+
+#[test]
 fn get_existing_does_not_bring_a_workspace_into_being() {
     let dir = TempDir::new().unwrap();
     let pool = pool(&dir);
