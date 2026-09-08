@@ -964,6 +964,56 @@ fn run_shard(args: &Args, setup: &Setup) -> anyhow::Result<()> {
     );
     println!();
 
+    // ---- demoted reads ----------------------------------------------------
+    // What a cold shard costs. The pool demotes a shard that is over budget and opens one for a
+    // read with its graphs mapped rather than resident, so this is the latency a workspace that
+    // is not being written to actually gets.
+    let resident_bytes = pool.stats().memory_bytes;
+    let demoted = pool.evict(workspace_ids[0])?;
+    let mapped_bytes = pool.stats().memory_bytes;
+    if demoted {
+        let shard = pool
+            .peek(workspace_ids[0])
+            .expect("still open, just mapped");
+        println!(
+            "demote            : index residency {:.0} MB -> {:.0} MB, RSS {:.0} MB",
+            resident_bytes as f64 / (1024.0 * 1024.0),
+            mapped_bytes as f64 / (1024.0 * 1024.0),
+            rss_kb().unwrap_or(0) as f64 / 1024.0
+        );
+
+        for mode in [SearchModeType::SplitOnly, SearchModeType::SplitAndSummary] {
+            for _ in 0..args.warmup {
+                let q = qrng.unit_vector(dim);
+                run_query_shard(&shard, &[], &q, args.top_k, mode, false)?;
+            }
+            let mut latencies = Vec::with_capacity(args.queries);
+            for _ in 0..args.queries {
+                let q = qrng.unit_vector(dim);
+                let t = Instant::now();
+                run_query_shard(&shard, &[], &q, args.top_k, mode, false)?;
+                latencies.push(t.elapsed());
+            }
+            latencies.sort();
+            println!(
+                "mapped {:<16}: p50 {:.2} ms, p99 {:.2} ms",
+                mode.to_string(),
+                ms(percentile(&latencies, 50.0)),
+                ms(percentile(&latencies, 99.0))
+            );
+        }
+
+        // And what the first write to it pays to get the graphs back.
+        let t = Instant::now();
+        shard.promote()?;
+        println!("promote           : {:.3}s", t.elapsed().as_secs_f64());
+        println!(
+            "RSS after promote : {:.0} MB",
+            rss_kb().unwrap_or(0) as f64 / 1024.0
+        );
+    }
+    println!();
+
     // ---- restart ----------------------------------------------------------
     if !args.skip_restart {
         let probe = qrng.unit_vector(dim);

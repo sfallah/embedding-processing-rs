@@ -29,3 +29,7 @@ tempfile = "3.14.0"
 [[bin]]
 name = "embedding_server"
 path = "src/main.rs"
+
+[[bin]]
+name = "smoke_client"
+path = "src/bin/smoke_client.rs"
