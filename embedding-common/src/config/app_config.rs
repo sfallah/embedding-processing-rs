@@ -4,7 +4,7 @@ use crate::config::model_info_config::ModelInfoConfig;
 use crate::config::*;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 #[allow(unused)]
 pub struct AppConfig {
     #[serde(rename = "index")]
@@ -15,6 +15,8 @@ pub struct AppConfig {
     pub embedding_model_info: ModelInfoConfig,
     #[serde(rename = "database")]
     pub database_config: DatabaseConfig,
+    #[serde(rename = "storage")]
+    pub storage_config: StorageConfig,
     #[serde(rename = "zmq")]
     pub zmq_config: ZmqConfig,
     #[serde(rename = "endpoints")]

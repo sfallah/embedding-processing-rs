@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use embedding_common::config::config_file::ConfigFromFile;
-    use embedding_common::config::{AppConfig, MetricKind, ScalarKind};
+    use embedding_common::config::{AppConfig, MetricKind, ScalarKind, StorageConfig};
 
     #[test]
     fn test_index_config() -> anyhow::Result<()> {
@@ -55,6 +55,81 @@ mod tests {
         println!("database config: {:?}", database_config);
         assert_eq!(database_config.rocksdb_dir, "test_rocksdb_dir".to_string());
         Ok(())
+    }
+
+    #[test]
+    fn test_storage_config() -> anyhow::Result<()> {
+        let conf_file = "tests/test_config.toml".to_string();
+        let app_config = AppConfig::from_file(conf_file)?;
+        let storage_config = app_config.storage_config;
+        println!("storage config: {:?}", storage_config);
+        assert_eq!(storage_config.dir, "test_storage_dir".to_string());
+        assert_eq!(storage_config.memory_budget_mb, 512);
+        assert_eq!(storage_config.fsync_interval_ms, 250);
+        assert_eq!(storage_config.snapshot_interval_s, 60);
+        assert_eq!(storage_config.segment_max_mb, 8);
+        assert_eq!(storage_config.compact_ratio, 0.5);
+        storage_config.validate()?;
+
+        // The units the store and the pool are built from, rather than the ones an operator writes.
+        assert_eq!(storage_config.memory_budget_bytes(), 512 * 1024 * 1024);
+        assert_eq!(storage_config.segment_max_bytes(), 8 * 1024 * 1024);
+        assert_eq!(
+            storage_config.fsync_interval(),
+            Some(std::time::Duration::from_millis(250))
+        );
+        assert_eq!(
+            storage_config.snapshot_interval(),
+            std::time::Duration::from_secs(60)
+        );
+        assert!(storage_config.storage_dir()?.ends_with("test_storage_dir"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_storage_config_defaults_and_validation() {
+        // An omitted key falls back to the plan's default rather than to zero.
+        let defaults = StorageConfig::default();
+        assert_eq!(defaults.dir, "storage");
+        assert_eq!(defaults.fsync_interval_ms, 1000); // decision D4
+        assert_eq!(defaults.segment_max_mb, 256); // the store's own default
+        defaults.validate().expect("the defaults are usable");
+
+        // A zero fsync interval is the other half of D4: sync every write, not spin on a timer.
+        let per_request = StorageConfig {
+            fsync_interval_ms: 0,
+            ..StorageConfig::default()
+        };
+        assert_eq!(per_request.fsync_interval(), None);
+        per_request
+            .validate()
+            .expect("per-request fsync is allowed");
+
+        // Settings that would misbehave rather than merely perform badly are refused.
+        for bad in [
+            StorageConfig {
+                memory_budget_mb: 0,
+                ..StorageConfig::default()
+            },
+            StorageConfig {
+                segment_max_mb: 0,
+                ..StorageConfig::default()
+            },
+            StorageConfig {
+                snapshot_interval_s: 0,
+                ..StorageConfig::default()
+            },
+            StorageConfig {
+                compact_ratio: 0.0,
+                ..StorageConfig::default()
+            },
+            StorageConfig {
+                compact_ratio: 1.5,
+                ..StorageConfig::default()
+            },
+        ] {
+            assert!(bad.validate().is_err(), "{:?} should be refused", bad);
+        }
     }
 
     #[test]

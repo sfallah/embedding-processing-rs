@@ -20,6 +20,14 @@ n_embd = 384
 [database]
 rocksdb_dir = "test_rocksdb_dir"
 
+[storage]
+dir = "test_storage_dir"
+memory_budget_mb = 512
+fsync_interval_ms = 250
+snapshot_interval_s = 60
+segment_max_mb = 8
+compact_ratio = 0.5
+
 [zmq]
 host = "127.0.0.1"
 frontend_port = 5556

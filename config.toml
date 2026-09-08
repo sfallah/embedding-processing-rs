@@ -28,6 +28,17 @@ n_embd = 768
 [database]
 #rocksdb_dir = "rocksdb_dir"
 
+[storage]
+# One directory per workspace under this root.
+dir = "storage"
+# What the loaded shards' indexes may hold resident together.
+memory_budget_mb = 4096
+# 0 syncs every write instead of on a timer.
+fsync_interval_ms = 1000
+snapshot_interval_s = 300
+segment_max_mb = 256
+compact_ratio = 0.3
+
 [zmq]
 host = "127.0.0.1"
 frontend_port = 5556
