@@ -25,9 +25,6 @@ n_ctx = 512
 #n_embd = 1024
 n_embd = 768
 
-[database]
-#rocksdb_dir = "rocksdb_dir"
-
 [storage]
 # One directory per workspace under this root.
 dir = "storage"

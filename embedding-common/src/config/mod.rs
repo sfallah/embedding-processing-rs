@@ -1,4 +1,3 @@
-pub use self::database_config::DatabaseConfig;
 pub use self::index_config::IndexConfig;
 pub use self::index_config::MetricKind;
 pub use self::index_config::ScalarKind;
@@ -14,7 +13,6 @@ pub use self::args::ServerArgs;
 mod app_config;
 pub(crate) mod args;
 pub mod config_file;
-mod database_config;
 mod endpoints;
 mod index_config;
 pub mod model_backend_config;

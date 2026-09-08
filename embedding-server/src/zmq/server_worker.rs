@@ -8,9 +8,8 @@ use crate::schema::zmq_message_header::{ZmqMessageHeader, ZmqMessageType};
 use crate::utils::zmq_utils::handle_error_and_respond;
 use embedding_common::config::ZmqConfig;
 use embedding_common::prelude::{DeterministicAHasher, Serde};
-use embedding_database::prelude::RocksDB;
-use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
+use embedding_store::prelude::ShardPool;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -18,9 +17,7 @@ pub fn worker_routine(
     zmq_config: Arc<ZmqConfig>,
     context: &zmq::Context,
     processing_context: Arc<ProcessingContext>,
-    split_index: &Arc<HnswIndex>,
-    summary_index: &Arc<HnswIndex>,
-    db: &Arc<RocksDB>,
+    pool: Arc<ShardPool>,
 ) {
     let hasher = Arc::new(DeterministicAHasher::new(None, None));
 
@@ -112,10 +109,8 @@ pub fn worker_routine(
             ZmqMessageType::DocumentInsertion => {
                 process_document_insertion_request(
                     &socket,
-                    db,
+                    &pool,
                     processing_context.clone(),
-                    split_index,
-                    summary_index,
                     &mut message_header,
                     &message_body,
                     &identity,
@@ -124,10 +119,8 @@ pub fn worker_routine(
             ZmqMessageType::DocumentQuery => {
                 process_document_query_request(
                     &socket,
-                    db,
+                    &pool,
                     processing_context.clone(),
-                    split_index,
-                    summary_index,
                     &mut message_header,
                     &message_body,
                     &identity,
@@ -137,7 +130,7 @@ pub fn worker_routine(
                 process_document_retrieval_request(
                     &socket,
                     hasher.clone(),
-                    db,
+                    &pool,
                     &mut message_header,
                     &message_body,
                     &identity,
@@ -146,9 +139,7 @@ pub fn worker_routine(
             ZmqMessageType::DocumentDeletion => {
                 process_document_deletion_request(
                     &socket,
-                    split_index,
-                    summary_index,
-                    db,
+                    &pool,
                     &mut message_header,
                     &message_body,
                     &identity,

@@ -3,7 +3,7 @@ use crate::schema::document_status::RetrievalStatus;
 use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils::{send_exception_response, send_success_response};
 use embedding_common::prelude::*;
-use embedding_database::prelude::*;
+use embedding_store::prelude::ShardPool;
 use std::sync::Arc;
 use tracing::error;
 use zmq::Socket;
@@ -11,7 +11,7 @@ use zmq::Socket;
 pub fn process_document_retrieval_request(
     worker_socket: &Socket,
     hasher: Arc<DeterministicAHasher>,
-    db: &Arc<RocksDB>,
+    pool: &Arc<ShardPool>,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
     identity: &Vec<u8>,
@@ -27,6 +27,18 @@ pub fn process_document_retrieval_request(
             return;
         }
     }
+
+    // A document lives in exactly one workspace's shard and there is no index from document to
+    // workspace, so the request has to say which one (gap G4, decision D2).
+    let workspace_id = match request.user {
+        Some(workspace_id) => workspace_id,
+        None => {
+            let error_message = "DocumentRetrievalRequest must have a workspace id";
+            error!("{}", error_message);
+            send_exception_response(worker_socket, error_message, message_header, identity);
+            return;
+        }
+    };
 
     // assert that the request has a valid document_id OR document_url
     if request.document_id.is_none() && request.document_url.is_none() {
@@ -47,7 +59,26 @@ pub fn process_document_retrieval_request(
         document_id = hasher.hash(&document_url);
     }
 
-    match get_full_doc(db, document_id, request.verbose.unwrap_or(false), None) {
+    let shard = match pool.get_existing(workspace_id) {
+        // A workspace nothing was ever written to holds no documents; that is a miss, not an
+        // error, and asking must not create the shard.
+        Ok(None) => {
+            send_document_retrieval_response(worker_socket, &None, message_header, identity);
+            return;
+        }
+        Ok(Some(shard)) => shard,
+        Err(e) => {
+            let error_message = format!(
+                "Error opening the shard for workspace {}: {:?}",
+                workspace_id, e
+            );
+            error!("{}", &error_message);
+            send_exception_response(worker_socket, &error_message, message_header, identity);
+            return;
+        }
+    };
+
+    match shard.get_doc(document_id, request.verbose.unwrap_or(false)) {
         Ok(doc_dto) => {
             send_document_retrieval_response(worker_socket, &doc_dto, message_header, identity)
         }
@@ -55,7 +86,6 @@ pub fn process_document_retrieval_request(
             let error_message = format!("Error retrieving document: {:?}", e);
             error!("{}", &error_message);
             send_exception_response(worker_socket, &error_message, message_header, identity);
-            return;
         }
     }
 }

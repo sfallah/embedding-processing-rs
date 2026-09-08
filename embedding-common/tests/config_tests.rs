@@ -48,16 +48,6 @@ mod tests {
     }
 
     #[test]
-    fn test_database_config() -> anyhow::Result<()> {
-        let conf_file = "tests/test_config.toml".to_string();
-        let app_config = AppConfig::from_file(conf_file)?;
-        let database_config = app_config.database_config;
-        println!("database config: {:?}", database_config);
-        assert_eq!(database_config.rocksdb_dir, "test_rocksdb_dir".to_string());
-        Ok(())
-    }
-
-    #[test]
     fn test_storage_config() -> anyhow::Result<()> {
         let conf_file = "tests/test_config.toml".to_string();
         let app_config = AppConfig::from_file(conf_file)?;

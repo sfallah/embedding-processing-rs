@@ -2,19 +2,15 @@ use clap::Parser;
 use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::AppConfig;
 use embedding_common::prelude::{DeterministicAHasher, Model};
-use embedding_common::utils::helpers::{create_directory, get_db_dir};
-use embedding_database::prelude::{put_model, RocksDB};
-use embedding_index::hnsw_index::HnswIndex;
-use embedding_index::initialize_index_from_db;
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
 use embedding_server::zmq::server_worker::worker_routine;
 use embedding_server::ServerArgs;
+use embedding_store::prelude::{ShardOptions, ShardPool};
 use std::sync::Arc;
 use std::thread;
 use tracing::{error, info};
 
 fn main() -> Result<(), anyhow::Error> {
-    error!("Starting up");
     // Parse command line arguments
     let args = ServerArgs::parse();
 
@@ -22,7 +18,8 @@ fn main() -> Result<(), anyhow::Error> {
 
     let embedding_model_info = app_config.embedding_model_info;
     let splitter_config = app_config.splitter_config;
-    let db_config = app_config.database_config;
+    let storage_config = app_config.storage_config;
+    storage_config.validate()?;
 
     setup_tracing(args.log_level.to_tracing_level());
 
@@ -35,12 +32,6 @@ fn main() -> Result<(), anyhow::Error> {
     let parallel_workers = zmq_config.num_workers.max(1).min(max_cores);
 
     info!("Number of workers: {}", parallel_workers);
-
-    let db_path_binding = get_db_dir(Some(&db_config.rocksdb_dir))?;
-    let db_path = db_path_binding.to_str().unwrap();
-    create_directory(db_path).expect("Failed to create directory");
-    let rocksdb = RocksDB::open(&db_path)?;
-    let db = Arc::new(rocksdb);
 
     let default_hasher = DeterministicAHasher::default_hasher();
     let model_id = Model::model_id(
@@ -55,7 +46,27 @@ fn main() -> Result<(), anyhow::Error> {
         embedding_model_info.n_embd,
     );
 
-    put_model(&db, &model)?;
+    // One shard per workspace, each holding its own log and its own two indexes. The model id
+    // goes into every shard's manifest, which is what refuses a shard written by another model
+    // (decision D5).
+    let mut shard_options = ShardOptions::new(model.model_id, app_config.index_config.clone());
+    shard_options.segment_max_bytes = storage_config.segment_max_bytes();
+
+    let storage_dir = storage_config.storage_dir()?;
+    let pool = Arc::new(
+        ShardPool::new(&storage_dir, shard_options)?
+            .with_memory_budget_mb(storage_config.memory_budget_mb),
+    );
+
+    // Nothing is loaded until a request asks for a workspace, so startup no longer pays for the
+    // whole corpus: at 500k splits the old rebuild took minutes and 11.9 GB of peak memory.
+    let known_workspaces = pool.list_workspaces()?;
+    info!(
+        "Storage at {}: {} workspace(s) on disk, {} MB budget",
+        storage_dir.display(),
+        known_workspaces.len(),
+        storage_config.memory_budget_mb
+    );
 
     let splitter_max_tokens = splitter_config.max_tokens;
 
@@ -98,56 +109,18 @@ fn main() -> Result<(), anyhow::Error> {
         return Err(e.into());
     }
 
-    // Set up signal handling
-
-    /*
-    let shutdown_clone = shutdown_sender.clone();
-    let shutdown_handle = tokio::spawn(async move {
-        if let Err(e) = tokio::signal::ctrl_c().await {
-            error!("Failed to listen for Ctrl+C event: {}", e);
-        }
-        if let Err(e) = shutdown_clone.send("shutdown".to_string()) {
-            error!("Failed to send shutdown signal: {}", e);
-        }
-        info!("Sent shutdown signal");
-    });
-     */
-
-    // Create an Arc reference to the database
-    let db = Arc::new(db);
-
-    // Create an HNSW index and initialize it from the database
-    let split_index = Arc::new(HnswIndex::create_index(
-        "splits".to_string(),
-        app_config.index_config.clone(),
-    )?);
-
-    let summary_index = Arc::new(HnswIndex::create_index(
-        "summaries".to_string(),
-        app_config.index_config,
-    )?);
-
-    initialize_index_from_db(&db, &split_index, &summary_index)?;
+    // Timers and signal handling are step 4: until then the shards are only put on disk when the
+    // pool evicts one, so a kill loses whatever the log has not been fsynced.
 
     // Initialize separate workers for each thread
     let mut worker_thread_pool = Vec::new();
     for _ in 0..parallel_workers {
         let processing_ctx = Arc::clone(&processing_ctx);
-        let split_index_clone = Arc::clone(&split_index);
-        let summary_index_clone = Arc::clone(&summary_index);
-        let db_clone = Arc::clone(&db);
+        let pool = Arc::clone(&pool);
         let zmq_config = Arc::clone(&zmq_config);
         let context = context.clone();
-        let worker_handler = thread::spawn(move || {
-            worker_routine(
-                zmq_config,
-                &context,
-                processing_ctx,
-                &split_index_clone,
-                &summary_index_clone,
-                &db_clone,
-            )
-        });
+        let worker_handler =
+            thread::spawn(move || worker_routine(zmq_config, &context, processing_ctx, pool));
         worker_thread_pool.push(worker_handler);
     }
 

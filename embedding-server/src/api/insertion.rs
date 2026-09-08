@@ -4,21 +4,17 @@ use crate::schema::zmq_message_header::ZmqMessageHeader;
 use crate::utils::zmq_utils;
 use crate::utils::zmq_utils::send_exception_response;
 use embedding_common::prelude::*;
-use embedding_database::prelude::{save_doc, RocksDB};
-use embedding_index::add_to_indices;
-use embedding_index::hnsw_index::HnswIndex;
 use embedding_processing::processing::context::ProcessingContext;
 use embedding_processing::processing::documents::process_document;
+use embedding_store::prelude::ShardPool;
 use std::sync::Arc;
 use tracing::error;
 use zmq::Socket;
 
 pub fn process_document_insertion_request(
     worker_socket: &Socket,
-    db: &Arc<RocksDB>,
+    pool: &Arc<ShardPool>,
     processing_context: Arc<ProcessingContext>,
-    split_index: &Arc<HnswIndex>,
-    summary_index: &Arc<HnswIndex>,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
     identity: &Vec<u8>,
@@ -48,17 +44,25 @@ pub fn process_document_insertion_request(
         }
     };
 
-    let user_id = request.workspace_id;
+    // Insertion is the only request that brings a workspace into being.
+    let shard = match pool.get(request.workspace_id) {
+        Ok(shard) => shard,
+        Err(e) => {
+            let error_message = format!(
+                "Error opening the shard for workspace {}: {:?}",
+                request.workspace_id, e
+            );
+            error!("{}", &error_message);
+            send_exception_response(worker_socket, &error_message, message_header, identity);
+            return;
+        }
+    };
 
-    if let Err(e) = save_doc(db, &document_dto, user_id) {
-        let error_message = format!("Error saving document to DB: {:?}", e);
-        error!("{}", &error_message);
-        send_exception_response(worker_socket, &error_message, message_header, identity);
-        return;
-    }
-
-    if let Err(e) = add_to_indices(split_index.clone(), summary_index.clone(), &document_dto) {
-        let error_message = format!("Error adding document to indices: {:?}", e);
+    // One call for the log and both indexes. Re-inserting a url whose content changed no longer
+    // leaves the splits and summaries of the old version behind: the shard deletes the document
+    // it replaces, minus the ids the new one reuses.
+    if let Err(e) = shard.insert(&document_dto) {
+        let error_message = format!("Error saving document: {:?}", e);
         error!("{}", &error_message);
         send_exception_response(worker_socket, &error_message, message_header, identity);
         return;

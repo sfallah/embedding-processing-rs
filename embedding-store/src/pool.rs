@@ -153,6 +153,19 @@ impl ShardPool {
         Ok(shard)
     }
 
+    /// The shard for `workspace` only when it already has a directory. Reads use this so a
+    /// request naming a workspace that was never written does not leave an empty shard behind;
+    /// only an insert should bring one into existence.
+    pub fn get_existing(&self, workspace: Uuid) -> Result<Option<Arc<Shard>>> {
+        if let Some(shard) = self.peek(workspace) {
+            return Ok(Some(shard));
+        }
+        if !self.shard_dir(workspace).is_dir() {
+            return Ok(None);
+        }
+        self.get(workspace).map(Some)
+    }
+
     /// The shard for `workspace` only if it is already loaded. Bumps its recency.
     pub fn peek(&self, workspace: Uuid) -> Option<Arc<Shard>> {
         self.lock().touch(workspace)

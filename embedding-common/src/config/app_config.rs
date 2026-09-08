@@ -13,8 +13,6 @@ pub struct AppConfig {
     pub splitter_config: SplitterConfig,
     #[serde(rename = "embedding_model")]
     pub embedding_model_info: ModelInfoConfig,
-    #[serde(rename = "database")]
-    pub database_config: DatabaseConfig,
     #[serde(rename = "storage")]
     pub storage_config: StorageConfig,
     #[serde(rename = "zmq")]

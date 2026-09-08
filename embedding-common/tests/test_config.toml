@@ -17,9 +17,6 @@ path = "models/all-minilm-l6-v2-q2_k.gguf"
 n_ctx = 512
 n_embd = 384
 
-[database]
-rocksdb_dir = "test_rocksdb_dir"
-
 [storage]
 dir = "test_storage_dir"
 memory_budget_mb = 512

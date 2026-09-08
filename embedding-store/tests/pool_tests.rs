@@ -264,6 +264,29 @@ fn list_workspaces_reads_the_directory_not_the_loaded_set() {
 }
 
 #[test]
+fn get_existing_does_not_bring_a_workspace_into_being() {
+    let dir = TempDir::new().unwrap();
+    let pool = pool(&dir);
+    let ws = Uuid::new_v4();
+
+    assert!(pool.get_existing(ws).unwrap().is_none());
+    assert!(
+        !pool.shard_dir(ws).exists(),
+        "a read must not create a shard"
+    );
+    assert!(pool.list_workspaces().unwrap().is_empty());
+
+    // Once an insert has created it, a read finds it, loaded or not.
+    pool.get(ws).unwrap().insert(&build_doc(1, 2)).unwrap();
+    assert!(pool.evict(ws).unwrap());
+    let found = pool
+        .get_existing(ws)
+        .unwrap()
+        .expect("the shard is on disk");
+    assert_eq!(found.stats().docs, 1);
+}
+
+#[test]
 fn evicting_an_unknown_workspace_is_not_an_error() {
     let dir = TempDir::new().unwrap();
     let pool = pool(&dir);

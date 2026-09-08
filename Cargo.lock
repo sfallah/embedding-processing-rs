@@ -933,6 +933,7 @@ dependencies = [
  "embedding-database",
  "embedding-index",
  "embedding-processing",
+ "embedding-store",
  "indexmap",
  "num_cpus",
  "serde",
