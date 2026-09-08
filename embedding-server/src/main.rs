@@ -3,6 +3,7 @@ use embedding_common::config::config_file::ConfigFromFile;
 use embedding_common::config::AppConfig;
 use embedding_common::prelude::{DeterministicAHasher, Model};
 use embedding_processing::utils::app_utils::{init_ctx, setup_tracing};
+use embedding_server::maintenance::{self, MaintenancePolicy};
 use embedding_server::zmq::server_worker::worker_routine;
 use embedding_server::ServerArgs;
 use embedding_store::prelude::{ShardOptions, ShardPool};
@@ -109,8 +110,18 @@ fn main() -> Result<(), anyhow::Error> {
         return Err(e.into());
     }
 
-    // Timers and signal handling are step 4: until then the shards are only put on disk when the
-    // pool evicts one, so a kill loses whatever the log has not been fsynced.
+    // Housekeeping. Without these two the shards are only put on disk when the pool evicts one,
+    // so a kill would leave the whole log to replay on the next start.
+    let policy = MaintenancePolicy::from_config(&storage_config);
+    maintenance::install_shutdown_handler(Arc::clone(&pool))?;
+    maintenance::spawn(Arc::clone(&pool), policy);
+
+    // With `fsync_interval_ms = 0` there is no timer to sync the log, so a write is synced before
+    // it is acknowledged (decision D4).
+    let sync_on_write = policy.fsync_interval.is_none();
+    if sync_on_write {
+        info!("fsync policy: every write is synced before it is acknowledged");
+    }
 
     // Initialize separate workers for each thread
     let mut worker_thread_pool = Vec::new();
@@ -119,8 +130,9 @@ fn main() -> Result<(), anyhow::Error> {
         let pool = Arc::clone(&pool);
         let zmq_config = Arc::clone(&zmq_config);
         let context = context.clone();
-        let worker_handler =
-            thread::spawn(move || worker_routine(zmq_config, &context, processing_ctx, pool));
+        let worker_handler = thread::spawn(move || {
+            worker_routine(zmq_config, &context, processing_ctx, pool, sync_on_write)
+        });
         worker_thread_pool.push(worker_handler);
     }
 

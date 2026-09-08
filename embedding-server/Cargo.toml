@@ -14,12 +14,17 @@ serde_repr = { workspace = true }
 chrono = { workspace = true }
 indexmap = { workspace = true }
 zmq = { workspace = true }
+# SIGINT, SIGTERM and SIGHUP, so a shutdown snapshots instead of leaving a tail to replay (D6).
+ctrlc = { version = "3.5", features = ["termination"] }
 
 embedding-common = { path = "../embedding-common" }
 embedding-database = { path = "../embedding-database" }
 embedding-index = { path = "../embedding-index" }
 embedding-processing = { path = "../embedding-processing" }
 embedding-store = { path = "../embedding-store" }
+
+[dev-dependencies]
+tempfile = "3.14.0"
 
 [[bin]]
 name = "embedding_server"

@@ -15,6 +15,7 @@ pub fn process_document_insertion_request(
     worker_socket: &Socket,
     pool: &Arc<ShardPool>,
     processing_context: Arc<ProcessingContext>,
+    sync_on_write: bool,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
     identity: &Vec<u8>,
@@ -66,6 +67,17 @@ pub fn process_document_insertion_request(
         error!("{}", &error_message);
         send_exception_response(worker_socket, &error_message, message_header, identity);
         return;
+    }
+
+    // Under a per-request fsync policy the client is told the document is stored only once it is
+    // on the device. The insert itself stands either way; what failed is the promise about it.
+    if sync_on_write {
+        if let Err(e) = shard.fsync() {
+            let error_message = format!("Document stored but not yet durable: {:?}", e);
+            error!("{}", &error_message);
+            send_exception_response(worker_socket, &error_message, message_header, identity);
+            return;
+        }
     }
 
     send_document_insertion_response(

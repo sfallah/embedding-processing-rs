@@ -1,5 +1,6 @@
 use clap::ValueEnum;
 
+pub mod maintenance;
 pub mod schema;
 pub mod utils;
 pub mod zmq;

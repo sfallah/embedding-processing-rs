@@ -18,6 +18,8 @@ pub fn worker_routine(
     context: &zmq::Context,
     processing_context: Arc<ProcessingContext>,
     pool: Arc<ShardPool>,
+    // Sync a write before acknowledging it, rather than leaving it to the timer.
+    sync_on_write: bool,
 ) {
     let hasher = Arc::new(DeterministicAHasher::new(None, None));
 
@@ -111,6 +113,7 @@ pub fn worker_routine(
                     &socket,
                     &pool,
                     processing_context.clone(),
+                    sync_on_write,
                     &mut message_header,
                     &message_body,
                     &identity,
@@ -140,6 +143,7 @@ pub fn worker_routine(
                 process_document_deletion_request(
                     &socket,
                     &pool,
+                    sync_on_write,
                     &mut message_header,
                     &message_body,
                     &identity,

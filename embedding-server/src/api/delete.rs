@@ -11,6 +11,7 @@ use zmq::Socket;
 pub fn process_document_deletion_request(
     worker_socket: &Socket,
     pool: &Arc<ShardPool>,
+    sync_on_write: bool,
     message_header: &mut ZmqMessageHeader,
     body_message: &Vec<u8>,
     identity: &Vec<u8>,
@@ -57,6 +58,20 @@ pub fn process_document_deletion_request(
     // error-then-success pair the two index deletes used to be able to send (gap G8).
     match shard.delete(request.document_id) {
         Ok(removed) => {
+            // A deletion is a record like any other, so it owes the same durability promise.
+            if removed && sync_on_write {
+                if let Err(e) = shard.fsync() {
+                    let error_message = format!("Document deleted but not yet durable: {:?}", e);
+                    error!("{}", &error_message);
+                    send_exception_response(
+                        worker_socket,
+                        &error_message,
+                        message_header,
+                        identity,
+                    );
+                    return;
+                }
+            }
             send_document_deletion_response(worker_socket, removed, message_header, identity)
         }
         Err(e) => {
