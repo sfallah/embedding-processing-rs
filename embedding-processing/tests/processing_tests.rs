@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use embedding_common::config::config_file::ConfigFromFile;
+    use embedding_common::config::AppConfig;
     use embedding_common::utils::tracting::setup_tracing;
     use embedding_processing::processing::documents::process_document;
     use embedding_processing::processing::embeddings::get_embeddings;
@@ -12,6 +14,34 @@ mod tests {
 
     const EMBEDDING_ENDPOINT: &str = "tcp://localhost:5559";
     const RERANKING_ENDPOINT: &str = "tcp://localhost:5557";
+
+    /// The repository's own `config.toml`, resolved at compile time so the tests do not depend on
+    /// the working directory they are run from.
+    const CONFIG_FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../config.toml");
+
+    /// The embedding dimension these tests must use, read from the config rather than written
+    /// down here.
+    ///
+    /// These tests talk to a live backend on [`EMBEDDING_ENDPOINT`], and LexRank reshapes the flat
+    /// embedding buffer into rows of this width, so a dimension that disagrees with the running
+    /// model does not fail as a wrong number: it fails as `ShapeError/IncompatibleShape`, or as a
+    /// document with no splits at all, because `process_document` drops the splits that failed.
+    /// That is what a hardcoded 384 did here for as long as the configured model was not a
+    /// 384-wide one.
+    ///
+    /// `[index] dimensions` and `[embedding_model] n_embd` are required to agree (the index
+    /// rejects vectors of any other width), so disagreement is a broken config and is worth a
+    /// clearer failure than the shape error it would otherwise cause downstream.
+    fn configured_dim() -> usize {
+        let config = AppConfig::from_file(CONFIG_FILE.to_string())
+            .unwrap_or_else(|e| panic!("cannot read {CONFIG_FILE}: {e}"));
+        let n_embd = config.embedding_model_info.n_embd as usize;
+        assert_eq!(
+            config.index_config.dimensions, n_embd,
+            "[index] dimensions and [embedding_model] n_embd disagree in {CONFIG_FILE}"
+        );
+        n_embd
+    }
 
     #[fixture]
     fn text() -> String {
@@ -44,7 +74,7 @@ mod tests {
         let ctx = init_ctx(
             510,
             Some(3),
-            384,
+            configured_dim(),
             500,
             EMBEDDING_ENDPOINT.to_string(),
             Some(RERANKING_ENDPOINT.to_string()),
@@ -71,7 +101,7 @@ mod tests {
         let ctx = init_ctx(
             512,
             None,
-            384,
+            configured_dim(),
             0,
             EMBEDDING_ENDPOINT.to_string(),
             Some(RERANKING_ENDPOINT.to_string()),
@@ -88,7 +118,7 @@ mod tests {
         let ctx = init_ctx(
             512,
             None,
-            384,
+            configured_dim(),
             10,
             EMBEDDING_ENDPOINT.to_string(),
             Some(RERANKING_ENDPOINT.to_string()),
@@ -122,7 +152,7 @@ mod tests {
         let ctx = init_ctx(
             512,
             None,
-            384,
+            configured_dim(),
             3000,
             EMBEDDING_ENDPOINT.to_string(),
             Some(RERANKING_ENDPOINT.to_string()),
@@ -144,7 +174,7 @@ mod tests {
         let ctx = init_ctx(
             512,
             None,
-            384,
+            configured_dim(),
             100,
             EMBEDDING_ENDPOINT.to_string(),
             Some(RERANKING_ENDPOINT.to_string()),
@@ -173,7 +203,7 @@ mod tests {
         let ctx = init_ctx(
             10,
             None,
-            384,
+            configured_dim(),
             3000,
             EMBEDDING_ENDPOINT.to_string(),
             Some(RERANKING_ENDPOINT.to_string()),
