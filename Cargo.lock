@@ -988,12 +988,14 @@ name = "embedding-store"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "crc32fast",
  "embedding-common",
  "half",
  "indexmap",
  "memmap2",
  "rmp-serde",
+ "rocksdb",
  "serde",
  "tempfile",
  "tracing",

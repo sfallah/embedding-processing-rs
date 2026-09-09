@@ -18,6 +18,10 @@ pub mod compact;
 pub mod manifest;
 pub mod maps;
 pub mod meta_snapshot;
+/// Reading a store written by the previous storage layer. Feature-gated: it is the only
+/// thing here that depends on the `rocksdb` crate.
+#[cfg(feature = "rocksdb-migration")]
+pub mod migrate;
 pub mod pool;
 pub mod record;
 pub mod replay;
