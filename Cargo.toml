@@ -3,9 +3,7 @@ resolver = "2"
 members = [
     "embedding-common",
     "embedding-processing",
-    "embedding-database",
     "embedding-store",
-    "embedding-index",
     "embedding-server",
     "embedding-model",
     "reranking-model"

@@ -30,6 +30,12 @@ RUN git config --global url."https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/"
 ARG CUDA_DOCKER_ARCH=default
 ARG LLAMA_CPP_VERSION=b4570
 
+# Building llama.cpp here is very likely dead weight: the `llama-cpp` crate vendors llama.cpp and
+# compiles it from source itself, and its build script does not read LLAMA_PATH or LD_LIBRARY_PATH.
+# Left in place because no CUDA machine was available to verify the image without it. Removing this
+# stage would roughly halve the image build; check first that the crate's build script gets
+# -DCMAKE_CUDA_ARCHITECTURES=${CUDA_DOCKER_ARCH} some other way.
+
 ENV LLAMA_CPP_BRANCH=release_${LLAMA_CPP_VERSION}
 ENV LLAMA_PATH=/usr/local/llama_${LLAMA_CPP_VERSION}
 ENV LD_LIBRARY_PATH=${LLAMA_PATH}/lib:${LD_LIBRARY_PATH}
@@ -59,7 +65,10 @@ WORKDIR /usr/src/app
 
 COPY --from=base-builder ${LLAMA_PATH} ${LLAMA_PATH}
 
-RUN cargo build --release --bin embedding-server
+# Three process groups, three sets of binaries. Only the two model crates take `cuda`; the server
+# does not link llama.cpp.
+RUN cargo build --release --bin embedding_server \
+ && cargo build --release -F cuda -p embedding-model -p reranking-model
 
 COPY ./.devops/starter.sh /usr/src/app/starter.sh
 

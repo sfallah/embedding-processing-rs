@@ -1,3 +1,9 @@
+# The server's config inside the container image, loaded by `.devops/starter.sh`.
+# Same schema as the repository root's `config.toml` (`AppConfig`); the values differ because the
+# image ships a different model. `[index] dimensions` must equal `[embedding_model] n_embd` and the
+# GGUF's own embedding size, and `[endpoints]` must name the two model backends, which run as their
+# own process groups and are not started by this image (see `.devops/DOCKER.md`).
+
 [index]
 dimensions = 384
 scalar_kind = "F16"
@@ -11,18 +17,26 @@ max_tokens = 400
 hf_model_id = "sentence-transformers/all-MiniLM-L6-v2"
 #patterns = [["\n\n"], ["\n"], [".", "!", "?"]]
 
-[model]
-gguf_file = "models/all-minilm-l6-v2-q2_k.gguf"
-instances = 2
-#cpu = false
-#ngl = 1000
-#verbose = true
+[embedding_model]
+path = "models/all-minilm-l6-v2-q2_k.gguf"
+n_ctx = 512
+n_embd = 384
 
-[database]
-#rocksdb_dir = "rocksdb_dir"
+[storage]
+# One directory per workspace under this root. Mount it if the shards are to outlive the container.
+dir = "storage"
+memory_budget_mb = 4096
+fsync_interval_ms = 1000
+snapshot_interval_s = 300
+segment_max_mb = 256
+compact_ratio = 0.3
 
 [zmq]
-zmq_host = "127.0.0.1"
-zmq_frontend_port = 5556
-zmq_backend_port = 5560
-zmq_num_workers = 2
+host = "0.0.0.0"
+frontend_port = 5556
+backend_port = 5560
+num_workers = 2
+
+[endpoints]
+embedding_endpoint = "tcp://localhost:5559"
+reranking_endpoint = "tcp://localhost:5557"

@@ -1,9 +1,9 @@
 //! Reads a store written by the previous storage layer and writes it into per-workspace shards.
 //!
-//! Behind the `rocksdb-migration` feature, which is the only place the `rocksdb` crate remains
-//! once `embedding-database` is deleted. It therefore reads the old column families directly
-//! rather than through that crate, and keeps its own copy of the two things about the old format
-//! it needs: the column family names and the key encoding.
+//! Behind the `rocksdb-migration` feature, which since step 6 is the only place the `rocksdb`
+//! crate remains: `embedding-database` is deleted. It reads the old column families directly,
+//! keeping its own copy of the two things about the old format it needs — the column family names
+//! and the key encoding — which is what let it outlive that crate.
 //!
 //! The old layer kept the workspace in exactly one place, an `embedding_filter_info` row per
 //! split and per summary vector holding `(embed_id, doc_id, user_uuid)`. That is what decides
@@ -27,9 +27,9 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-/// The old layer's column families, from `embedding-database`'s `ColumnFamilyType`. Spelled out
-/// rather than imported so this outlives that crate. All of them must be named at open time, or
-/// RocksDB refuses the directory.
+/// The old layer's column families, from the deleted `embedding-database`'s `ColumnFamilyType`.
+/// Spelled out rather than imported, which is what let this outlive that crate. All of them must
+/// be named at open time, or RocksDB refuses the directory.
 const CF_DEFAULT: &str = "default";
 const CF_DOCUMENTS: &str = "documents";
 const CF_SPLITS: &str = "splits";

@@ -4,6 +4,8 @@ debug/
 target/
 models/*.gguf
 
+# The previous storage layer's directories. `rocksdb_dir/` is still read, as the migration
+# tool's source; the other two are only leftovers in older checkouts.
 rocks_db_dir/
 rocksdb_dir/
 index_dir/
