@@ -5,7 +5,7 @@
 //! arrives. Whatever is still buffered at the end was a torn insert and is dropped.
 
 use crate::maps::{DocEntry, Loc, Maps, SplitEntry, SummaryEntry};
-use crate::record::{decode, DecodeError, DocMeta, RecordKind, SplitMeta, SummaryMeta, DeleteMeta};
+use crate::record::{decode, DecodeError, DeleteMeta, DocMeta, RecordKind, SplitMeta, SummaryMeta};
 use anyhow::{anyhow, Context, Result};
 
 #[derive(Debug, Default)]

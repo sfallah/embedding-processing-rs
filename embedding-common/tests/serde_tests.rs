@@ -1,11 +1,9 @@
 #[cfg(test)]
 mod tests {
     use anyhow::anyhow;
-    use serde::{Deserialize, Serialize};
     use embedding_common::prelude::*;
+    use serde::{Deserialize, Serialize};
     use uuid::Uuid;
-
-
 
     #[test]
     fn embedding_user_serde() -> anyhow::Result<()> {

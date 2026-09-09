@@ -125,10 +125,16 @@ pub struct DeleteMeta {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DecodeError {
     /// Fewer bytes available than the frame claims: a torn tail, not corruption.
-    Truncated { need: usize, have: usize },
+    Truncated {
+        need: usize,
+        have: usize,
+    },
     /// A length that cannot be right for any record.
     BadLength(u32),
-    BadCrc { expected: u32, found: u32 },
+    BadCrc {
+        expected: u32,
+        found: u32,
+    },
     BadKind(u8),
     BadDtype(u8),
 }
@@ -141,7 +147,11 @@ impl std::fmt::Display for DecodeError {
             }
             DecodeError::BadLength(len) => write!(f, "impossible record length {}", len),
             DecodeError::BadCrc { expected, found } => {
-                write!(f, "crc mismatch: expected {:#x}, found {:#x}", expected, found)
+                write!(
+                    f,
+                    "crc mismatch: expected {:#x}, found {:#x}",
+                    expected, found
+                )
             }
             DecodeError::BadKind(k) => write!(f, "unknown record kind {}", k),
             DecodeError::BadDtype(d) => write!(f, "unknown vector dtype {}", d),
@@ -288,7 +298,10 @@ mod tests {
         assert_eq!(view.kind, RecordKind::DeleteDoc);
         assert_eq!(view.dtype, VectorDtype::F16);
         assert_eq!(view.meta, meta.as_slice());
-        assert_eq!(decode_vector(view.vector, view.dtype), vec![1.0, -0.5, 0.25]);
+        assert_eq!(
+            decode_vector(view.vector, view.dtype),
+            vec![1.0, -0.5, 0.25]
+        );
     }
 
     #[test]
@@ -311,7 +324,10 @@ mod tests {
     #[test]
     fn f16_round_trip_is_within_half_precision() {
         let original: Vec<f32> = (0..64).map(|i| (i as f32) / 64.0 - 0.5).collect();
-        let decoded = decode_vector(&encode_vector(&original, VectorDtype::F16), VectorDtype::F16);
+        let decoded = decode_vector(
+            &encode_vector(&original, VectorDtype::F16),
+            VectorDtype::F16,
+        );
         for (a, b) in original.iter().zip(decoded.iter()) {
             assert!((a - b).abs() < 1e-3, "{} vs {}", a, b);
         }

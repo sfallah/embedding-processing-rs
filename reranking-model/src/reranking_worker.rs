@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let mut batch = LlamaBatch::new(n_ctx as usize,0, 1);
+    let mut batch = LlamaBatch::new(n_ctx as usize, 0, 1);
 
     //  Prepare our context and socket
     let context = zmq::Context::new();

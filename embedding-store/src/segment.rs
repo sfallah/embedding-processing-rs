@@ -134,8 +134,8 @@ impl SealedSegment {
         let file = File::open(path).with_context(|| format!("opening {}", path.display()))?;
         // Safety: the file is never written again once sealed, so the mapping cannot see a torn
         // update. Compaction writes a new file and swaps it in rather than editing this one.
-        let map = unsafe { Mmap::map(&file) }
-            .with_context(|| format!("mapping {}", path.display()))?;
+        let map =
+            unsafe { Mmap::map(&file) }.with_context(|| format!("mapping {}", path.display()))?;
         Ok(SealedSegment {
             id,
             path: path.to_path_buf(),

@@ -37,7 +37,11 @@ pub fn compact(store: &mut Store) -> Result<()> {
             let partial = segment_path(&store.dir, new_id);
             if partial.exists() {
                 if let Err(rm) = fs::remove_file(&partial) {
-                    tracing::warn!("could not remove partial segment {}: {}", partial.display(), rm);
+                    tracing::warn!(
+                        "could not remove partial segment {}: {}",
+                        partial.display(),
+                        rm
+                    );
                 }
             }
             Err(e)
@@ -46,7 +50,6 @@ pub fn compact(store: &mut Store) -> Result<()> {
 }
 
 fn compact_into(store: &mut Store, new_id: u32, sealed_ids: &HashSet<u32>) -> Result<()> {
-
     // Documents whose records live in a sealed segment, in a deterministic order.
     let mut doc_ids: Vec<u64> = store
         .maps
@@ -146,7 +149,11 @@ fn compact_into(store: &mut Store, new_id: u32, sealed_ids: &HashSet<u32>) -> Re
     for id in old_ids {
         let path = segment_path(&store.dir, id);
         if let Err(e) = fs::remove_file(&path) {
-            tracing::warn!("could not remove compacted segment {}: {}", path.display(), e);
+            tracing::warn!(
+                "could not remove compacted segment {}: {}",
+                path.display(),
+                e
+            );
         }
     }
 

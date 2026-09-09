@@ -70,7 +70,11 @@ fn summary(doc_id: u64, split_id: u64, sent_seq: i32, salt: u64) -> SummaryDto {
         &format!("summary {} of split {}", sent_seq, split_id),
         7 + sent_seq as usize,
         1.0 / (sent_seq as f32 + 1.0),
-        Some(EmbeddingDto::new(summary_id, vector(seed(salt, summary_id)), MODEL_ID)),
+        Some(EmbeddingDto::new(
+            summary_id,
+            vector(seed(salt, summary_id)),
+            MODEL_ID,
+        )),
         None,
         None,
     )
@@ -91,7 +95,11 @@ fn build_doc(doc_id: u64, n_splits: usize, per_split: usize, salt: u64) -> Docum
             &format!("split {} of document {}", seq, doc_id),
             42 + seq,
             summaries,
-            Some(EmbeddingDto::new(split_id, vector(seed(salt, split_id)), MODEL_ID)),
+            Some(EmbeddingDto::new(
+                split_id,
+                vector(seed(salt, split_id)),
+                MODEL_ID,
+            )),
             None,
             None,
         ));
@@ -334,7 +342,9 @@ fn a_document_filter_matches_only_those_documents() {
     let dir = TempDir::new().unwrap();
     let docs: Vec<DocumentDto> = (1..=6).map(|i| build_doc(i, 3, 2, i * 41)).collect();
     let query = vector(1234);
-    let wanted: HashSet<u64> = [docs[1].document_id, docs[4].document_id].into_iter().collect();
+    let wanted: HashSet<u64> = [docs[1].document_id, docs[4].document_id]
+        .into_iter()
+        .collect();
 
     let scored_by_hand = |shard: &Shard| {
         let splits = shard.search_splits(&query, 4, Some(&wanted)).unwrap();
@@ -361,7 +371,10 @@ fn a_document_filter_matches_only_those_documents() {
             .find(|d| d.splits.iter().any(|s| s.split_id == *split_id))
             .unwrap()
             .document_id;
-        assert!(wanted.contains(&doc_id), "a filtered search stays inside the filter");
+        assert!(
+            wanted.contains(&doc_id),
+            "a filtered search stays inside the filter"
+        );
     }
     assert_eq!(brute_summaries.len(), 4);
 
@@ -421,7 +434,10 @@ fn the_query_read_path_carries_distances_and_only_the_summaries_that_were_hit() 
         summaries[0].query_distance,
         Some(summary_hits[&hit_summary.summary_id])
     );
-    assert!(summaries[0].embedding.is_none(), "embeddings were not asked for");
+    assert!(
+        summaries[0].embedding.is_none(),
+        "embeddings were not asked for"
+    );
 
     let mut hit_summaries: IndexMap<u64, Vec<SummaryDto>> = IndexMap::new();
     hit_summaries.insert(doc.splits[0].split_id, summaries);
@@ -439,22 +455,38 @@ fn the_query_read_path_carries_distances_and_only_the_summaries_that_were_hit() 
         order,
         "splits come back in the order they were asked for"
     );
-    assert_eq!(splits[0].query_distance, None, "a summary-derived split has no distance of its own");
-    assert_eq!(splits[0].summaries.len(), 1, "only the summary that was hit");
+    assert_eq!(
+        splits[0].query_distance, None,
+        "a summary-derived split has no distance of its own"
+    );
+    assert_eq!(
+        splits[0].summaries.len(),
+        1,
+        "only the summary that was hit"
+    );
     assert_eq!(splits[0].summaries[0].summary_id, hit_summary.summary_id);
     assert_eq!(
         splits[1].query_distance,
         Some(direct[&doc.splits[1].split_id])
     );
-    assert!(splits[1].summaries.is_empty(), "a direct hit carries no summaries");
+    assert!(
+        splits[1].summaries.is_empty(),
+        "a direct hit carries no summaries"
+    );
 
     // The document keeps its own complete list, in recorded order and without distances.
-    let loaded = shard.load_doc(doc.document_id, splits, false).unwrap().unwrap();
+    let loaded = shard
+        .load_doc(doc.document_id, splits, false)
+        .unwrap()
+        .unwrap();
     assert_eq!(loaded.document_url, doc.document_url);
     assert_eq!(loaded.splits.len(), 2);
     let doc_summaries = loaded.summaries.unwrap();
     assert_eq!(
-        doc_summaries.iter().map(|s| s.summary_id).collect::<Vec<_>>(),
+        doc_summaries
+            .iter()
+            .map(|s| s.summary_id)
+            .collect::<Vec<_>>(),
         doc.summaries
             .as_ref()
             .unwrap()
@@ -474,7 +506,10 @@ fn retrieval_returns_the_document_fully_nested() {
     let doc = build_doc(1, 2, 2, 55);
     shard.insert(&doc).unwrap();
 
-    assert_eq!(shard.doc_id_for_url(&doc.document_url), Some(doc.document_id));
+    assert_eq!(
+        shard.doc_id_for_url(&doc.document_url),
+        Some(doc.document_id)
+    );
     assert!(shard.contains_doc(doc.document_id));
 
     let loaded = shard.get_doc(doc.document_id, true).unwrap().unwrap();
@@ -495,7 +530,10 @@ fn retrieval_returns_the_document_fully_nested() {
     let entry = shard.doc_entry(doc.document_id).unwrap();
     assert_eq!(entry.split_ids.len(), 2);
     assert_eq!(entry.summary_ids.as_ref().unwrap().len(), 4);
-    assert!(entry.extra_summary_ids.is_empty(), "the document list is the union");
+    assert!(
+        entry.extra_summary_ids.is_empty(),
+        "the document list is the union"
+    );
 }
 
 #[test]
@@ -517,7 +555,10 @@ fn compaction_leaves_the_indexes_and_the_snapshot_path_intact() {
     shard.seal_active().unwrap();
     assert!(shard.stats().tombstone_bytes > 0);
 
-    assert!(shard.compact_if_needed(0.1).unwrap(), "half the log is dead");
+    assert!(
+        shard.compact_if_needed(0.1).unwrap(),
+        "half the log is dead"
+    );
     let stats = shard.stats();
     assert_eq!(stats.docs, 20);
     assert_eq!(stats.tombstone_bytes, 0);
@@ -533,7 +574,10 @@ fn compaction_leaves_the_indexes_and_the_snapshot_path_intact() {
 
     let filter: HashSet<u64> = [survivor.document_id].into_iter().collect();
     let filtered = shard.search_splits(&query, 3, Some(&filter)).unwrap();
-    assert_eq!(*filtered.keys().next().unwrap(), survivor.splits[1].split_id);
+    assert_eq!(
+        *filtered.keys().next().unwrap(),
+        survivor.splits[1].split_id
+    );
     assert!(filtered[&survivor.splits[1].split_id] < 1e-2);
 
     // The snapshot compaction takes on the way out is the one the next open reads back.
@@ -542,7 +586,12 @@ fn compaction_leaves_the_indexes_and_the_snapshot_path_intact() {
     assert!(shard.loaded_from_snapshot());
     assert_eq!(shard.stats().docs, 20);
     assert_eq!(
-        *shard.search_splits(&query, 1, None).unwrap().keys().next().unwrap(),
+        *shard
+            .search_splits(&query, 1, None)
+            .unwrap()
+            .keys()
+            .next()
+            .unwrap(),
         survivor.splits[1].split_id
     );
 }

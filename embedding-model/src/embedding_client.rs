@@ -26,8 +26,12 @@ fn main() {
         let msg = request.pack().expect("Failed to pack");
         socket.send(msg, 0).expect("Failed to send");
         let rsp = socket.recv_bytes(0).expect("Failed to receive");
-        let response: EmbeddingsResponse = EmbeddingsResponse::unpack(&rsp).expect("Failed to unpack");
-        println!("Received response dimensions: {:?}", response.embeddings[0].len());
+        let response: EmbeddingsResponse =
+            EmbeddingsResponse::unpack(&rsp).expect("Failed to unpack");
+        println!(
+            "Received response dimensions: {:?}",
+            response.embeddings[0].len()
+        );
         let json = EmbeddingsResponse::to_json(&response);
         println!("Received: {:?}", json);
     }

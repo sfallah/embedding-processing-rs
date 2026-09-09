@@ -4,9 +4,9 @@
 //! failure prints the seed and is replayed by hand.
 
 use embedding_common::prelude::*;
-use embedding_store::prelude::*;
 use embedding_store::maps::Maps;
 use embedding_store::meta_snapshot;
+use embedding_store::prelude::*;
 use tempfile::TempDir;
 
 const N_EMBD: usize = 16;
@@ -69,7 +69,13 @@ enum DocList {
     None,
 }
 
-fn build_doc(doc_id: u64, n_splits: usize, per_split: usize, list: DocList, salt: u64) -> DocumentDto {
+fn build_doc(
+    doc_id: u64,
+    n_splits: usize,
+    per_split: usize,
+    list: DocList,
+    salt: u64,
+) -> DocumentDto {
     let mut splits = Vec::new();
     for seq in 0..n_splits {
         let split_id = doc_id.wrapping_mul(7919).wrapping_add(seq as u64 + 1);
@@ -83,7 +89,11 @@ fn build_doc(doc_id: u64, n_splits: usize, per_split: usize, list: DocList, salt
             &format!("split {} of document {}", seq, doc_id),
             42 + seq,
             summaries,
-            Some(EmbeddingDto::new(split_id, vector(salt + seq as u64), MODEL_ID)),
+            Some(EmbeddingDto::new(
+                split_id,
+                vector(salt + seq as u64),
+                MODEL_ID,
+            )),
             None,
             None,
         ));
@@ -111,7 +121,12 @@ fn build_doc(doc_id: u64, n_splits: usize, per_split: usize, list: DocList, salt
 fn assert_vectors_close(a: &[f32], b: &[f32]) {
     assert_eq!(a.len(), b.len(), "vector lengths differ");
     for (x, y) in a.iter().zip(b.iter()) {
-        assert!((x - y).abs() < 1e-2, "f16 round trip lost too much: {} vs {}", x, y);
+        assert!(
+            (x - y).abs() < 1e-2,
+            "f16 round trip lost too much: {} vs {}",
+            x,
+            y
+        );
     }
 }
 
@@ -230,7 +245,12 @@ fn document_list_that_differs_from_the_union_round_trips() {
     // A document with no list at all stays without one.
     let doc = build_doc(4, 2, 1, DocList::None, 3);
     store.insert(&doc).unwrap();
-    assert!(store.get_doc(4, false).unwrap().unwrap().summaries.is_none());
+    assert!(store
+        .get_doc(4, false)
+        .unwrap()
+        .unwrap()
+        .summaries
+        .is_none());
 }
 
 #[test]
@@ -247,7 +267,12 @@ fn insert_is_rejected_before_anything_is_written() {
 
     // Wrong width.
     let mut doc = build_doc(6, 2, 1, DocList::Union, 1);
-    doc.splits[0].embedding.as_mut().unwrap().embedding.truncate(3);
+    doc.splits[0]
+        .embedding
+        .as_mut()
+        .unwrap()
+        .embedding
+        .truncate(3);
     assert!(store.insert(&doc).is_err());
     assert_eq!(store.doc_count(), 0);
 
@@ -370,7 +395,9 @@ fn a_torn_tail_is_truncated_and_the_partial_insert_disappears() {
     let (doc_ids, segment_path) = {
         let mut store = Store::open(dir.path(), opts()).unwrap();
         for doc_id in 1..=3u64 {
-            store.insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id)).unwrap();
+            store
+                .insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id))
+                .unwrap();
         }
         store.fsync().unwrap();
         (vec![1u64, 2, 3], dir.path().join("records-000000.seg"))
@@ -378,7 +405,10 @@ fn a_torn_tail_is_truncated_and_the_partial_insert_disappears() {
 
     // Cut the last few bytes: the third document's `Doc` record never completes.
     let len = std::fs::metadata(&segment_path).unwrap().len();
-    let file = std::fs::OpenOptions::new().write(true).open(&segment_path).unwrap();
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&segment_path)
+        .unwrap();
     file.set_len(len - 6).unwrap();
     drop(file);
 
@@ -396,7 +426,9 @@ fn a_torn_tail_is_truncated_and_the_partial_insert_disappears() {
     // The segment was truncated, so appends continue from a clean boundary.
     drop(store);
     let mut store = Store::open(dir.path(), opts()).unwrap();
-    store.insert(&build_doc(9, 1, 1, DocList::Union, 9)).unwrap();
+    store
+        .insert(&build_doc(9, 1, 1, DocList::Union, 9))
+        .unwrap();
     drop(store);
     let store = Store::open(dir.path(), opts()).unwrap();
     assert!(store.contains_doc(9));
@@ -411,7 +443,9 @@ fn segments_seal_at_the_size_threshold() {
 
     let mut store = Store::open(dir.path(), options.clone()).unwrap();
     for doc_id in 1..=40u64 {
-        store.insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id)).unwrap();
+        store
+            .insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id))
+            .unwrap();
     }
     assert!(
         !store.manifest().sealed.is_empty(),
@@ -428,7 +462,11 @@ fn segments_seal_at_the_size_threshold() {
 
     let store = Store::open(dir.path(), options).unwrap();
     assert_eq!(store.manifest().sealed.len(), sealed);
-    assert_eq!(store.maps(), &live, "reopening a sealed shard changed the maps");
+    assert_eq!(
+        store.maps(),
+        &live,
+        "reopening a sealed shard changed the maps"
+    );
 }
 
 #[test]
@@ -439,7 +477,9 @@ fn compaction_keeps_every_live_record() {
 
     let mut store = Store::open(dir.path(), options.clone()).unwrap();
     for doc_id in 1..=40u64 {
-        store.insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id)).unwrap();
+        store
+            .insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id))
+            .unwrap();
     }
     // Kill half of them, then force the active segment into the sealed set too.
     for doc_id in (1..=40u64).filter(|d| d % 2 == 0) {
@@ -455,7 +495,11 @@ fn compaction_keeps_every_live_record() {
 
     store.compact().unwrap();
 
-    assert_eq!(store.manifest().sealed.len(), 1, "one segment after compaction");
+    assert_eq!(
+        store.manifest().sealed.len(),
+        1,
+        "one segment after compaction"
+    );
     assert_eq!(store.manifest().tombstone_bytes, 0);
     assert_eq!(store.doc_count(), 20);
 
@@ -491,16 +535,22 @@ fn snapshot_plus_tail_replay_equals_full_replay() {
     let live = {
         let mut store = Store::open(dir.path(), opts()).unwrap();
         for doc_id in 1..=10u64 {
-            store.insert(&build_doc(doc_id, 2, 2, DocList::Union, doc_id)).unwrap();
+            store
+                .insert(&build_doc(doc_id, 2, 2, DocList::Union, doc_id))
+                .unwrap();
         }
         let seq = store.snapshot_meta().unwrap();
         assert!(seq > 0);
         // Work that lands after the snapshot and must come back from the tail.
         for doc_id in 11..=15u64 {
-            store.insert(&build_doc(doc_id, 2, 2, DocList::Union, doc_id)).unwrap();
+            store
+                .insert(&build_doc(doc_id, 2, 2, DocList::Union, doc_id))
+                .unwrap();
         }
         store.delete(3).unwrap();
-        store.insert(&build_doc(4, 1, 1, DocList::None, 400)).unwrap();
+        store
+            .insert(&build_doc(4, 1, 1, DocList::None, 400))
+            .unwrap();
         store.fsync().unwrap();
         store.maps().clone()
     };
@@ -527,7 +577,9 @@ fn a_shard_refuses_a_different_model() {
     let dir = TempDir::new().unwrap();
     {
         let mut store = Store::open(dir.path(), opts()).unwrap();
-        store.insert(&build_doc(1, 1, 1, DocList::Union, 1)).unwrap();
+        store
+            .insert(&build_doc(1, 1, 1, DocList::Union, 1))
+            .unwrap();
     }
     let other = StoreOptions::new(0xDEAD, N_EMBD);
     assert!(Store::open(dir.path(), other).is_err());
@@ -550,25 +602,35 @@ fn a_snapshot_that_outruns_the_log_is_discarded() {
     {
         let mut store = Store::open(dir.path(), opts()).unwrap();
         for doc_id in 1..=5u64 {
-            store.insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id)).unwrap();
+            store
+                .insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id))
+                .unwrap();
         }
         store.snapshot_meta().unwrap();
     }
 
     let segment = dir.path().join("records-000000.seg");
     let len = std::fs::metadata(&segment).unwrap().len();
-    let file = std::fs::OpenOptions::new().write(true).open(&segment).unwrap();
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&segment)
+        .unwrap();
     file.set_len(len - 200).unwrap();
     drop(file);
 
     let mut store = Store::open(dir.path(), opts()).unwrap();
-    assert!(store.doc_count() < 5, "the lost tail must not still be reported");
+    assert!(
+        store.doc_count() < 5,
+        "the lost tail must not still be reported"
+    );
     // Whatever survived is readable, and appending continues from a sound boundary.
     let ids: Vec<u64> = store.maps().docs.keys().copied().collect();
     for doc_id in ids {
         assert!(store.get_doc(doc_id, true).unwrap().is_some());
     }
-    store.insert(&build_doc(99, 1, 1, DocList::Union, 99)).unwrap();
+    store
+        .insert(&build_doc(99, 1, 1, DocList::Union, 99))
+        .unwrap();
     let live = store.maps().clone();
     drop(store);
     let store = Store::open(dir.path(), opts()).unwrap();
@@ -584,10 +646,14 @@ fn dead_bytes_in_the_active_segment_reach_the_compaction_trigger() {
     let mut store = Store::open(dir.path(), opts()).unwrap();
 
     for doc_id in 1..=6u64 {
-        store.insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id)).unwrap();
+        store
+            .insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id))
+            .unwrap();
     }
     for doc_id in 1..=6u64 {
-        store.insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id + 100)).unwrap();
+        store
+            .insert(&build_doc(doc_id, 3, 2, DocList::Union, doc_id + 100))
+            .unwrap();
     }
     assert_eq!(
         store.manifest().tombstone_bytes,
@@ -600,7 +666,10 @@ fn dead_bytes_in_the_active_segment_reach_the_compaction_trigger() {
         store.manifest().tombstone_bytes > 0,
         "sealing must hand the active segment's dead bytes to the compaction accounting"
     );
-    assert!(store.compact_if_needed(0.1).unwrap(), "compaction should trigger");
+    assert!(
+        store.compact_if_needed(0.1).unwrap(),
+        "compaction should trigger"
+    );
 
     assert_eq!(store.doc_count(), 6);
     for doc_id in 1..=6u64 {
@@ -619,7 +688,9 @@ fn corruption_in_the_middle_of_the_log_is_reported_not_truncated() {
     {
         let mut store = Store::open(dir.path(), opts()).unwrap();
         for doc_id in 1..=4u64 {
-            store.insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id)).unwrap();
+            store
+                .insert(&build_doc(doc_id, 2, 1, DocList::Union, doc_id))
+                .unwrap();
         }
         store.fsync().unwrap();
     }
@@ -649,7 +720,9 @@ fn a_shard_refuses_a_different_vector_dtype() {
     let dir = TempDir::new().unwrap();
     {
         let mut store = Store::open(dir.path(), opts()).unwrap();
-        store.insert(&build_doc(1, 1, 1, DocList::Union, 1)).unwrap();
+        store
+            .insert(&build_doc(1, 1, 1, DocList::Union, 1))
+            .unwrap();
     }
     let mut other = opts();
     other.dtype = VectorDtype::F32;
