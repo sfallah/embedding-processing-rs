@@ -137,6 +137,13 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     if let Err(e) = zmq::proxy(&frontend, &backend) {
+        // A signal interrupts the proxy here while the shutdown handler snapshots on its own
+        // thread. Returning would end the process mid-snapshot, so wait for it instead, and do
+        // not call an ordinary shutdown a failure.
+        if e == zmq::Error::EINTR && maintenance::await_shutdown() {
+            info!("shut down on signal");
+            return Ok(());
+        }
         error!("Failed to proxy: {:?}", e);
         return Err(e.into());
     }

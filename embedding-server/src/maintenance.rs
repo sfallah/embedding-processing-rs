@@ -9,6 +9,7 @@
 
 use embedding_common::config::StorageConfig;
 use embedding_store::prelude::ShardPool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -100,6 +101,9 @@ pub fn spawn(pool: Arc<ShardPool>, policy: MaintenancePolicy) -> JoinHandle<()> 
 /// indexes and one that rebuilds them.
 pub fn install_shutdown_handler(pool: Arc<ShardPool>) -> anyhow::Result<()> {
     ctrlc::set_handler(move || {
+        // Claimed before anything else, so the main thread can tell a signal apart from a real
+        // proxy failure and wait rather than exiting out from under this snapshot.
+        SHUTTING_DOWN.store(true, Ordering::SeqCst);
         info!("shutting down: snapshotting every loaded shard");
         match pool.snapshot_all() {
             Ok(n) => info!("snapshotted {} shard(s), exiting", n),
@@ -111,4 +115,54 @@ pub fn install_shutdown_handler(pool: Arc<ShardPool>) -> anyhow::Result<()> {
         std::process::exit(0);
     })?;
     Ok(())
+}
+
+/// Set by the shutdown handler before it starts snapshotting.
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
+/// Whether a shutdown signal has been taken.
+pub fn is_shutting_down() -> bool {
+    SHUTTING_DOWN.load(Ordering::SeqCst)
+}
+
+/// How long the main thread waits for the handler to claim a shutdown. The handler sets the flag
+/// before it does anything else, so this only has to cover the scheduling gap between the signal
+/// interrupting the proxy and the handler thread being run.
+const SHUTDOWN_CLAIM_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// How long it then waits for the snapshot to finish. A large shard's usearch save is measured in
+/// seconds, so this is deliberately generous: it is not a deadline for the snapshot, only a stop
+/// so that a signal which never reaches the handler cannot hang the server forever.
+const SHUTDOWN_EXIT_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// Wait out a shutdown that has interrupted the ZMQ proxy, and say whether there was one.
+///
+/// A signal interrupts [`zmq::proxy`] on the main thread at the same moment the handler starts
+/// snapshotting on its own, and whichever finishes first decides the process's fate. Returning
+/// from `main` there ended the process mid-snapshot and exited non-zero on an ordinary SIGTERM —
+/// the log still held every acknowledged write, but the next start had to replay it, which is the
+/// whole thing the shutdown snapshot exists to avoid.
+///
+/// So the main thread waits here instead. The handler's own `exit(0)` is what normally ends the
+/// process; this returning at all means the handler is stuck, and `true` says to go quietly
+/// anyway because a shutdown was asked for. `false` means the interruption was not a shutdown and
+/// the caller should treat it as the error it is.
+pub fn await_shutdown() -> bool {
+    let claim = Instant::now();
+    while !is_shutting_down() {
+        if claim.elapsed() >= SHUTDOWN_CLAIM_TIMEOUT {
+            return false;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let start = Instant::now();
+    while start.elapsed() < SHUTDOWN_EXIT_TIMEOUT {
+        thread::sleep(Duration::from_millis(50));
+    }
+    warn!(
+        "shutdown handler has not finished after {:?}; exiting without waiting further",
+        SHUTDOWN_EXIT_TIMEOUT
+    );
+    true
 }
