@@ -1,4 +1,4 @@
-//! The manual smoke test from `PLAN-lean-storage.md`, step 3, as a program.
+//! The manual end-to-end smoke test, as a program.
 //!
 //! Drives a running `embedding_server` over its own ZMQ protocol — insert, query in all three
 //! modes, retrieve, delete, re-insert the same url — and checks the answers. It needs the two

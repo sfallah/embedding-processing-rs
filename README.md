@@ -63,7 +63,4 @@ could not be migrated, having migrated the rest.
 
 ## More
 
-`CLAUDE.md` is the working guide to the codebase: architecture, wire protocol, configuration and
-the things that must agree between the three config files. `BENCH.md` holds the storage benchmarks
-and `PLAN-lean-storage.md` the refactoring that produced the current storage layer. Deployment is
-in `.devops/DOCKER.md`.
+Deployment is in `.devops/DOCKER.md`.

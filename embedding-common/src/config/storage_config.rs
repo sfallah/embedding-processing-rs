@@ -8,8 +8,8 @@ use std::time::Duration;
 /// together, and how often the server puts them on the device.
 ///
 /// One shard per workspace sits under [`dir`](Self::dir) as `<dir>/<workspace uuid>/`. The
-/// defaults are the ones `PLAN-lean-storage.md` settles on: raw f16 vectors in a 256 MB segment,
-/// a one-second fsync timer (decision D4), and a budget sized for roughly 750k splits.
+/// defaults are raw f16 vectors in a 256 MB segment, a one-second fsync timer (decision D4), and
+/// a budget sized for roughly 750k splits.
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[allow(unused)]
 #[serde(deny_unknown_fields)]

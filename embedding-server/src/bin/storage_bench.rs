@@ -1,4 +1,4 @@
-//! Storage harness for the lean-storage refactoring (`PLAN-lean-storage.md`, steps 1, 3 and 4).
+//! Storage harness for the lean-storage refactoring.
 //!
 //! Drives the storage layer directly, with no ZMQ and no model backend: a `ShardPool` of
 //! per-workspace shards, fed a corpus and measured on insert, query and restart. Text comes from
@@ -6,9 +6,10 @@
 //! storage and index latency, never retrieval relevance.
 //!
 //! It had a second mode, `--backend rocksdb`, that drove the old RocksDB layer over the same
-//! corpus with the same vectors and the same measurements, which is the only reason the two
-//! builds' rows in `BENCH.md` can be compared. Step 6 deleted that layer and this mode with it;
-//! reproducing a baseline row means checking out the commit before it.
+//! corpus with the same vectors and the same measurements, which is the only reason results from
+//! the two builds can be compared. Deleting the RocksDB layer removed this mode with it;
+//! reproducing a RocksDB baseline means checking out the commit before "refactor: delete the
+//! RocksDB storage layer".
 //!
 //! No tracing subscriber is installed, so the library's `info!` calls are dropped rather than
 //! polluting the measurement.

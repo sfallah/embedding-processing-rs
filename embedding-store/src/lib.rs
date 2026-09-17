@@ -1,4 +1,4 @@
-//! Per-workspace record store for the lean-storage design (`PLAN-lean-storage.md`, step 2).
+//! Per-workspace record store for the lean-storage design.
 //!
 //! One directory per workspace holds an append-only record log split into segments, a manifest,
 //! and derived files that let a restart skip the log. Entities are stored one record each — a
