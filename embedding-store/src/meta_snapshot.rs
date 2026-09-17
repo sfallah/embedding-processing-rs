@@ -1,5 +1,5 @@
 //! `meta.snap`: the three maps in a flat file, so a restart is a snapshot load plus a short tail
-//! replay instead of a full scan of every segment (gap G2).
+//! replay instead of a full scan of every segment.
 //!
 //! Without it the maps could only be rebuilt from the log, which means reading every record —
 //! including every embedding — before the shard can answer anything. At a million splits that is

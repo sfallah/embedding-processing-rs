@@ -1,4 +1,4 @@
-//! Step 3 tests: the shard, its two indexes, and the query read path.
+//! Shard tests: the shard, its two indexes, and the query read path.
 //!
 //! The store's own guarantees are covered by `store_tests.rs`; what matters here is that the
 //! indexes stay in step with the log through inserts, replacements and deletes, that a snapshot
@@ -80,7 +80,7 @@ fn summary(doc_id: u64, split_id: u64, sent_seq: i32, salt: u64) -> SummaryDto {
     )
 }
 
-/// A document whose document-level list is the union of its splits' lists (decision D7).
+/// A document whose document-level list is the union of its splits' lists.
 fn build_doc(doc_id: u64, n_splits: usize, per_split: usize, salt: u64) -> DocumentDto {
     let mut splits = Vec::new();
     for seq in 0..n_splits {

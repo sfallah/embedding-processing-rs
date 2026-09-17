@@ -1,4 +1,4 @@
-//! The `embedding-index` tests, ported to the shard (step 3).
+//! The `embedding-index` tests, ported to the shard.
 //!
 //! What survives the port is what was actually being claimed there and is not claimed elsewhere in
 //! this crate: that the index is built with the parameters the config gives and keeps them when it

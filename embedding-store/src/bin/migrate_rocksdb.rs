@@ -51,10 +51,10 @@ fn main() -> Result<()> {
     let storage = config.storage_config.clone();
     storage.validate()?;
 
-    // Every shard carries the model id in its manifest and refuses a vector from another model
-    // (decision D5). The old rows carry their own model id, so a database written by a different
-    // model than the config names is refused document by document, which is the point: those
-    // vectors are not comparable with the ones the server would produce now.
+    // Every shard carries the model id in its manifest and refuses a vector from another model.
+    // The old rows carry their own model id, so a database written by a different model than the
+    // config names is refused document by document, which is the point: those vectors are not
+    // comparable with the ones the server would produce now.
     let hasher = DeterministicAHasher::default_hasher();
     let model_id = Model::model_id(
         &hasher,

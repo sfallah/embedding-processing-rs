@@ -1,4 +1,4 @@
-//! Step 5 tests: reading a store written by the previous storage layer.
+//! Migration tests: reading a store written by the previous storage layer.
 //!
 //! These build their own RocksDB in the old shape rather than leaning on the `rocksdb_dir/` in
 //! the repo root, which is not checked in. What is worth testing is the part that is not a
@@ -149,7 +149,7 @@ impl Source {
         }
 
         // The old layer kept a document-level summary list as well as the per-split one. The two
-        // name the same summaries here, which is what makes the union in decision D7 visible.
+        // name the same summaries here, which is what makes the store's union of the two visible.
         let mut document = Document::new(&format!("test://doc/{doc_id}"), doc_id);
         document.split_ids = split_ids.clone();
         document.summary_ids = Some(summary_ids.clone());

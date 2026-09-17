@@ -221,7 +221,8 @@ fn token_len(text: &str) -> usize {
 }
 
 /// One document: `passages` become splits, each split gets up to two summaries, and the
-/// document-level summary list is the union of the split lists in split order (decision D7).
+/// document-level summary list is the union of the split lists in split order, the shape
+/// production uses.
 fn build_document(
     hasher: &DeterministicAHasher,
     rng: &mut Rng,

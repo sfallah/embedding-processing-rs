@@ -1,4 +1,4 @@
-//! Step 4: the housekeeping pass the server's timer runs.
+//! Tests for the housekeeping pass the server's timer runs.
 //!
 //! The claim worth testing is not that the functions get called but what the pass buys: after one
 //! snapshot pass a restart loads its indexes instead of rebuilding them, and eviction on the way

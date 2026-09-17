@@ -26,7 +26,7 @@ pub fn process_document_deletion_request(
         }
     };
 
-    // As for retrieval: without the workspace there is no shard to look in (gap G4).
+    // As for retrieval: without the workspace there is no shard to look in.
     let workspace_id = match request.user {
         Some(workspace_id) => workspace_id,
         None => {
@@ -55,7 +55,7 @@ pub fn process_document_deletion_request(
     };
 
     // The log and both indexes go together, so there is one outcome to report rather than the
-    // error-then-success pair the two index deletes used to be able to send (gap G8).
+    // error-then-success pair the two index deletes used to be able to send.
     match shard.delete(request.document_id) {
         Ok(removed) => {
             // A deletion is a record like any other, so it owes the same durability promise.

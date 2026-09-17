@@ -1,7 +1,7 @@
 //! `Store`: the record log plus the maps, one per workspace shard.
 //!
-//! The store owns durability and layout. It knows nothing about vector search: the shard in step 3
-//! wraps it together with the two usearch indexes and a lock.
+//! The store owns durability and layout. It knows nothing about vector search: `Shard` wraps it
+//! together with the two usearch indexes and a lock.
 
 use crate::manifest::{Manifest, SegmentInfo};
 use crate::maps::{DocEntry, Loc, Maps, RemovedDoc, SplitEntry, SummaryEntry};
@@ -28,7 +28,7 @@ pub enum EntityKind {
 
 #[derive(Debug, Clone)]
 pub struct StoreOptions {
-    /// The model every embedding in this shard must come from (decision D5).
+    /// The model every embedding in this shard must come from.
     pub model_id: u64,
     pub n_embd: usize,
     pub dtype: VectorDtype,

@@ -6,8 +6,8 @@
 //! replaces. Sequence numbers are carried over unchanged.
 //!
 //! The rewrite reads only immutable sealed segments, so it could run off the shard's write lock
-//! and take the lock just for the swap (gap G7). It is synchronous here; the shard in step 3 is
-//! the right place to move the read phase off the lock, since it owns the lock.
+//! and take the lock just for the swap. It is synchronous here; the shard is the right place to
+//! move the read phase off the lock, since it owns the lock.
 
 use crate::manifest::SegmentInfo;
 use crate::maps::Loc;

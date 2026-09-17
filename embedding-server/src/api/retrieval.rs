@@ -29,7 +29,7 @@ pub fn process_document_retrieval_request(
     }
 
     // A document lives in exactly one workspace's shard and there is no index from document to
-    // workspace, so the request has to say which one (gap G4, decision D2).
+    // workspace, so the request has to say which one.
     let workspace_id = match request.user {
         Some(workspace_id) => workspace_id,
         None => {

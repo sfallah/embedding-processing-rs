@@ -136,7 +136,7 @@ pub struct Shard {
 ///
 /// A shard nobody is writing to does not need its graphs resident: usearch can answer searches
 /// from the mapped file. `Viewed` is what the pool demotes a cold shard to instead of dropping it,
-/// so its record maps stay and a later read costs nothing (decision D3).
+/// so its record maps stay and a later read costs nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IndexResidency {
     /// Graphs in memory, writable.

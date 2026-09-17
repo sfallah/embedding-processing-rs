@@ -8,8 +8,8 @@ use std::time::Duration;
 /// together, and how often the server puts them on the device.
 ///
 /// One shard per workspace sits under [`dir`](Self::dir) as `<dir>/<workspace uuid>/`. The
-/// defaults are raw f16 vectors in a 256 MB segment, a one-second fsync timer (decision D4), and
-/// a budget sized for roughly 750k splits.
+/// defaults are raw f16 vectors in a 256 MB segment, a one-second fsync timer, and a budget
+/// sized for roughly 750k splits.
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 #[allow(unused)]
 #[serde(deny_unknown_fields)]
@@ -24,7 +24,7 @@ pub struct StorageConfig {
     #[serde(default = "default_memory_budget_mb")]
     pub memory_budget_mb: usize,
     /// How often acknowledged writes are put on the device. `0` means after every write, which
-    /// trades throughput for a window of zero (decision D4).
+    /// trades throughput for a window of zero.
     #[serde(default = "default_fsync_interval_ms")]
     pub fsync_interval_ms: u64,
     /// How often the indexes and the record maps are written out. A crash replays the log from

@@ -48,8 +48,7 @@ fn main() -> Result<(), anyhow::Error> {
     );
 
     // One shard per workspace, each holding its own log and its own two indexes. The model id
-    // goes into every shard's manifest, which is what refuses a shard written by another model
-    // (decision D5).
+    // goes into every shard's manifest, which is what refuses a shard written by another model.
     let mut shard_options = ShardOptions::new(model.model_id, app_config.index_config.clone());
     shard_options.segment_max_bytes = storage_config.segment_max_bytes();
 
@@ -117,7 +116,7 @@ fn main() -> Result<(), anyhow::Error> {
     maintenance::spawn(Arc::clone(&pool), policy);
 
     // With `fsync_interval_ms = 0` there is no timer to sync the log, so a write is synced before
-    // it is acknowledged (decision D4).
+    // it is acknowledged.
     let sync_on_write = policy.fsync_interval.is_none();
     if sync_on_write {
         info!("fsync policy: every write is synced before it is acknowledged");

@@ -3,7 +3,7 @@
 //! A workspace's shard lives at `<dir>/<uuid>/`. [`ShardPool::get`] opens it on first use (or
 //! creates it empty) and hands back an `Arc`; when the loaded shards' index residency exceeds the
 //! budget, the least recently used ones that no caller is holding are snapshotted and demoted —
-//! their graphs are handed back to the page cache and mapped instead (decision D3). A demoted
+//! their graphs are handed back to the page cache and mapped instead. A demoted
 //! shard still answers reads at full speed and keeps its record maps; the first write to it reads
 //! the graphs back in.
 //!

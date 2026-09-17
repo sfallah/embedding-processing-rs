@@ -1,4 +1,4 @@
-//! Step 2 tests: records, replay, sealing, compaction and the meta snapshot.
+//! Store tests: records, replay, sealing, compaction and the meta snapshot.
 //!
 //! Randomised sequences use a hand-rolled generator rather than a proptest dependency, so a
 //! failure prints the seed and is replayed by hand.
@@ -61,7 +61,7 @@ fn summary(doc_id: u64, split_id: u64, sent_seq: i32, salt: u64) -> SummaryDto {
 
 /// How the document-level summary list is built.
 enum DocList {
-    /// Every split summary, in split order — decision D7, the production shape today.
+    /// Every split summary, in split order: the shape production uses today.
     Union,
     /// Only the first summary of each split, so the list is not the union.
     FirstOfEachSplit,
@@ -258,7 +258,7 @@ fn insert_is_rejected_before_anything_is_written() {
     let dir = TempDir::new().unwrap();
     let mut store = Store::open(dir.path(), opts()).unwrap();
 
-    // Wrong model id (decision D5).
+    // Wrong model id: a store refuses vectors from another model.
     let mut doc = build_doc(5, 2, 1, DocList::Union, 1);
     doc.splits[1].embedding.as_mut().unwrap().model_id = 0xBAD;
     assert!(store.insert(&doc).is_err());

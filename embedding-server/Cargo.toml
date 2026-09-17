@@ -14,7 +14,7 @@ serde_repr = { workspace = true }
 chrono = { workspace = true }
 indexmap = { workspace = true }
 zmq = { workspace = true }
-# SIGINT, SIGTERM and SIGHUP, so a shutdown snapshots instead of leaving a tail to replay (D6).
+# SIGINT, SIGTERM and SIGHUP, so a shutdown snapshots instead of leaving a tail to replay.
 ctrlc = { version = "3.5", features = ["termination"] }
 
 embedding-common = { path = "../embedding-common" }

@@ -1,7 +1,7 @@
 //! Reads a store written by the previous storage layer and writes it into per-workspace shards.
 //!
-//! Behind the `rocksdb-migration` feature, which since step 6 is the only place the `rocksdb`
-//! crate remains: `embedding-database` is deleted. It reads the old column families directly,
+//! Behind the `rocksdb-migration` feature, which is now the only place the `rocksdb` crate
+//! remains: `embedding-database` is deleted. It reads the old column families directly,
 //! keeping its own copy of the two things about the old format it needs — the column family names
 //! and the key encoding — which is what let it outlive that crate.
 //!
@@ -59,7 +59,7 @@ pub struct MigrationOptions {
     /// Where the shards go.
     pub destination: PathBuf,
     /// What the destination shards are opened with. Its model id is what refuses vectors from
-    /// another model (decision D5).
+    /// another model.
     pub shard: ShardOptions,
     pub memory_budget_mb: usize,
     /// Read and count everything, write nothing.
@@ -317,7 +317,7 @@ fn read_document(db: &DB, doc_id: u64) -> Result<Option<DocumentDto>> {
     }
 
     // Document-level summaries are a separate list in the old model. The store takes the union of
-    // the two (decision D7), so both are handed over as they are.
+    // the two, so both are handed over as they are.
     let doc_summaries = match doc.summary_ids.as_ref() {
         Some(ids) if !ids.is_empty() => {
             let mut summaries = Vec::with_capacity(ids.len());

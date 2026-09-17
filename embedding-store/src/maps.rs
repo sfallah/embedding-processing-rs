@@ -1,8 +1,8 @@
 //! The in-memory maps: where every live entity's record is, and the membership lists.
 //!
-//! These answer the document filter without a third `embed_id -> doc_id` map (gap G6): split ids
-//! are keys of `splits`, summary ids are keys of `summaries`, and each index only ever returns
-//! ids of its own kind.
+//! These answer the document filter without a third `embed_id -> doc_id` map: split ids are keys
+//! of `splits`, summary ids are keys of `summaries`, and each index only ever returns ids of its
+//! own kind.
 
 use std::collections::HashMap;
 
@@ -24,9 +24,9 @@ pub struct DocEntry {
     /// apart so a `DocumentDto` round-trips exactly.
     pub summary_ids: Option<Vec<u64>>,
     /// Summaries this document owns that are not in its own list, i.e. those that appear only in
-    /// a split's list. Under decision D7 the document list is the union of the split lists and
-    /// this is empty, but the storage does not assume that: a delete has to reach every summary
-    /// the document owns without scanning the whole map or re-reading every split record.
+    /// a split's list. As documents are built today, the document list is the union of the split
+    /// lists and this is empty, but the storage does not assume that: a delete has to reach every
+    /// summary the document owns without scanning the whole map or re-reading every split record.
     pub extra_summary_ids: Vec<u64>,
     pub seq: u64,
     pub loc: Loc,

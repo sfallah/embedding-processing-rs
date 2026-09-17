@@ -386,7 +386,7 @@ fn run(args: &Args) -> anyhow::Result<Report> {
         || "url lookup did not find it".to_string(),
     );
 
-    // Gap G4: without a workspace there is no shard to look in.
+    // Without a workspace there is no shard to look in.
     let (header, _) = call(
         &socket,
         ZmqMessageType::DocumentRetrieval,
@@ -401,7 +401,7 @@ fn run(args: &Args) -> anyhow::Result<Report> {
         ),
     )?;
     report.check(
-        "retrieval without a workspace is refused (G4)",
+        "retrieval without a workspace is refused",
         !succeeded(&header),
         || "it was accepted".to_string(),
     );
@@ -418,7 +418,7 @@ fn run(args: &Args) -> anyhow::Result<Report> {
         ),
     )?;
     report.check(
-        "deletion without a workspace is refused (G4)",
+        "deletion without a workspace is refused",
         !succeeded(&header),
         || "it was accepted".to_string(),
     );
@@ -458,7 +458,7 @@ fn run(args: &Args) -> anyhow::Result<Report> {
         || format!("{} against {}", second.splits.len(), document.splits.len()),
     );
 
-    // Gap G8: the old version's splits used to be left behind in the index.
+    // Re-inserting a url: the old version's splits used to be left behind in the index.
     let response = query(
         &socket,
         &QueryArgs {
@@ -484,7 +484,7 @@ fn run(args: &Args) -> anyhow::Result<Report> {
         .filter(|id| orphan_ids.contains(id))
         .collect();
     report.check(
-        "the replaced version's splits are gone from the index (G8)",
+        "the replaced version's splits are gone from the index",
         still_there.is_empty(),
         || format!("{:?} are still searchable", still_there),
     );

@@ -1,4 +1,4 @@
-//! Step 4: what survives a process that dies without a chance to tidy up.
+//! Crash tests: what survives a process that dies without a chance to tidy up.
 //!
 //! The child half opens a shard, inserts, fsyncs, inserts more, and aborts — no snapshot, no
 //! shutdown handler, no destructors. The parent then reopens the same directory and checks that

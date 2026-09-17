@@ -81,11 +81,11 @@ mod tests {
         // An omitted key falls back to the plan's default rather than to zero.
         let defaults = StorageConfig::default();
         assert_eq!(defaults.dir, "storage");
-        assert_eq!(defaults.fsync_interval_ms, 1000); // decision D4
+        assert_eq!(defaults.fsync_interval_ms, 1000); // a one-second fsync timer by default
         assert_eq!(defaults.segment_max_mb, 256); // the store's own default
         defaults.validate().expect("the defaults are usable");
 
-        // A zero fsync interval is the other half of D4: sync every write, not spin on a timer.
+        // A zero fsync interval is the per-request policy: sync every write, not spin on a timer.
         let per_request = StorageConfig {
             fsync_interval_ms: 0,
             ..StorageConfig::default()

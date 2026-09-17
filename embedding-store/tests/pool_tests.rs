@@ -1,4 +1,4 @@
-//! Step 3 tests: the pool that keeps one shard per workspace under a memory budget.
+//! Pool tests: the pool that keeps one shard per workspace under a memory budget.
 //!
 //! What matters here is what the pool adds on top of a shard: that a workspace maps to exactly
 //! one live `Shard` however many callers ask for it at once, that eviction goes through a
@@ -52,7 +52,8 @@ fn vector(salt: u64) -> Vec<f32> {
     raw
 }
 
-/// A document with `n_splits` splits, one summary each, as decision D7 shapes it.
+/// A document with `n_splits` splits, one summary each, and a document-level list that is the
+/// union of the split lists.
 fn build_doc(doc_id: u64, n_splits: usize) -> DocumentDto {
     let mut splits = Vec::new();
     for seq in 0..n_splits {
