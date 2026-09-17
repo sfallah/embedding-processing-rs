@@ -1606,7 +1606,7 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 [[package]]
 name = "lexrank-ndarray"
 version = "0.1.0"
-source = "git+https://gitlab.com/qimiaio/qimia-ai-dev/lexrank-ndarray.git?branch=main#b10bb0447e5384f491e09b3c19011373b67ef20d"
+source = "git+https://github.com/sfallah/lexrank-ndarray.git?branch=main#b10bb0447e5384f491e09b3c19011373b67ef20d"
 dependencies = [
  "accelerate-src",
  "anyhow",
