@@ -1636,7 +1636,7 @@ checksum = "09edd9e8b54e49e587e4f6295a7d29c3ea94d469cb40ab8ca70b288248a81db2"
 [[package]]
 name = "lexrank-ndarray"
 version = "0.1.0"
-source = "git+https://github.com/sfallah/lexrank-ndarray.git?branch=ndarray_cblas#61e20f5f6e6851dbecccb4823be7af461a4e2176"
+source = "git+https://github.com/sfallah/lexrank-ndarray.git?branch=main#006b2cb676e58d2f5586bca67e6a9a82326cf558"
 dependencies = [
  "accelerate-src",
  "anyhow",

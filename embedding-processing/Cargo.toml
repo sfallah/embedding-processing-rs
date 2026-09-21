@@ -18,7 +18,7 @@ async-channel = {workspace = true}
 fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async_sent" }
 # blas_lexrank_array needs a BLAS linked; the per-platform features below pick one, so a plain
 # `cargo build` works everywhere. Override with -F mkl (or -F blas for a shared OpenBLAS).
-lexrank-ndarray = { git = "https://github.com/sfallah/lexrank-ndarray.git", branch = "ndarray_cblas" }
+lexrank-ndarray = { git = "https://github.com/sfallah/lexrank-ndarray.git", branch = "main" }
 rayon = "1.10.0"
 
 embedding-common = { path = "../embedding-common" }
@@ -26,12 +26,12 @@ rand = "0.9.0"
 
 # Apple's Accelerate: part of macOS, nothing to install or ship.
 [target.'cfg(target_os = "macos")'.dependencies]
-lexrank-ndarray = { git = "https://github.com/sfallah/lexrank-ndarray.git", branch = "ndarray_cblas", features = ["accelerate"] }
+lexrank-ndarray = { git = "https://github.com/sfallah/lexrank-ndarray.git", branch = "main", features = ["accelerate"] }
 
 # OpenBLAS, built from source and linked statically, so the binary carries it and the slim
 # runtime image needs nothing added. The builder image needs a C toolchain and make.
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-lexrank-ndarray = { git = "https://github.com/sfallah/lexrank-ndarray.git", branch = "ndarray_cblas", features = ["blas-static"] }
+lexrank-ndarray = { git = "https://github.com/sfallah/lexrank-ndarray.git", branch = "main", features = ["blas-static"] }
 
 [dev-dependencies]
 rstest = {workspace = true}
