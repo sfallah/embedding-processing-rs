@@ -72,6 +72,11 @@ RUN cargo build --release --bin embedding_server \
 
 COPY ./.devops/starter.sh /usr/src/app/starter.sh
 
+# Splits already run in parallel through rayon; a threaded BLAS on top of that loses time on
+# matrices this small (a chunk is at most a few dozen sentences). The server's OpenBLAS comes
+# from lexrank-ndarray's blas-static feature and is linked into the binary.
+ENV OPENBLAS_NUM_THREADS=1
+
 RUN chmod +x /usr/src/app/starter.sh
 
 EXPOSE 5556

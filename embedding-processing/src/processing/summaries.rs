@@ -22,7 +22,7 @@ pub fn process_summaries(
         return Ok(Vec::new());
     }
 
-    let lx_ranks = lexrank_sentences(embeddings.to_vec(), sentences.len(), ctx.n_embd, None, None)?;
+    let lx_ranks = lexrank_sentences(embeddings, sentences.len(), ctx.n_embd, None, None)?;
 
     let summaries: Vec<_> = lx_ranks
         .into_iter()
@@ -78,15 +78,23 @@ fn filter_splits(splits: &Vec<SplitResultLite>, ln: usize) -> Vec<SplitResultLit
         .collect()
 }
 
+/// LexRank over one split's sentence embeddings, through the CBLAS pipeline.
+///
+/// `blas_lexrank_array` takes the embeddings as a slice and reads them in place, while
+/// `lexrank_array` (ndarray) needs an owned `Vec` and copies it again internally. On the
+/// benchmarks it runs this batch about twice as fast: 0.196 vs 0.386 ms on an M3 Max, 0.336 vs
+/// 0.782 ms on a Kaby Lake laptop, 0.348 vs 0.586 ms on a DGX Spark, with 4 threads and one BLAS
+/// thread. Give the BLAS one thread (`OPENBLAS_NUM_THREADS=1`): splits already run in parallel,
+/// and a threaded BLAS on top of that costs more than it gains on matrices this small.
 fn lexrank_sentences(
-    embeddings: Vec<f32>,
+    embeddings: &[f32],
     len: usize,
     n_embd: usize,
     threshold: Option<f32>,
     max_iter: Option<usize>,
 ) -> anyhow::Result<Vec<(usize, f32)>> {
-    lexrank_ndarray::lexrank_array(
-        &embeddings,
+    lexrank_ndarray::cblas_impl::blas_lexrank_array(
+        embeddings,
         len,
         n_embd,
         threshold,
