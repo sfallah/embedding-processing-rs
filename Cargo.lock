@@ -1036,7 +1036,7 @@ dependencies = [
 [[package]]
 name = "fast-text-splitter"
 version = "0.1.0"
-source = "git+https://github.com/sfallah/fast-text-splitter.git?branch=feat%2Fmerge_level_async_sent#8ddcacf0ad4c4bb923ee0aa1b50f16da80a14adf"
+source = "git+https://github.com/sfallah/fast-text-splitter.git?branch=feat%2Fmerge_level_async_sent#9d67e725f4ff767fb13337f43529c55eb58af881"
 dependencies = [
  "aho-corasick",
  "anyhow",
