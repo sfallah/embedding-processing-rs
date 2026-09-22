@@ -15,7 +15,7 @@ zmq = {workspace = true}
 async-channel = {workspace = true}
 
 
-fast-text-splitter = { git = "https://gitlab.com/qimiaio/qimia-ai-dev/fast-text-splitter.git", branch = "feat/merge_level_async_sent" }
+fast-text-splitter = { git = "https://github.com/sfallah/fast-text-splitter.git", branch = "feat/merge_level_async_sent" }
 # blas_lexrank_array needs a BLAS linked; the per-platform features below pick one, so a plain
 # `cargo build` works everywhere. Override with -F blas to link a shared system OpenBLAS.
 lexrank-ndarray = { git = "https://github.com/sfallah/lexrank-ndarray.git", branch = "main" }
