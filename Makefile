@@ -8,7 +8,7 @@ build:
 release:
 	cargo build --release
 
-# `cuda` and `metal` exist only on the two model crates; they forward to llama-cpp, whose build
+# `cuda` and `metal` exist only on the two model crates; they forward to qllama, whose build
 # script compiles vendored llama.cpp from source, so the first build of these is slow.
 release_metal:
 	cargo build --release -F metal -p embedding-model -p reranking-model

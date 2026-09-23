@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-llama-cpp = { workspace = true }
+qllama = { workspace = true }
 anyhow = {workspace = true}
 clap = { version = "4.5.28", features = ["derive"] }
 tracing = "0.1.41"
@@ -18,8 +18,8 @@ rand = "0.9.0"
 
 [features]
 default = []
-cuda = [ "llama-cpp/cuda"]
-metal = ["llama-cpp/metal"]
+cuda = ["qllama/cuda"]
+metal = ["qllama/metal"]
 
 [[bin]]
 name = "model_cli"

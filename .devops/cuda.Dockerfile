@@ -30,7 +30,7 @@ RUN git config --global url."https://${GITLAB_USER}:${GITLAB_TOKEN}@gitlab.com/"
 ARG CUDA_DOCKER_ARCH=default
 ARG LLAMA_CPP_VERSION=b4570
 
-# Building llama.cpp here is very likely dead weight: the `llama-cpp` crate vendors llama.cpp and
+# Building llama.cpp here is very likely dead weight: the `qllama` crate vendors llama.cpp and
 # compiles it from source itself, and its build script does not read LLAMA_PATH or LD_LIBRARY_PATH.
 # Left in place because no CUDA machine was available to verify the image without it. Removing this
 # stage would roughly halve the image build; check first that the crate's build script gets

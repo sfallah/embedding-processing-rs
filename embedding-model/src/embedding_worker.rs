@@ -7,13 +7,13 @@ use embedding_common::prelude::{
     DeterministicAHasher, EmbeddingsRequest, EmbeddingsResponse, Model, Serde,
 };
 use embedding_common::utils::tracting::setup_tracing;
-use llama_cpp::context::params::LlamaContextParams;
-use llama_cpp::context::LlamaContext;
-use llama_cpp::ggml_time_us;
-use llama_cpp::llama_backend::LlamaBackend;
-use llama_cpp::llama_batch::LlamaBatch;
-use llama_cpp::model::params::LlamaModelParams;
-use llama_cpp::model::{AddBos, LlamaModel};
+use qllama::context::params::LlamaContextParams;
+use qllama::context::LlamaContext;
+use qllama::ggml_time_us;
+use qllama::llama_backend::LlamaBackend;
+use qllama::llama_batch::LlamaBatch;
+use qllama::model::params::LlamaModelParams;
+use qllama::model::{AddBos, LlamaModel};
 use std::num::NonZero;
 use std::path::PathBuf;
 use tracing::{debug, error, info, warn};
@@ -92,7 +92,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let mut batch = LlamaBatch::new(n_ctx as usize, 0, 1);
+    let mut batch = LlamaBatch::new(n_ctx as usize, 1);
 
     //  Prepare our context and socket
     let context = zmq::Context::new();

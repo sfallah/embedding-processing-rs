@@ -21,7 +21,7 @@ cargo build -r -F cuda  -p embedding-model -p reranking-model         # NVIDIA
 ```
 
 `cuda` and `metal` exist only on the two model crates; the server does not link llama.cpp. The
-`llama-cpp` crate builds vendored llama.cpp from source with CMake, so a C/C++ toolchain and
+`qllama` crate builds vendored llama.cpp from source with CMake, so a C/C++ toolchain and
 `cmake` are required and the first build is slow. Its output is thousands of lines: send it to a
 file rather than to the terminal.
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-llama-cpp = { workspace = true }
+qllama = { workspace = true }
 anyhow = "1.0.95"
 clap = { version = "4.5.28", features = ["derive"] }
 tracing = "0.1.41"
@@ -27,8 +27,8 @@ harness = false
 
 [features]
 default = []
-cuda = [ "llama-cpp/cuda"]
-metal = ["llama-cpp/metal"]
+cuda = ["qllama/cuda"]
+metal = ["qllama/metal"]
 
 [[bin]]
 name = "reranking_cli"

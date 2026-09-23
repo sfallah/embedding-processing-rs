@@ -7,12 +7,12 @@ use embedding_common::prelude::{
 };
 use embedding_common::utils::tracting::setup_tracing;
 use indexmap::IndexMap;
-use llama_cpp::context::params::{LlamaContextParams, LlamaPoolingType};
-use llama_cpp::context::LlamaContext;
-use llama_cpp::llama_backend::LlamaBackend;
-use llama_cpp::llama_batch::LlamaBatch;
-use llama_cpp::model::params::LlamaModelParams;
-use llama_cpp::model::{AddBos, LlamaModel};
+use qllama::context::params::{LlamaContextParams, LlamaPoolingType};
+use qllama::context::LlamaContext;
+use qllama::llama_backend::LlamaBackend;
+use qllama::llama_batch::LlamaBatch;
+use qllama::model::params::LlamaModelParams;
+use qllama::model::{AddBos, LlamaModel};
 use reranking_model::model_backend_config::ModelAppConfig;
 use std::num::NonZero;
 use std::path::PathBuf;
@@ -96,7 +96,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let mut batch = LlamaBatch::new(n_ctx as usize, 0, 1);
+    let mut batch = LlamaBatch::new(n_ctx as usize, 1);
 
     //  Prepare our context and socket
     let context = zmq::Context::new();
