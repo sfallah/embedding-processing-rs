@@ -2333,7 +2333,7 @@ dependencies = [
 [[package]]
 name = "qllama"
 version = "0.1.0"
-source = "git+https://github.com/sfallah/qllama-rs.git?branch=main#d604d1be991817060d14d9bf5ab1f6bc2ecdb73d"
+source = "git+https://github.com/sfallah/qllama-rs.git?branch=main#9f6f7bc15622c195b4a8198a6a0a6d85158d4e7b"
 dependencies = [
  "anyhow",
  "encoding_rs",
@@ -2347,7 +2347,7 @@ dependencies = [
 [[package]]
 name = "qllama-sys"
 version = "0.1.0"
-source = "git+https://github.com/sfallah/qllama-rs.git?branch=main#d604d1be991817060d14d9bf5ab1f6bc2ecdb73d"
+source = "git+https://github.com/sfallah/qllama-rs.git?branch=main#9f6f7bc15622c195b4a8198a6a0a6d85158d4e7b"
 dependencies = [
  "bindgen",
  "cc",
@@ -3664,7 +3664,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
